@@ -1,0 +1,66 @@
+# SalonOS - Ignore Python, Docker, and data artifacts
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+env/
+.venv/
+.env/
+
+# Editor directories and files
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+
+# Python egg files
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Test output/coverage
+htmlcov/
+.tox/
+.coverage
+.cache
+.noseids
+
+# Log files
+*.log
+logs/
+backend/logs/
+salon-data/logs/
+
+# Local environment variable files
+.env
+*.env
+
+# Database and backup data
+salon-data/
+salon-data/postgres/
+salon-data/redis/
+salon-data/backups/
+
+# Docker
+*.pid
+*.pid.lock
+
+# Nginx generated files or logs (if any)
+nginx/*.log
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Output files
+*.out
+
+# Node/npm (if in future frontend)
+node_modules/
+

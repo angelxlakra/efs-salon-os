@@ -1,0 +1,120 @@
+name: efs-salon-os
+
+networks:
+  salon_internal:
+    driver: bridge
+    internal: false
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: salon-postgres
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-salon_db}
+      - POSTGRES_USER=${POSTGRES_USER:-salon_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-change_me_123}
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    volumes:
+      - ./salon-data/postgres:/var/lib/postgresql/data
+    networks:
+      - salon_internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U salon_user -d salon_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: salon-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - ./salon-data/redis:/data
+    networks:
+      - salon_internal
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: salon-api
+    environment:
+      - DATABASE_URL=postgresql://salon_user:change_me_123@postgres:5432/salon_db
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=${SECRET_KEY:-change_me_please}
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+    volumes:
+      - ./backend:/app
+      - ./salon-data/logs:/app/logs
+    networks:
+      - salon_internal
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: salon-worker
+    command: python -m app.worker
+    environment:
+      - DATABASE_URL=postgresql://salon_user:change_me_123@postgres:5432/salon_db
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=${SECRET_KEY:-change_me_please}
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+    volumes:
+      - ./backend:/app
+      - ./salon-data/backups:/backups
+      - ./salon-data/logs:/app/logs
+    networks:
+      - salon_internal
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    container_name: salon-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - salon_internal
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost/healthz",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
