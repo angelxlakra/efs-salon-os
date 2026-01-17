@@ -9,7 +9,7 @@ dependencies = [
     "sqlalchemy==2.0.23",
     "alembic==1.12.1",
     "psycopg[binary]>=3.1.0",
-    "pydantic==2.5.0",
+    "pydantic[email]==2.5.0",
     "pydantic-settings==2.1.0",
     "python-jose[cryptography]==3.3.0",
     "passlib==1.7.4",
@@ -48,3 +48,8 @@ line-length = 100
 target-version = "py311"
 select = ["E", "F", "I"]
 ignore = ["E501"]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.25.1",
+]
