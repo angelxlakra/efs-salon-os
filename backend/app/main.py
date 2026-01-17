@@ -15,6 +15,7 @@ from app.auth.router import router as auth_router
 from app.api.pos import router as pos_router
 from app.api.catalog import router as catalog_router
 from app.api.customers import router as customers_router
+from app.api.cash_drawer import router as cash_drawer_router
 
 # Initialize FastAPI application
 app = FastAPI(
@@ -37,6 +38,7 @@ app.include_router(auth_router, prefix="/api", tags=["Authentication"])
 app.include_router(pos_router, prefix="/api", tags=["POS"])
 app.include_router(catalog_router, prefix="/api", tags=["Catalog"])
 app.include_router(customers_router, prefix="/api", tags=["Customers"])
+app.include_router(cash_drawer_router, prefix="/api", tags=["Cash Drawer"])
 
 
 @app.get("/healthz")
