@@ -14,6 +14,7 @@ from app.config import settings
 from app.auth.router import router as auth_router
 from app.api.pos import router as pos_router
 from app.api.catalog import router as catalog_router
+from app.api.customers import router as customers_router
 
 # Initialize FastAPI application
 app = FastAPI(
@@ -35,6 +36,7 @@ app.add_middleware(
 app.include_router(auth_router, prefix="/api", tags=["Authentication"])
 app.include_router(pos_router, prefix="/api", tags=["POS"])
 app.include_router(catalog_router, prefix="/api", tags=["Catalog"])
+app.include_router(customers_router, prefix="/api", tags=["Customers"])
 
 
 @app.get("/healthz")
