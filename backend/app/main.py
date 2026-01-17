@@ -9,6 +9,12 @@ dependencies, ensuring fast performance and data privacy for salon operations.
 """
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from app.config import settings
+from app.auth.router import router as auth_router
+from app.api.pos import router as pos_router
+from app.api.catalog import router as catalog_router
+from app.api.customers import router as customers_router
 
 # Initialize FastAPI application
 app = FastAPI(
@@ -16,6 +22,21 @@ app = FastAPI(
     version="0.1.0",
     description="Local-first salon management system for POS, scheduling, inventory, and accounting",
 )
+
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Include routers
+app.include_router(auth_router, prefix="/api", tags=["Authentication"])
+app.include_router(pos_router, prefix="/api", tags=["POS"])
+app.include_router(catalog_router, prefix="/api", tags=["Catalog"])
+app.include_router(customers_router, prefix="/api", tags=["Customers"])
 
 
 @app.get("/healthz")
