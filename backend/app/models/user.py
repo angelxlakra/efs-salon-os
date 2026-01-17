@@ -50,6 +50,7 @@ class User(Base, ULIDMixin, TimestampMixin, SoftDeleteMixin):
     username = Column(String, nullable=False, unique=True, index=True)
     email = Column(String, unique=True)
     password_hash = Column(String, nullable=False)
+    password_history = Column(ARRAY(String), default=list)  # Store last N password hashes
     full_name = Column(String, nullable=False)
     phone = Column(String)  # Encrypted in production
     is_active = Column(Boolean, nullable=False, default=True)

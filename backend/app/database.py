@@ -1,7 +1,20 @@
-from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+"""
+Database configuration and session management for the salon service app.
+
+This module sets up the SQLAlchemy engine, session factory, and declarative base
+used throughout the application for ORM models.
+
+Exports:
+    - engine: The SQLAlchemy engine connected to the configured database.
+    - SessionLocal: The session factory for creating new database sessions.
+    - Base: The declarative base class for ORM models.
+    - get_db: Dependency function for acquiring and releasing DB sessions in FastAPI endpoints.
+"""
+
+
 import os
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, declarative_base
 
 # Get database URL from environment
 DATABASE_URL = os.getenv(

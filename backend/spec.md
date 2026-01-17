@@ -1,934 +1,851 @@
-# Spec 3: Authentication & Authorization System
+# Spec 4: POS & Billing Module
 
 ## Purpose
-Implement secure JWT-based authentication with role-based access control (RBAC) for Owner, Receptionist, and Staff roles with specific permission boundaries.
+Implement the complete Point of Sale (POS) system for creating bills, applying discounts, recording payments, generating receipts, and handling refunds.
 
 ## Scope
-- User login/logout with JWT tokens
-- Role-based permissions
-- Session management with device binding for reception terminal
-- Password hashing and security
-- Privacy controls for staff users
-- Audit logging for authentication events
+- Cart-based billing flow
+- Bill-level discounts with audit logging
+- Manual payment confirmation (cash/UPI/card/other)
+- Invoice number generation (SAL-YY-NNNN)
+- GST calculation (CGST/SGST split)
+- 80mm receipt printing via browser
+- Receipt send via email/WhatsApp (Phase 1: print only)
+- Refund processing
+- Idempotency for bill creation
 
-## Security Requirements
+## Business Rules
 
-### Password Policy
-- Minimum 8 characters
-- Must contain: uppercase, lowercase, number
-- Bcrypt hashing with cost factor 12
-- No password reuse (last 3 passwords)
+### Pricing & Tax
+- All catalog prices are **tax-inclusive**
+- GST Rate: 18% (9% CGST + 9% SGST)
+- Tax calculation: `tax = (price * 18) / 118`
+- Rounding: Round final total to nearest ₹1
 
-### Token Strategy
-- **Access Token**: Short-lived (15 minutes), JWT
-- **Refresh Token**: Long-lived (7 days), stored in Redis
-- **Device Binding**: Reception terminal gets persistent session
-- **Rotation**: Refresh tokens rotate on use
+### Discounts
+- **Bill-level only** (no line-item discounts in Phase 1)
+- Discount applied after subtotal, before tax calculation
+- Must log: user_id, device_id, timestamp, amount, optional reason
+- Receptionist can apply up to ₹500 without approval
+- Owner can apply any amount
 
-### Session Management
-- Redis-backed session store
-- Automatic cleanup of expired sessions
-- Device fingerprinting for reception terminal
-- Manual logout clears all tokens
+### Invoice Numbering
+- Format: `SAL-YY-NNNN`
+- Example: `SAL-25-0001`, `SAL-25-0002`
+- Resets annually on fiscal year (April 1st)
+- Sequential, no gaps allowed
+- Generated server-side, atomic
 
-## Role Permissions Matrix
+### Payment Flow
+1. Create bill (status: draft)
+2. Add payments (manual confirmation)
+3. When payments sum >= total: mark bill as posted
+4. Generate invoice number on posting
+5. Print/send receipt
 
-### Owner Role
-```json
-{
-  "billing": {
-    "create": true,
-    "read": true,
-    "update": true,
-    "refund": true,
-    "discount": true,
-    "view_totals": true
-  },
-  "appointments": {
-    "create": true,
-    "read": true,
-    "update": true,
-    "delete": true,
-    "assign_staff": true
-  },
-  "inventory": {
-    "create": true,
-    "read": true,
-    "update": true,
-    "approve_changes": true,
-    "view_costs": true
-  },
-  "accounting": {
-    "view_dashboard": true,
-    "view_profit": true,
-    "export_reports": true,
-    "access_tax_reports": true
-  },
-  "staff": {
-    "create": true,
-    "read": true,
-    "update": true,
-    "delete": true
-  },
-  "settings": {
-    "read": true,
-    "update": true
-  }
-}
+### Refunds
+- Can only refund posted bills
+- Creates negative bill linking to original
+- Refund appears in "Adjustments" section of reports
+- Does not modify original bill's posted amounts
+- Full refund only in Phase 1
+
+## Data Flow
+
 ```
-
-### Receptionist Role
-```json
-{
-  "billing": {
-    "create": true,
-    "read": true,
-    "update": false,
-    "refund": false,
-    "discount": true,
-    "view_totals": true
-  },
-  "appointments": {
-    "create": true,
-    "read": true,
-    "update": true,
-    "delete": false,
-    "assign_staff": true
-  },
-  "inventory": {
-    "create": false,
-    "read": true,
-    "update": false,
-    "request_changes": true,
-    "view_costs": false
-  },
-  "accounting": {
-    "view_dashboard": true,
-    "view_profit": false,
-    "open_close_drawer": true
-  },
-  "staff": {
-    "read": true
-  }
-}
-```
-
-### Staff Role
-```json
-{
-  "schedule": {
-    "view_own": true,
-    "view_all": true,
-    "view_customer_name": "first_name_only",
-    "view_phone": false
-  },
-  "services": {
-    "mark_complete": true,
-    "add_notes": true,
-    "edit_notes_window_minutes": 15
-  },
-  "billing": {
-    "view_totals": false
-  }
-}
+Cart (Frontend State)
+    ↓
+POST /api/pos/bills (Create Bill - draft)
+    ↓
+Bill Record Created (status: draft)
+    ↓
+POST /api/pos/bills/:id/payments (Record Payment)
+    ↓
+Payments Sum >= Total? → Update status to 'posted'
+    ↓
+Generate Invoice Number (atomic)
+    ↓
+Emit Event: bill.posted
+    ↓
+GET /api/pos/bills/:id/receipt → Render 80mm receipt → Print
 ```
 
 ## API Endpoints
 
-### POST /api/auth/login
-**Purpose**: Authenticate user and issue tokens
+### POST /api/pos/bills
+**Purpose**: Create a new bill (draft status)
+
+**Auth**: Receptionist or Owner
 
 **Request Body**:
 ```json
 {
-  "username": "string",
-  "password": "string",
-  "device_id": "string (optional, for reception terminal)"
+  "items": [
+    {
+      "service_id": "01HXXX...",
+      "staff_id": "01HYYY...",  // optional
+      "appointment_id": "01HZZZ...",  // optional, links to appointment
+      "walkin_id": "01HAAA...",  // optional, links to walkin
+      "quantity": 1,
+      "notes": "Extra conditioning treatment"  // optional
+    }
+  ],
+  "customer_id": "01HBBB...",  // optional
+  "customer_name": "John Doe",  // required if no customer_id
+  "customer_phone": "9876543210",  // required if no customer_id
+  "discount_amount": 50,  // optional, in rupees
+  "discount_reason": "Regular customer discount"  // optional
 }
 ```
-
-**Response (200)**:
-```json
-{
-  "access_token": "eyJhbGc...",
-  "refresh_token": "eyJhbGc...",
-  "token_type": "Bearer",
-  "expires_in": 900,
-  "user": {
-    "id": "01HXXX...",
-    "username": "owner",
-    "full_name": "Salon Owner",
-    "role": "owner",
-    "permissions": { /* full permissions object */ }
-  }
-}
-```
-
-**Error Responses**:
-- 401: Invalid credentials
-- 403: Account disabled
-- 429: Too many attempts (rate limited)
-
-**Security Measures**:
-- Rate limiting: 5 attempts per minute per IP
-- Account lockout: 10 failed attempts locks for 15 minutes
-- Audit log: All login attempts logged
-
-### POST /api/auth/refresh
-**Purpose**: Get new access token using refresh token
-
-**Request Body**:
-```json
-{
-  "refresh_token": "string"
-}
-```
-
-**Response (200)**:
-```json
-{
-  "access_token": "eyJhbGc...",
-  "refresh_token": "eyJhbGc...",  // New rotated token
-  "expires_in": 900
-}
-```
-
-**Error Responses**:
-- 401: Invalid or expired refresh token
-- 403: Token revoked or user disabled
-
-### POST /api/auth/logout
-**Purpose**: Invalidate tokens and end session
 
 **Headers**:
 ```
-Authorization: Bearer {access_token}
+Authorization: Bearer {token}
+Idempotency-Key: {unique_key}  // Prevents duplicate bills
 ```
+
+**Response (201)**:
+```json
+{
+  "id": "01HXXX...",
+  "status": "draft",
+  "subtotal": 1500,  // paise
+  "discount_amount": 5000,  // paise (₹50)
+  "tax_amount": 22966,  // paise (calculated)
+  "cgst_amount": 11483,
+  "sgst_amount": 11483,
+  "total_amount": 147034,  // paise
+  "rounded_total": 147000,  // paise (₹1470)
+  "rounding_adjustment": -34,
+  "items": [
+    {
+      "id": "01HYYY...",
+      "service_name": "Haircut + Styling",
+      "base_price": 75000,  // paise
+      "quantity": 1,
+      "line_total": 75000,
+      "staff_name": "Sarah"
+    },
+    {
+      "id": "01HZZZ...",
+      "service_name": "Hair Color",
+      "base_price": 80000,
+      "quantity": 1,
+      "line_total": 80000,
+      "staff_name": "Mike"
+    }
+  ],
+  "created_at": "2025-10-15T10:30:00+05:30",
+  "created_by": "receptionist1"
+}
+```
+
+**Validation**:
+- At least one item required
+- All service_ids must exist
+- Discount cannot exceed subtotal
+- If discount > ₹500 and user is receptionist, return 403
+- Customer name and phone required if no customer_id
+
+**Idempotency**:
+- If same Idempotency-Key sent twice, return existing bill (200)
+- Keys expire after 24 hours
+
+### POST /api/pos/bills/:id/payments
+**Purpose**: Record payment for a bill
+
+**Auth**: Receptionist or Owner
 
 **Request Body**:
 ```json
 {
-  "refresh_token": "string (optional)",
-  "logout_all_devices": false
+  "method": "cash",  // enum: cash, upi, card, other
+  "amount": 1470.00,  // rupees (will convert to paise)
+  "reference_number": "UPI123456",  // optional
+  "notes": "Paid via PhonePe"  // optional
 }
 ```
 
 **Response (200)**:
 ```json
 {
-  "message": "Logged out successfully"
+  "payment_id": "01HXXX...",
+  "bill_id": "01HYYY...",
+  "method": "cash",
+  "amount": 147000,  // paise
+  "confirmed_at": "2025-10-15T10:32:00+05:30",
+  "confirmed_by": "receptionist1",
+  "bill_status": "posted",  // Updated if payments sum >= total
+  "invoice_number": "SAL-25-0042"  // Generated on posting
 }
 ```
 
 **Behavior**:
-- Removes refresh token from Redis
-- Adds access token to blacklist (until expiry)
-- If `logout_all_devices=true`, removes all user sessions
+- Can record multiple payments (split payments)
+- When sum of payments >= bill total:
+  - Update bill status to 'posted'
+  - Generate invoice number atomically
+  - Emit `bill.posted` event
+  - Update customer.total_spent if customer_id exists
 
-### GET /api/auth/me
-**Purpose**: Get current user information
+**Validation**:
+- Bill must be in 'draft' status
+- Payment amount > 0
+- Cannot overpay (sum of payments must not exceed total + ₹10 tolerance)
 
-**Headers**:
-```
-Authorization: Bearer {access_token}
-```
+### GET /api/pos/bills/:id
+**Purpose**: Get bill details
+
+**Auth**: Receptionist or Owner
 
 **Response (200)**:
 ```json
 {
   "id": "01HXXX...",
-  "username": "receptionist1",
-  "full_name": "John Doe",
-  "email": "john@salon.local",
-  "role": "receptionist",
-  "permissions": { /* permissions object */ },
-  "last_login_at": "2025-10-15T10:30:00+05:30",
-  "is_active": true
+  "invoice_number": "SAL-25-0042",
+  "status": "posted",
+  "customer": {
+    "id": "01HBBB...",
+    "name": "John Doe",
+    "phone": "9876543210"
+  },
+  "subtotal": 155000,
+  "discount_amount": 5000,
+  "tax_amount": 22966,
+  "cgst_amount": 11483,
+  "sgst_amount": 11483,
+  "total_amount": 147034,
+  "rounded_total": 147000,
+  "rounding_adjustment": -34,
+  "items": [ /* bill items */ ],
+  "payments": [
+    {
+      "id": "01HYYY...",
+      "method": "cash",
+      "amount": 100000,
+      "confirmed_at": "2025-10-15T10:32:00+05:30"
+    },
+    {
+      "id": "01HZZZ...",
+      "method": "upi",
+      "amount": 47000,
+      "confirmed_at": "2025-10-15T10:32:30+05:30"
+    }
+  ],
+  "posted_at": "2025-10-15T10:32:30+05:30",
+  "created_at": "2025-10-15T10:30:00+05:30",
+  "created_by": {
+    "id": "01HAAA...",
+    "username": "receptionist1",
+    "full_name": "Jane Smith"
+  }
 }
 ```
 
-### POST /api/auth/change-password
-**Purpose**: Change user's password
+### GET /api/pos/bills/:id/receipt
+**Purpose**: Get receipt HTML for printing
 
-**Headers**:
+**Auth**: Receptionist or Owner
+
+**Query Params**:
+- `format=html` (default) or `format=json`
+
+**Response (200) - HTML**:
+Returns 80mm-width HTML receipt ready for printing via `window.print()`
+
+**Response (200) - JSON**:
+```json
+{
+  "salon_name": "Unisex Beauty Salon",
+  "address": "123 Main St, City, State",
+  "gstin": "29XXXXX1234X1ZX",
+  "invoice_number": "SAL-25-0042",
+  "date": "15 Oct 2025",
+  "time": "10:32 AM",
+  "customer_name": "John Doe",
+  "items": [
+    {
+      "name": "Haircut + Styling",
+      "staff": "Sarah",
+      "amount": "₹750.00"
+    }
+  ],
+  "subtotal": "₹1,550.00",
+  "discount": "₹50.00",
+  "cgst": "₹114.83",
+  "sgst": "₹114.83",
+  "total": "₹1,470.00",
+  "payment_method": "Cash, UPI",
+  "footer_message": "Thank you for visiting!"
+}
 ```
-Authorization: Bearer {access_token}
-```
+
+### POST /api/pos/bills/:id/refund
+**Purpose**: Create refund for a posted bill
+
+**Auth**: Owner only
 
 **Request Body**:
 ```json
 {
-  "current_password": "string",
-  "new_password": "string"
+  "reason": "Customer dissatisfaction",  // required
+  "notes": "Issue with hair color result"  // optional
 }
 ```
 
 **Response (200)**:
 ```json
 {
-  "message": "Password changed successfully"
+  "refund_bill_id": "01HXXX...",
+  "original_bill_id": "01HYYY...",
+  "original_invoice_number": "SAL-25-0042",
+  "refund_invoice_number": "SAL-25-0043",
+  "refund_amount": 147000,  // paise
+  "status": "refunded",
+  "refunded_at": "2025-10-15T15:30:00+05:30"
 }
 ```
+
+**Behavior**:
+- Creates new bill with negative amounts
+- Links to original bill via `original_bill_id`
+- Original bill status → 'refunded'
+- Emits `bill.refunded` event
+- Updates customer.total_spent (subtract refund amount)
 
 **Validation**:
-- Current password must be correct
-- New password must meet policy requirements
-- Cannot reuse last 3 passwords
+- Bill must be 'posted' status
+- Cannot refund already refunded bills
+- Only owner can refund
 
-## Implementation
+### GET /api/pos/bills
+**Purpose**: List bills with filters
 
-### Backend Structure
+**Auth**: Receptionist or Owner
 
-```
-backend/app/
-├── auth/
-│   ├── __init__.py
-│   ├── dependencies.py      # FastAPI dependencies
-│   ├── jwt.py               # JWT token handling
-│   ├── password.py          # Password hashing/verification
-│   ├── permissions.py       # Permission checking
-│   └── router.py            # Auth endpoints
-├── middleware/
-│   ├── __init__.py
-│   └── auth.py              # Authentication middleware
-└── models/
-    └── user.py              # User, Role models
-```
+**Query Params**:
+- `status` - filter by status (draft, posted, refunded)
+- `from` - start date (ISO format)
+- `to` - end date (ISO format)
+- `customer_id` - filter by customer
+- `invoice_number` - search by invoice number
+- `page` - page number (default: 1)
+- `limit` - items per page (default: 50, max: 100)
 
-### JWT Token Structure
-
-**Access Token Payload**:
+**Response (200)**:
 ```json
 {
-  "sub": "01HXXX...",           // user_id
-  "username": "owner",
-  "role": "owner",
-  "type": "access",
-  "device_id": "reception_001",  // Optional
-  "iat": 1697520000,
-  "exp": 1697520900
+  "bills": [ /* array of bill summaries */ ],
+  "pagination": {
+    "page": 1,
+    "limit": 50,
+    "total": 243,
+    "pages": 5
+  }
 }
 ```
 
-**Refresh Token Payload**:
-```json
-{
-  "sub": "01HXXX...",
-  "type": "refresh",
-  "device_id": "reception_001",
-  "jti": "unique_token_id",      // For revocation
-  "iat": 1697520000,
-  "exp": 1698124800
-}
-```
+## Implementation Details
 
-### backend/app/auth/jwt.py
+### Invoice Number Generation (Atomic)
 
 ```python
-from datetime import datetime, timedelta
-from typing import Optional, Dict, Any
-import jwt
-from app.config import settings
-from app.models.user import User
-
-class JWTHandler:
-    """Handle JWT token creation and validation."""
-    
-    ALGORITHM = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES = 15
-    REFRESH_TOKEN_EXPIRE_DAYS = 7
-    
-    @classmethod
-    def create_access_token(
-        cls,
-        user: User,
-        device_id: Optional[str] = None
-    ) -> str:
-        """Create JWT access token."""
-        expire = datetime.utcnow() + timedelta(
-            minutes=cls.ACCESS_TOKEN_EXPIRE_MINUTES
-        )
-        
-        payload = {
-            "sub": user.id,
-            "username": user.username,
-            "role": user.role.name.value,
-            "type": "access",
-            "iat": datetime.utcnow(),
-            "exp": expire
-        }
-        
-        if device_id:
-            payload["device_id"] = device_id
-        
-        return jwt.encode(
-            payload,
-            settings.SECRET_KEY,
-            algorithm=cls.ALGORITHM
-        )
-    
-    @classmethod
-    def create_refresh_token(
-        cls,
-        user: User,
-        device_id: Optional[str] = None
-    ) -> tuple[str, str]:
-        """Create JWT refresh token. Returns (token, jti)."""
-        from ulid import ULID
-        
-        jti = str(ULID())
-        expire = datetime.utcnow() + timedelta(
-            days=cls.REFRESH_TOKEN_EXPIRE_DAYS
-        )
-        
-        payload = {
-            "sub": user.id,
-            "type": "refresh",
-            "jti": jti,
-            "iat": datetime.utcnow(),
-            "exp": expire
-        }
-        
-        if device_id:
-            payload["device_id"] = device_id
-        
-        token = jwt.encode(
-            payload,
-            settings.SECRET_KEY,
-            algorithm=cls.ALGORITHM
-        )
-        
-        return token, jti
-    
-    @classmethod
-    def decode_token(cls, token: str) -> Dict[str, Any]:
-        """Decode and verify JWT token."""
-        try:
-            return jwt.decode(
-                token,
-                settings.SECRET_KEY,
-                algorithms=[cls.ALGORITHM]
-            )
-        except jwt.ExpiredSignatureError:
-            raise ValueError("Token has expired")
-        except jwt.InvalidTokenError:
-            raise ValueError("Invalid token")
-```
-
-### backend/app/auth/password.py
-
-```python
-from passlib.context import CryptContext
-from typing import List
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-class PasswordHandler:
-    """Handle password hashing and verification."""
-    
-    @staticmethod
-    def hash_password(password: str) -> str:
-        """Hash a password."""
-        return pwd_context.hash(password)
-    
-    @staticmethod
-    def verify_password(plain_password: str, hashed_password: str) -> bool:
-        """Verify a password against its hash."""
-        return pwd_context.verify(plain_password, hashed_password)
-    
-    @staticmethod
-    def validate_password_strength(password: str) -> tuple[bool, List[str]]:
-        """
-        Validate password meets requirements.
-        Returns (is_valid, error_messages)
-        """
-        errors = []
-        
-        if len(password) < 8:
-            errors.append("Password must be at least 8 characters long")
-        
-        if not any(c.isupper() for c in password):
-            errors.append("Password must contain at least one uppercase letter")
-        
-        if not any(c.islower() for c in password):
-            errors.append("Password must contain at least one lowercase letter")
-        
-        if not any(c.isdigit() for c in password):
-            errors.append("Password must contain at least one number")
-        
-        return len(errors) == 0, errors
-```
-
-### backend/app/auth/permissions.py
-
-```python
-from enum import Enum
-from typing import Dict, Any
-from app.models.user import RoleEnum
-
-class Permission(str, Enum):
-    """Permission constants."""
-    # Billing
-    CREATE_BILL = "billing.create"
-    READ_BILL = "billing.read"
-    REFUND_BILL = "billing.refund"
-    APPLY_DISCOUNT = "billing.discount"
-    VIEW_TOTALS = "billing.view_totals"
-    
-    # Appointments
-    CREATE_APPOINTMENT = "appointments.create"
-    READ_APPOINTMENT = "appointments.read"
-    UPDATE_APPOINTMENT = "appointments.update"
-    DELETE_APPOINTMENT = "appointments.delete"
-    
-    # Inventory
-    APPROVE_INVENTORY_CHANGE = "inventory.approve"
-    VIEW_COSTS = "inventory.view_costs"
-    
-    # Accounting
-    VIEW_PROFIT = "accounting.view_profit"
-    EXPORT_REPORTS = "accounting.export"
-    
-    # Staff
-    MANAGE_USERS = "users.manage"
-
-class PermissionChecker:
-    """Check if user has required permissions."""
-    
-    ROLE_PERMISSIONS: Dict[RoleEnum, Dict[str, Any]] = {
-        RoleEnum.OWNER: {
-            "billing": ["create", "read", "update", "refund", "discount", "view_totals"],
-            "appointments": ["create", "read", "update", "delete"],
-            "inventory": ["create", "read", "update", "approve", "view_costs"],
-            "accounting": ["view_dashboard", "view_profit", "export"],
-            "users": ["create", "read", "update", "delete"],
-            "settings": ["read", "update"]
-        },
-        RoleEnum.RECEPTIONIST: {
-            "billing": ["create", "read", "discount", "view_totals"],
-            "appointments": ["create", "read", "update"],
-            "inventory": ["read", "request"],
-            "accounting": ["view_dashboard", "manage_drawer"],
-            "staff": ["read"]
-        },
-        RoleEnum.STAFF: {
-            "schedule": ["view_all"],
-            "services": ["mark_complete", "add_notes"],
-            "pii_restrictions": ["first_name_only", "no_phone", "no_totals"]
-        }
-    }
-    
-    @classmethod
-    def has_permission(
-        cls,
-        role: RoleEnum,
-        resource: str,
-        action: str
-    ) -> bool:
-        """Check if role has permission for resource.action."""
-        role_perms = cls.ROLE_PERMISSIONS.get(role, {})
-        resource_perms = role_perms.get(resource, [])
-        return action in resource_perms
-    
-    @classmethod
-    def can_view_customer_pii(cls, role: RoleEnum) -> bool:
-        """Check if role can view full customer PII."""
-        return role in [RoleEnum.OWNER, RoleEnum.RECEPTIONIST]
-    
-    @classmethod
-    def can_view_financials(cls, role: RoleEnum) -> bool:
-        """Check if role can view financial totals."""
-        return role in [RoleEnum.OWNER, RoleEnum.RECEPTIONIST]
-```
-
-### backend/app/auth/dependencies.py
-
-```python
-from typing import Optional
-from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+# backend/app/services/billing.py
+from sqlalchemy import text
 from sqlalchemy.orm import Session
-from app.database import get_db
-from app.models.user import User, RoleEnum
-from app.auth.jwt import JWTHandler
-from app.auth.permissions import PermissionChecker
+from datetime import datetime
 
-security = HTTPBearer()
-
-async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: Session = Depends(get_db)
-) -> User:
-    """Dependency to get current authenticated user."""
-    try:
-        token = credentials.credentials
-        payload = JWTHandler.decode_token(token)
+class InvoiceNumberGenerator:
+    """Generate sequential invoice numbers safely."""
+    
+    @staticmethod
+    def generate(db: Session) -> str:
+        """
+        Generate next invoice number atomically.
+        Format: SAL-YY-NNNN
+        """
+        current_year = datetime.now().strftime("%y")
         
-        if payload.get("type") != "access":
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token type"
-            )
+        # Use advisory lock to prevent race conditions
+        db.execute(text("SELECT pg_advisory_lock(12345)"))
         
-        user_id = payload.get("sub")
-        if not user_id:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token payload"
-            )
-        
-        user = db.query(User).filter(
-            User.id == user_id,
-            User.deleted_at.is_(None),
-            User.is_active == True
-        ).first()
-        
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="User not found or inactive"
-            )
-        
-        return user
-        
-    except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=str(e)
-        )
-
-def require_role(*allowed_roles: RoleEnum):
-    """Dependency factory to require specific roles."""
-    def role_checker(current_user: User = Depends(get_current_user)):
-        if current_user.role.name not in allowed_roles:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Insufficient permissions"
-            )
-        return current_user
-    return role_checker
-
-def require_permission(resource: str, action: str):
-    """Dependency factory to require specific permission."""
-    def permission_checker(current_user: User = Depends(get_current_user)):
-        if not PermissionChecker.has_permission(
-            current_user.role.name,
-            resource,
-            action
-        ):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Missing permission: {resource}.{action}"
-            )
-        return current_user
-    return permission_checker
-
-# Commonly used dependencies
-require_owner = require_role(RoleEnum.OWNER)
-require_owner_or_receptionist = require_role(
-    RoleEnum.OWNER,
-    RoleEnum.RECEPTIONIST
-)
+        try:
+            # Get current max number for this year
+            result = db.execute(
+                text("""
+                    SELECT COALESCE(MAX(
+                        CAST(SPLIT_PART(invoice_number, '-', 3) AS INTEGER)
+                    ), 0) as max_num
+                    FROM bills
+                    WHERE invoice_number LIKE :pattern
+                """),
+                {"pattern": f"SAL-{current_year}-%"}
+            ).first()
+            
+            next_num = (result.max_num or 0) + 1
+            invoice_number = f"SAL-{current_year}-{next_num:04d}"
+            
+            return invoice_number
+            
+        finally:
+            db.execute(text("SELECT pg_advisory_unlock(12345)"))
 ```
 
-### Session Management with Redis
+### GST Calculation
 
 ```python
-from typing import Optional
-import redis.asyncio as redis
-from datetime import timedelta
-from app.config import settings
+# backend/app/services/billing.py
+from decimal import Decimal, ROUND_HALF_UP
 
-class SessionManager:
-    """Manage user sessions in Redis."""
+class TaxCalculator:
+    """Calculate GST breakdown from tax-inclusive prices."""
     
-    def __init__(self):
-        self.redis = redis.from_url(settings.REDIS_URL)
+    GST_RATE = Decimal("0.18")  # 18%
+    CGST_RATE = Decimal("0.09")  # 9%
+    SGST_RATE = Decimal("0.09")  # 9%
     
-    async def store_refresh_token(
-        self,
-        user_id: str,
-        jti: str,
-        token: str,
-        device_id: Optional[str] = None
-    ):
-        """Store refresh token in Redis."""
-        key = f"refresh_token:{user_id}:{jti}"
+    @classmethod
+    def calculate_tax_breakdown(cls, inclusive_price: int) -> dict:
+        """
+        Calculate tax breakdown from inclusive price.
         
-        data = {
-            "token": token,
-            "device_id": device_id or "unknown"
+        Args:
+            inclusive_price: Price in paise (tax-inclusive)
+        
+        Returns:
+            dict with taxable_value, cgst, sgst, total_tax
+        """
+        # Convert to Decimal for precision
+        price = Decimal(inclusive_price)
+        
+        # Calculate taxable value: price / (1 + tax_rate)
+        taxable_value = price / (Decimal("1") + cls.GST_RATE)
+        
+        # Calculate CGST and SGST
+        cgst = taxable_value * cls.CGST_RATE
+        sgst = taxable_value * cls.SGST_RATE
+        total_tax = cgst + sgst
+        
+        # Round to nearest paise
+        return {
+            "taxable_value": int(taxable_value.quantize(
+                Decimal("1"), rounding=ROUND_HALF_UP
+            )),
+            "cgst": int(cgst.quantize(
+                Decimal("1"), rounding=ROUND_HALF_UP
+            )),
+            "sgst": int(sgst.quantize(
+                Decimal("1"), rounding=ROUND_HALF_UP
+            )),
+            "total_tax": int(total_tax.quantize(
+                Decimal("1"), rounding=ROUND_HALF_UP
+            ))
         }
+    
+    @classmethod
+    def round_to_rupee(cls, amount_paise: int) -> tuple[int, int]:
+        """
+        Round amount to nearest rupee.
         
-        await self.redis.hset(key, mapping=data)
-        await self.redis.expire(
-            key,
-            timedelta(days=JWTHandler.REFRESH_TOKEN_EXPIRE_DAYS)
-        )
+        Returns:
+            (rounded_amount_paise, adjustment_paise)
+        """
+        rupees = Decimal(amount_paise) / Decimal("100")
+        rounded_rupees = rupees.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+        rounded_paise = int(rounded_rupees * 100)
+        adjustment = rounded_paise - amount_paise
+        
+        return rounded_paise, adjustment
+```
+
+### Bill Creation Service
+
+```python
+# backend/app/services/billing.py
+from sqlalchemy.orm import Session
+from app.models import Bill, BillItem, Service, Customer
+from app.schemas import BillCreate
+from ulid import ULID
+
+class BillingService:
+    """Handle bill creation and management."""
     
-    async def validate_refresh_token(
+    def __init__(self, db: Session):
+        self.db = db
+    
+    def create_bill(
         self,
-        user_id: str,
-        jti: str
-    ) -> bool:
-        """Check if refresh token exists and is valid."""
-        key = f"refresh_token:{user_id}:{jti}"
-        return await self.redis.exists(key) > 0
+        data: BillCreate,
+        created_by_id: str
+    ) -> Bill:
+        """Create a new bill (draft status)."""
+        
+        # Validate items and calculate subtotal
+        subtotal = 0
+        bill_items = []
+        
+        for item_data in data.items:
+            service = self.db.query(Service).filter(
+                Service.id == item_data.service_id
+            ).first()
+            
+            if not service:
+                raise ValueError(f"Service not found: {item_data.service_id}")
+            
+            line_total = service.base_price * item_data.quantity
+            subtotal += line_total
+            
+            bill_items.append({
+                "service_id": service.id,
+                "item_name": service.name,
+                "base_price": service.base_price,
+                "quantity": item_data.quantity,
+                "line_total": line_total,
+                "staff_id": item_data.staff_id,
+                "appointment_id": item_data.appointment_id,
+                "walkin_id": item_data.walkin_id,
+                "notes": item_data.notes
+            })
+        
+        # Apply discount
+        discount_amount = (data.discount_amount or 0) * 100  # Convert to paise
+        
+        if discount_amount > subtotal:
+            raise ValueError("Discount cannot exceed subtotal")
+        
+        amount_after_discount = subtotal - discount_amount
+        
+        # Calculate tax
+        tax_breakdown = TaxCalculator.calculate_tax_breakdown(
+            amount_after_discount
+        )
+        
+        # Calculate total and rounding
+        total_amount = amount_after_discount + tax_breakdown["total_tax"]
+        rounded_total, rounding_adjustment = TaxCalculator.round_to_rupee(
+            total_amount
+        )
+        
+        # Create bill
+        bill = Bill(
+            id=str(ULID()),
+            customer_id=data.customer_id,
+            customer_name=data.customer_name,
+            customer_phone=data.customer_phone,
+            subtotal=subtotal,
+            discount_amount=discount_amount,
+            discount_reason=data.discount_reason,
+            tax_amount=tax_breakdown["total_tax"],
+            cgst_amount=tax_breakdown["cgst"],
+            sgst_amount=tax_breakdown["sgst"],
+            total_amount=total_amount,
+            rounded_total=rounded_total,
+            rounding_adjustment=rounding_adjustment,
+            status="draft",
+            created_by=created_by_id
+        )
+        
+        self.db.add(bill)
+        self.db.flush()
+        
+        # Create bill items
+        for item_data in bill_items:
+            bill_item = BillItem(
+                id=str(ULID()),
+                bill_id=bill.id,
+                **item_data
+            )
+            self.db.add(bill_item)
+        
+        self.db.commit()
+        self.db.refresh(bill)
+        
+        return bill
     
-    async def revoke_refresh_token(self, user_id: str, jti: str):
-        """Revoke a specific refresh token."""
-        key = f"refresh_token:{user_id}:{jti}"
-        await self.redis.delete(key)
-    
-    async def revoke_all_user_tokens(self, user_id: str):
-        """Revoke all refresh tokens for a user."""
-        pattern = f"refresh_token:{user_id}:*"
-        async for key in self.redis.scan_iter(match=pattern):
-            await self.redis.delete(key)
-    
-    async def blacklist_access_token(self, jti: str, expires_in: int):
-        """Add access token to blacklist."""
-        key = f"blacklist:{jti}"
-        await self.redis.setex(key, expires_in, "1")
-    
-    async def is_token_blacklisted(self, jti: str) -> bool:
-        """Check if access token is blacklisted."""
-        key = f"blacklist:{jti}"
-        return await self.redis.exists(key) > 0
-
-session_manager = SessionManager()
+    def add_payment(
+        self,
+        bill_id: str,
+        payment_data: PaymentCreate,
+        confirmed_by_id: str
+    ) -> Payment:
+        """Add payment to bill and post if fully paid."""
+        
+        bill = self.db.query(Bill).filter(Bill.id == bill_id).first()
+        
+        if not bill:
+            raise ValueError("Bill not found")
+        
+        if bill.status != "draft":
+            raise ValueError("Can only add payments to draft bills")
+        
+        # Calculate current payment total
+        existing_payments = self.db.query(Payment).filter(
+            Payment.bill_id == bill_id
+        ).all()
+        
+        current_total = sum(p.amount for p in existing_payments)
+        new_total = current_total + (payment_data.amount * 100)  # Convert to paise
+        
+        if new_total > bill.rounded_total + 1000:  # ₹10 tolerance
+            raise ValueError("Payment exceeds bill total")
+        
+        # Create payment
+        payment = Payment(
+            id=str(ULID()),
+            bill_id=bill_id,
+            payment_method=payment_data.method,
+            amount=payment_data.amount * 100,
+            reference_number=payment_data.reference_number,
+            notes=payment_data.notes,
+            confirmed_by=confirmed_by_id
+        )
+        
+        self.db.add(payment)
+        
+        # Check if bill is fully paid
+        if new_total >= bill.rounded_total:
+            # Generate invoice number
+            invoice_number = InvoiceNumberGenerator.generate(self.db)
+            
+            bill.invoice_number = invoice_number
+            bill.status = "posted"
+            bill.posted_at = datetime.utcnow()
+            
+            # Update customer stats if applicable
+            if bill.customer_id:
+                customer = self.db.query(Customer).filter(
+                    Customer.id == bill.customer_id
+                ).first()
+                
+                if customer:
+                    customer.total_visits += 1
+                    customer.total_spent += bill.rounded_total
+                    customer.last_visit_at = datetime.utcnow()
+            
+            # Emit event for accounting updates
+            from app.events import emit_event
+            emit_event(self.db, "bill.posted", {
+                "bill_id": bill.id,
+                "invoice_number": invoice_number,
+                "total": bill.rounded_total,
+                "customer_id": bill.customer_id
+            })
+        
+        self.db.commit()
+        self.db.refresh(payment)
+        
+        return payment
 ```
 
-## Frontend Integration
+## 80mm Receipt Template
 
-### Auth Context (React)
+### HTML Template (80mm width = 302px)
+
+```html
+<!-- templates/receipt.html -->
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Receipt - {{ invoice_number }}</title>
+    <style>
+        @page {
+            size: 80mm auto;
+            margin: 0;
+        }
+        body {
+            width: 80mm;
+            margin: 0 auto;
+            padding: 10mm 5mm;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+        .center { text-align: center; }
+        .bold { font-weight: bold; }
+        .line {
+            border-top: 1px dashed #000;
+            margin: 5px 0;
+        }
+        .row {
+            display: flex;
+            justify-content: space-between;
+            margin: 2px 0;
+        }
+        .item {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+        }
+        .staff { font-size: 10px; color: #666; }
+    </style>
+</head>
+<body>
+    <div class="center bold" style="font-size: 16px;">
+        UNISEX BEAUTY SALON
+    </div>
+    <div class="center" style="font-size: 10px;">
+        123 Main Street, City, State<br>
+        Phone: 9876543210<br>
+        GSTIN: 29XXXXX1234X1ZX
+    </div>
+    
+    <div class="line"></div>
+    
+    <div class="row">
+        <span>Invoice: <span class="bold">{{ invoice_number }}</span></span>
+        <span>{{ date }}</span>
+    </div>
+    <div class="row">
+        <span>Time: {{ time }}</span>
+    </div>
+    <div class="row">
+        <span>Customer: {{ customer_name }}</span>
+    </div>
+    
+    <div class="line"></div>
+    
+    {% for item in items %}
+    <div class="item">
+        <div style="flex: 1;">
+            {{ item.name }}<br>
+            <span class="staff">by {{ item.staff }}</span>
+        </div>
+        <div style="text-align: right;">
+            {{ item.amount }}
+        </div>
+    </div>
+    {% endfor %}
+    
+    <div class="line"></div>
+    
+    <div class="row">
+        <span>Subtotal:</span>
+        <span>{{ subtotal }}</span>
+    </div>
+    
+    {% if discount > 0 %}
+    <div class="row">
+        <span>Discount:</span>
+        <span>-{{ discount }}</span>
+    </div>
+    {% endif %}
+    
+    <div class="row" style="font-size: 10px;">
+        <span>CGST (9%):</span>
+        <span>{{ cgst }}</span>
+    </div>
+    <div class="row" style="font-size: 10px;">
+        <span>SGST (9%):</span>
+        <span>{{ sgst }}</span>
+    </div>
+    
+    <div class="line"></div>
+    
+    <div class="row bold" style="font-size: 14px;">
+        <span>TOTAL:</span>
+        <span>{{ total }}</span>
+    </div>
+    
+    <div class="row" style="font-size: 10px;">
+        <span>Paid: {{ payment_method }}</span>
+    </div>
+    
+    <div class="line"></div>
+    
+    <div class="center" style="font-size: 10px; margin-top: 10px;">
+        {{ footer_message }}<br>
+        Visit Again!
+    </div>
+</body>
+</html>
+```
+
+### Print Function (Frontend)
 
 ```typescript
-// frontend/src/contexts/AuthContext.tsx
-import { createContext, useContext, useState, useEffect } from 'react';
-
-interface User {
-  id: string;
-  username: string;
-  fullName: string;
-  role: 'owner' | 'receptionist' | 'staff';
-  permissions: Record<string, any>;
-}
-
-interface AuthContextType {
-  user: User | null;
-  login: (username: string, password: string) => Promise<void>;
-  logout: () => Promise<void>;
-  isAuthenticated: boolean;
-  hasPermission: (resource: string, action: string) => boolean;
-}
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [accessToken, setAccessToken] = useState<string | null>(null);
-  
-  useEffect(() => {
-    // Check for existing session on mount
-    const token = localStorage.getItem('access_token');
-    if (token) {
-      fetchCurrentUser(token);
-    }
-  }, []);
-  
-  const login = async (username: string, password: string) => {
-    const response = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password })
-    });
-    
-    if (!response.ok) {
-      throw new Error('Login failed');
-    }
-    
-    const data = await response.json();
-    
-    localStorage.setItem('access_token', data.access_token);
-    localStorage.setItem('refresh_token', data.refresh_token);
-    
-    setAccessToken(data.access_token);
-    setUser(data.user);
-  };
-  
-  const logout = async () => {
-    const refreshToken = localStorage.getItem('refresh_token');
-    
-    await fetch('/api/auth/logout', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${accessToken}`
-      },
-      body: JSON.stringify({ refresh_token: refreshToken })
-    });
-    
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
-    setAccessToken(null);
-    setUser(null);
-  };
-  
-  const hasPermission = (resource: string, action: string): boolean => {
-    if (!user?.permissions) return false;
-    const resourcePerms = user.permissions[resource];
-    return resourcePerms?.includes(action) ?? false;
-  };
-  
-  return (
-    <AuthContext.Provider value={{
-      user,
-      login,
-      logout,
-      isAuthenticated: !!user,
-      hasPermission
-    }}>
-      {children}
-    </AuthContext.Provider>
+// frontend/src/lib/printing.ts
+export async function printReceipt(billId: string) {
+  // Open receipt in new window
+  const receiptWindow = window.open(
+    `/api/pos/bills/${billId}/receipt?format=html`,
+    '_blank',
+    'width=302,height=600,menubar=no,toolbar=no'
   );
-}
-
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within AuthProvider');
-  }
-  return context;
-};
-```
-
-### API Client with Token Refresh
-
-```typescript
-// frontend/src/lib/apiClient.ts
-let isRefreshing = false;
-let refreshSubscribers: ((token: string) => void)[] = [];
-
-async function refreshAccessToken(): Promise<string> {
-  const refreshToken = localStorage.getItem('refresh_token');
   
-  const response = await fetch('/api/auth/refresh', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ refresh_token: refreshToken })
-  });
-  
-  if (!response.ok) {
-    // Refresh failed, redirect to login
-    window.location.href = '/login';
-    throw new Error('Token refresh failed');
+  if (!receiptWindow) {
+    throw new Error('Could not open print window');
   }
   
-  const data = await response.json();
-  localStorage.setItem('access_token', data.access_token);
-  localStorage.setItem('refresh_token', data.refresh_token);
-  
-  return data.access_token;
-}
-
-export async function apiRequest(
-  url: string,
-  options: RequestInit = {}
-): Promise<Response> {
-  const token = localStorage.getItem('access_token');
-  
-  const headers = {
-    'Content-Type': 'application/json',
-    ...(token && { 'Authorization': `Bearer ${token}` }),
-    ...options.headers
+  // Wait for content to load, then print
+  receiptWindow.onload = () => {
+    setTimeout(() => {
+      receiptWindow.print();
+      receiptWindow.close();
+    }, 500);
   };
-  
-  let response = await fetch(url, { ...options, headers });
-  
-  // If 401, try refreshing token
-  if (response.status === 401 && !isRefreshing) {
-    isRefreshing = true;
-    
-    try {
-      const newToken = await refreshAccessToken();
-      
-      // Retry original request with new token
-      headers['Authorization'] = `Bearer ${newToken}`;
-      response = await fetch(url, { ...options, headers });
-      
-      isRefreshing = false;
-    } catch (error) {
-      isRefreshing = false;
-      throw error;
-    }
-  }
-  
-  return response;
 }
 ```
 
 ## Acceptance Criteria
 
-- [ ] User can login with username/password
-- [ ] JWT access and refresh tokens issued on successful login
-- [ ] Access token expires after 15 minutes
-- [ ] Refresh token can get new access token
-- [ ] Logout revokes refresh token in Redis
-- [ ] Login attempts are rate limited (5/min)
-- [ ] Account locks after 10 failed attempts for 15 minutes
-- [ ] Owner has full system access
-- [ ] Receptionist has limited access (no refunds, no profit view)
-- [ ] Staff only sees first name + ticket number
-- [ ] Staff cannot view billing totals
-- [ ] Password must meet strength requirements
-- [ ] Old passwords cannot be reused
-- [ ] Device binding works for reception terminal
-- [ ] All authentication events logged to audit_log
-- [ ] Token blacklist prevents reuse of logged-out tokens
-- [ ] API returns 401 for invalid/expired tokens
-- [ ] API returns 403 for insufficient permissions
+- [ ] Can create bill with multiple services
+- [ ] Bill-level discount applies correctly
+- [ ] GST calculates CGST/SGST split accurately
+- [ ] Rounding to nearest ₹1 works
+- [ ] Invoice number generates sequentially
+- [ ] Cannot create duplicate bills with same Idempotency-Key
+- [ ] Can record split payments (cash + digital)
+- [ ] Bill posts automatically when fully paid
+- [ ] 80mm receipt prints correctly via browser
+- [ ] Refund creates negative bill linking to original
+- [ ] Only owner can refund bills
+- [ ] Discount audit log captures all required fields
+- [ ] Customer stats update on bill posting
+- [ ] bill.posted event emitted after posting
+- [ ] Cannot overpay beyond tolerance
+- [ ] Receipt shows all items with staff names
+- [ ] Tax breakdown shows on receipt
+- [ ] List bills with pagination works
 
 ## Testing Checklist
 
 ```bash
-# 1. Test login
-curl -X POST http://localhost/api/auth/login \
+# 1. Create bill
+curl -X POST http://localhost/api/pos/bills \
+  -H "Authorization: Bearer {token}" \
   -H "Content-Type: application/json" \
-  -d '{"username":"owner","password":"change_me_123"}'
+  -H "Idempotency-Key: test-123" \
+  -d '{
+    "items": [{"service_id": "01HXX...", "quantity": 1}],
+    "customer_name": "Test Customer",
+    "customer_phone": "9876543210"
+  }'
 
-# 2. Test protected endpoint
-curl http://localhost/api/auth/me \
-  -H "Authorization: Bearer {access_token}"
-
-# 3. Test refresh token
-curl -X POST http://localhost/api/auth/refresh \
+# 2. Add payment
+curl -X POST http://localhost/api/pos/bills/{bill_id}/payments \
+  -H "Authorization: Bearer {token}" \
   -H "Content-Type: application/json" \
-  -d '{"refresh_token":"{refresh_token}"}'
+  -d '{"method": "cash", "amount": 750.00}'
 
-# 4. Test logout
-curl -X POST http://localhost/api/auth/logout \
-  -H "Authorization: Bearer {access_token}" \
+# 3. Get receipt
+curl http://localhost/api/pos/bills/{bill_id}/receipt \
+  -H "Authorization: Bearer {token}"
+
+# 4. Test refund (as owner)
+curl -X POST http://localhost/api/pos/bills/{bill_id}/refund \
+  -H "Authorization: Bearer {owner_token}" \
   -H "Content-Type: application/json" \
-  -d '{"refresh_token":"{refresh_token}"}'
+  -d '{"reason": "Test refund"}'
 
-# 5. Test rate limiting
-for i in {1..10}; do
-  curl -X POST http://localhost/api/auth/login \
-    -H "Content-Type: application/json" \
-    -d '{"username":"owner","password":"wrong"}'
-done
-# Should get 429 after 5 attempts
-
-# 6. Test permissions
-# Login as staff user and try to access owner-only endpoint
-curl http://localhost/api/accounting/profit \
-  -H "Authorization: Bearer {staff_token}"
-# Should get 403
+# 5. Test idempotency
+curl -X POST http://localhost/api/pos/bills \
+  -H "Idempotency-Key: test-123" \
+  ... # Same payload, should return existing bill
 ```
 
 ## Next Steps
-After authentication is validated:
-1. Proceed to Spec 4: POS & Billing Module
-2. Implement protected routes in frontend
-3. Add permission checks to all API endpoints
+After POS module is validated:
+1. Proceed to Spec 5: Appointments & Scheduling
+2. Integrate billing with appointment completion
+3. Add print confirmation dialog in frontend
