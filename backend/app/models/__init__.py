@@ -13,7 +13,7 @@ from app.models.user import Role, RoleEnum, User, Staff
 from app.models.customer import Customer
 
 # Service Catalog
-from app.models.service import ServiceCategory, Service, ServiceAddon
+from app.models.service import ServiceCategory, Service, ServiceAddon, ServiceMaterialUsage
 
 # Appointments
 from app.models.appointment import Appointment, AppointmentStatus, WalkIn
@@ -36,8 +36,23 @@ from app.models.inventory import (
 # Accounting
 from app.models.accounting import CashDrawer, DaySummary, ExportLog
 
+# Expenses
+from app.models.expense import Expense, ExpenseCategory, RecurrenceType, ExpenseStatus
+
+# Purchases
+from app.models.purchase import PurchaseInvoice, PurchaseItem, SupplierPayment, PurchaseStatus
+
+# Reconciliation
+from app.models.reconciliation import DailyReconciliation
+
 # Audit
 from app.models.audit import Event, AuditLog
+
+# Settings
+from app.models.settings import SalonSettings
+
+# Attendance
+from app.models.attendance import Attendance, AttendanceStatus
 
 __all__ = [
     # Base
@@ -56,6 +71,7 @@ __all__ = [
     "ServiceCategory",
     "Service",
     "ServiceAddon",
+    "ServiceMaterialUsage",
     # Appointment
     "Appointment",
     "AppointmentStatus",
@@ -79,7 +95,24 @@ __all__ = [
     "CashDrawer",
     "DaySummary",
     "ExportLog",
+    # Expenses
+    "Expense",
+    "ExpenseCategory",
+    "RecurrenceType",
+    "ExpenseStatus",
+    # Purchases
+    "PurchaseInvoice",
+    "PurchaseItem",
+    "SupplierPayment",
+    "PurchaseStatus",
+    # Reconciliation
+    "DailyReconciliation",
     # Audit
     "Event",
     "AuditLog",
+    # Settings
+    "SalonSettings",
+    # Attendance
+    "Attendance",
+    "AttendanceStatus",
 ]

@@ -84,6 +84,7 @@ class WalkIn(Base, ULIDMixin, TimestampMixin):
 
     ticket_number = Column(String, nullable=False, unique=True, index=True)
     visit_id = Column(String(26))
+    session_id = Column(String(26), index=True)  # Groups services for same customer visit
     customer_id = Column(String(26), ForeignKey("customers.id"), index=True)
     service_id = Column(String(26), ForeignKey("services.id"), nullable=False)
     assigned_staff_id = Column(String(26), ForeignKey("staff.id"), index=True)
@@ -92,8 +93,10 @@ class WalkIn(Base, ULIDMixin, TimestampMixin):
     status = Column(
         Enum(AppointmentStatus),
         nullable=False,
-        default=AppointmentStatus.CHECKED_IN
+        default=AppointmentStatus.CHECKED_IN,
+        index=True
     )
+    checked_in_at = Column(DateTime(timezone=True))
     started_at = Column(DateTime(timezone=True))
     completed_at = Column(DateTime(timezone=True))
 
@@ -102,13 +105,19 @@ class WalkIn(Base, ULIDMixin, TimestampMixin):
     service_notes = Column(Text)
     service_notes_updated_at = Column(DateTime(timezone=True))
 
+    # Billing integration
+    bill_id = Column(String(26), ForeignKey("bills.id"), nullable=True, index=True)
+
     created_by = Column(String(26), ForeignKey("users.id"), nullable=False)
+    cancelled_at = Column(DateTime(timezone=True))
+    cancellation_reason = Column(Text)
 
     # Relationships
     customer = relationship("Customer")
     service = relationship("Service")
     assigned_staff = relationship("Staff")
     created_by_user = relationship("User", foreign_keys=[created_by])
+    bill = relationship("Bill", foreign_keys=[bill_id])
 
     def __repr__(self):
         return f"<WalkIn {self.ticket_number} - {self.customer_name}>"

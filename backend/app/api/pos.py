@@ -20,18 +20,23 @@ from app.models.user import User
 from app.models.billing import Bill, BillStatus
 from app.services.billing_service import BillingService
 from app.services.idempotency_service import IdempotencyService
+from app.services.export_service import ExportService
 from app.schemas.billing import (
     BillCreate,
     BillResponse,
     PaymentCreate,
     PaymentResponseWithBill,
+    VoidCreate,
     RefundCreate,
     RefundResponse,
     BillListResponse,
     BillListItem
 )
 from app.auth.dependencies import get_current_user
+from app.auth.dependencies import get_current_user
 from app.auth.permissions import PermissionChecker
+from fastapi.responses import Response
+from app.services.receipt_service import ReceiptService
 
 
 router = APIRouter(prefix="/pos", tags=["POS"])
@@ -78,7 +83,7 @@ def create_bill(
         409: Idempotency key conflict (returns existing bill)
     """
     # Check permissions
-    if not PermissionChecker.has_permission(current_user.role.name, "bills", "create"):
+    if not PermissionChecker.has_permission(current_user.role.name, "billing", "create"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Insufficient permissions to create bills"
@@ -116,12 +121,13 @@ def create_bill(
 
         bill = billing_service.create_bill(
             items=items_dict,
-            created_by_id=current_user._id,
+            created_by_id=current_user.id,
             customer_id=bill_data.customer_id,
             customer_name=bill_data.customer_name,
             customer_phone=bill_data.customer_phone,
             discount_amount=bill_data.discount_amount,
-            discount_reason=bill_data.discount_reason
+            discount_reason=bill_data.discount_reason,
+            session_id=bill_data.session_id
         )
 
         # Store idempotency key
@@ -173,7 +179,7 @@ def add_payment(
         404: Bill not found.
     """
     # Check permissions
-    if not PermissionChecker.has_permission(current_user.role.name, "bills", "create"):
+    if not PermissionChecker.has_permission(current_user.role.name, "billing", "create"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Insufficient permissions to add payments"
@@ -185,7 +191,7 @@ def add_payment(
         payment = billing_service.add_payment(
             bill_id=bill_id,
             payment_method=payment_data.method,
-            amount=int(payment_data.amount),  # Convert float rupees to int
+            amount=int(round(payment_data.amount)),  # Round to nearest rupee before int conversion
             confirmed_by_id=current_user.id,
             reference_number=payment_data.reference_number,
             notes=payment_data.notes
@@ -249,7 +255,7 @@ def get_bill(
         404: Bill not found.
     """
     # Check permissions
-    if not PermissionChecker.has_permission(current_user.role.name, "bills", "read"):
+    if not PermissionChecker.has_permission(current_user.role.name, "billing", "read"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Insufficient permissions to view bills"
@@ -265,6 +271,118 @@ def get_bill(
         )
 
     return BillResponse.model_validate(bill)
+
+
+@router.get(
+    "/bills/{bill_id}/receipt",
+    response_class=Response,
+    status_code=status.HTTP_200_OK,
+    summary="Get bill receipt PDF"
+)
+def get_bill_receipt(
+    bill_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Generate and stream PDF receipt for a bill.
+
+    **Permissions**: Receptionist or Owner
+
+    Args:
+        bill_id: Bill ID to get receipt for.
+        db: Database session.
+        current_user: Authenticated user.
+
+    Returns:
+        Response: PDF file stream with 'application/pdf' content type.
+
+    Raises:
+        403: Insufficient permissions.
+        404: Bill not found.
+    """
+    # Check permissions (read access is enough)
+    if not PermissionChecker.has_permission(current_user.role.name, "billing", "read"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions to view receipts"
+        )
+
+    billing_service = BillingService(db)
+    bill = billing_service.get_bill(bill_id)
+
+    if not bill:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Bill not found: {bill_id}"
+        )
+
+    pdf_buffer = ReceiptService.generate_receipt_pdf(bill, db)
+
+    return Response(
+        content=pdf_buffer.getvalue(),
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'inline; filename="receipt_{bill.invoice_number or "draft"}.pdf"'
+        }
+    )
+
+
+@router.post(
+    "/bills/{bill_id}/void",
+    response_model=BillResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Void a draft bill"
+)
+def void_bill(
+    bill_id: str,
+    void_data: VoidCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Void a draft bill.
+
+    Voids a bill that hasn't been posted yet. Used for cancellations
+    or mistakes. Only draft bills can be voided.
+
+    **Permissions**: Owner or Receptionist
+
+    Args:
+        bill_id: ID of bill to void.
+        void_data: Void reason (optional).
+        db: Database session.
+        current_user: Authenticated user.
+
+    Returns:
+        BillResponse: Voided bill.
+
+    Raises:
+        403: Insufficient permissions.
+        404: Bill not found.
+        400: Bill is not in draft status.
+    """
+    # Check permissions
+    if not PermissionChecker.has_permission(current_user.role.name, "billing", "update"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions to void bills"
+        )
+
+    billing_service = BillingService(db)
+
+    try:
+        voided_bill = billing_service.void_bill(
+            bill_id=bill_id,
+            voided_by_id=current_user.id,
+            reason=void_data.reason
+        )
+
+        return BillResponse.model_validate(voided_bill)
+
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
 
 
 @router.post(
@@ -387,7 +505,7 @@ def list_bills(
         403: Insufficient permissions.
     """
     # Check permissions
-    if not PermissionChecker.has_permission(current_user.role.name, "bills", "read"):
+    if not PermissionChecker.has_permission(current_user.role.name, "billing", "read"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Insufficient permissions to list bills"
@@ -447,3 +565,133 @@ def list_bills(
             "pages": total_pages
         }
     )
+
+
+@router.get(
+    "/bills/export",
+    response_class=Response,
+    status_code=status.HTTP_200_OK,
+    summary="Export bills to CSV or PDF"
+)
+def export_bills(
+    format: str = "csv",
+    status_filter: Optional[str] = None,
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
+    customer_id: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Export bills to CSV or PDF format.
+
+    **Permissions**: Receptionist or Owner
+
+    **Formats**:
+    - csv: Comma-separated values (for Excel)
+    - pdf: PDF document with formatted table
+
+    **Filters**:
+    - status: Filter by bill status (draft, posted, void, refunded)
+    - from_date: Start date (ISO format: 2025-10-01)
+    - to_date: End date (ISO format: 2025-10-31)
+    - customer_id: Filter by customer
+
+    Args:
+        format: Export format (csv or pdf)
+        status_filter: Optional bill status filter
+        from_date: Optional start date filter
+        to_date: Optional end date filter
+        customer_id: Optional customer filter
+        db: Database session
+        current_user: Authenticated user
+
+    Returns:
+        Response: File download (CSV or PDF)
+
+    Raises:
+        403: Insufficient permissions
+        400: Invalid format
+    """
+    # Check permissions
+    if not PermissionChecker.has_permission(current_user.role.name, "billing", "read"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions to export bills"
+        )
+
+    # Validate format
+    if format not in ["csv", "pdf"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid format. Must be 'csv' or 'pdf'"
+        )
+
+    # Build query (same as list_bills but without pagination)
+    query = db.query(Bill)
+
+    # Apply filters
+    if status_filter:
+        try:
+            bill_status = BillStatus(status_filter)
+            query = query.filter(Bill.status == bill_status)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid status: {status_filter}"
+            )
+
+    if from_date:
+        query = query.filter(Bill.created_at >= from_date)
+
+    if to_date:
+        query = query.filter(Bill.created_at <= to_date)
+
+    if customer_id:
+        query = query.filter(Bill.customer_id == customer_id)
+
+    # Get all matching bills (no pagination for export)
+    bills = query.order_by(Bill.created_at.desc()).all()
+
+    if not bills:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No bills found matching the criteria"
+        )
+
+    # Generate export based on format
+    if format == "csv":
+        csv_content = ExportService.export_bills_to_csv(bills)
+
+        # Build filename
+        filename = f"bills_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+
+        return Response(
+            content=csv_content,
+            media_type="text/csv",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"'
+            }
+        )
+
+    else:  # pdf
+        # Build date range string for PDF title
+        date_range = None
+        if from_date or to_date:
+            date_range = f"From {from_date or 'start'} to {to_date or 'now'}"
+
+        pdf_content = ExportService.export_bills_to_pdf(
+            bills,
+            salon_name="SalonOS",  # TODO: Get from settings
+            date_range=date_range
+        )
+
+        # Build filename
+        filename = f"bills_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+
+        return Response(
+            content=pdf_content,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"'
+            }
+        )

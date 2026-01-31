@@ -58,8 +58,24 @@ class Supplier(Base, ULIDMixin, TimestampMixin):
     notes = Column(Text)
     is_active = Column(Boolean, nullable=False, default=True)
 
+    # Business details
+    gstin = Column(String(15))  # GST Identification Number
+    payment_terms = Column(String(255))  # e.g., "Net 30", "50% advance, 50% on delivery"
+
     # Relationships
     skus = relationship("SKU", back_populates="supplier")
+    purchase_invoices = relationship("PurchaseInvoice", back_populates="supplier")
+    payments = relationship("SupplierPayment", back_populates="supplier")
+
+    @property
+    def total_outstanding(self) -> int:
+        """Calculate total outstanding balance across all invoices."""
+        return sum(invoice.balance_due for invoice in self.purchase_invoices if invoice.balance_due > 0)
+
+    @property
+    def total_purchases(self) -> int:
+        """Calculate total purchase amount from this supplier."""
+        return sum(invoice.total_amount for invoice in self.purchase_invoices)
 
     def __repr__(self):
         return f"<Supplier {self.name}>"
@@ -79,6 +95,9 @@ class SKU(Base, ULIDMixin, TimestampMixin):
     sku_code = Column(String, nullable=False, unique=True)
     name = Column(String, nullable=False)
     description = Column(Text)
+    brand_name = Column(String(255))  # Brand/manufacturer name
+    volume = Column(String(50))  # Product volume/size (e.g., "500ml", "100gm")
+    barcode = Column(String(100), index=True)  # Product barcode for purchase lookup
 
     uom = Column(Enum(UOMEnum), nullable=False)
     reorder_point = Column(Numeric(10, 2), nullable=False, default=0)
@@ -89,11 +108,17 @@ class SKU(Base, ULIDMixin, TimestampMixin):
 
     is_active = Column(Boolean, nullable=False, default=True, index=True)
 
+    # Retail capability
+    is_sellable = Column(Boolean, nullable=False, default=False, index=True)
+    retail_price = Column(Integer, nullable=True)  # paise (tax-inclusive)
+    retail_markup_percent = Column(Numeric(5, 2), nullable=True)
+
     # Relationships
     category = relationship("InventoryCategory", back_populates="skus")
     supplier = relationship("Supplier", back_populates="skus")
     change_requests = relationship("InventoryChangeRequest", back_populates="sku")
     ledger_entries = relationship("StockLedger", back_populates="sku")
+    bill_items = relationship("BillItem", back_populates="sku")
 
     def __repr__(self):
         return f"<SKU {self.sku_code} - {self.name}>"

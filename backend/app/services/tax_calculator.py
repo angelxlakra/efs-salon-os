@@ -74,7 +74,7 @@ class TaxCalculator:
         if inclusive_price < 0:
             raise ValueError("Price cannot be negative")
 
-        price = Decimal(inclusive_price)
+        price = Decimal(str(inclusive_price))
         taxable_value = price / (Decimal("1") + cls.GST_RATE)
         total_tax = price - taxable_value
         cgst = cls.CGST_RATE * taxable_value

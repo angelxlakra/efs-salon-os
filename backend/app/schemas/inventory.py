@@ -58,11 +58,17 @@ class SKUBase(BaseModel):
     sku_code: str
     name: str
     description: Optional[str] = None
+    brand_name: Optional[str] = None
+    volume: Optional[str] = None
     uom: UOMEnum
     reorder_point: float = Field(default=0, ge=0)
     category_id: str
     supplier_id: Optional[str] = None
     is_active: bool = True
+    # Retail fields
+    is_sellable: bool = False
+    retail_price: Optional[int] = None  # in paise
+    retail_markup_percent: Optional[float] = None
 
 class SKUCreate(SKUBase):
     pass
@@ -71,20 +77,27 @@ class SKUUpdate(BaseModel):
     sku_code: Optional[str] = None
     name: Optional[str] = None
     description: Optional[str] = None
+    brand_name: Optional[str] = None
+    volume: Optional[str] = None
     uom: Optional[UOMEnum] = None
     reorder_point: Optional[float] = Field(None, ge=0)
     category_id: Optional[str] = None
     supplier_id: Optional[str] = None
     is_active: Optional[bool] = None
+    # Retail fields
+    is_sellable: Optional[bool] = None
+    retail_price: Optional[int] = None  # in paise
+    retail_markup_percent: Optional[float] = None
 
 class SKUResponse(SKUBase):
     id: str
+    barcode: Optional[str] = None
     current_stock: float
     avg_cost_per_unit: int  # in paise
     is_low_stock: bool
     created_at: datetime
     updated_at: datetime
-    
+
     # Nested responses for convenience (optional, depending on pattern)
     category_name: Optional[str] = None
     supplier_name: Optional[str] = None

@@ -11,14 +11,24 @@ from app.models.billing import BillStatus, PaymentMethod
 
 
 class BillItemCreate(BaseModel):
-    """Schema for creating a bill item."""
+    """Schema for creating a bill item (service OR product)."""
 
-    service_id: str = Field(..., min_length=26, max_length=26)
+    service_id: Optional[str] = Field(None, min_length=26, max_length=26)
+    sku_id: Optional[str] = Field(None, min_length=26, max_length=26)
     quantity: int = Field(default=1, ge=1, description="Quantity (must be >= 1)")
     staff_id: Optional[str] = Field(None, min_length=26, max_length=26)
     appointment_id: Optional[str] = Field(None, min_length=26, max_length=26)
     walkin_id: Optional[str] = Field(None, min_length=26, max_length=26)
     notes: Optional[str] = Field(None, max_length=500)
+
+    @model_validator(mode='after')
+    def validate_item_type(self):
+        """Ensure exactly one of service_id or sku_id is set."""
+        if not self.service_id and not self.sku_id:
+            raise ValueError("Either service_id or sku_id must be provided")
+        if self.service_id and self.sku_id:
+            raise ValueError("Cannot specify both service_id and sku_id")
+        return self
 
     class Config:
         from_attributes = True  # For SQLAlchemy model conversion
@@ -28,11 +38,13 @@ class BillItemResponse(BaseModel):
     """Schema for bill item in response."""
 
     id: str
-    service_id: str
+    service_id: Optional[str] = None
+    sku_id: Optional[str] = None
     item_name: str
     base_price: int  # paise
     quantity: int
     line_total: int  # paise
+    cogs_amount: Optional[int] = None  # paise
     staff_id: Optional[str] = None
     notes: Optional[str] = None
 
@@ -49,6 +61,11 @@ class BillItemResponse(BaseModel):
         """Get line total in rupees."""
         return self.line_total / 100.0
 
+    @property
+    def cogs_amount_rupees(self) -> Optional[float]:
+        """Get COGS amount in rupees."""
+        return self.cogs_amount / 100.0 if self.cogs_amount else None
+
 
 class BillCreate(BaseModel):
     """Schema for creating a new bill."""
@@ -57,8 +74,11 @@ class BillCreate(BaseModel):
     customer_id: Optional[str] = Field(None, min_length=26, max_length=26)
     customer_name: Optional[str] = Field(None, min_length=1, max_length=200)
     customer_phone: Optional[str] = Field(None, min_length=10, max_length=15)
-    discount_amount: int = Field(default=0, ge=0, description="Discount in rupees")
+    discount_amount: int = Field(default=0, ge=0, description="Discount in paise")
     discount_reason: Optional[str] = Field(None, max_length=500)
+    session_id: Optional[str] = Field(None, min_length=26, max_length=26, description="Session ID to link walk-ins")
+    tip_amount: int = Field(default=0, ge=0, description="Tip amount in paise")
+    tip_staff_id: Optional[str] = Field(None, min_length=26, max_length=26, description="Staff receiving tip")
 
     @model_validator(mode='after')
     def validate_customer_info(self):
@@ -88,7 +108,7 @@ class BillResponse(BaseModel):
     """Schema for bill in response."""
 
     id: str
-    invoice_number: str
+    invoice_number: Optional[str] = None
     status: BillStatus
 
     # Customer info
@@ -105,6 +125,8 @@ class BillResponse(BaseModel):
     total_amount: int
     rounded_total: int
     rounding_adjustment: int
+    tip_amount: int = 0
+    tip_staff_id: Optional[str] = None
 
     # Items
     items: List[BillItemResponse] = []
@@ -179,7 +201,20 @@ class PaymentResponseWithBill(PaymentResponse):
     """Payment response including updated bill status."""
 
     bill_status: BillStatus
-    invoice_number: str
+    invoice_number: Optional[str] = None
+
+
+class VoidCreate(BaseModel):
+    """Schema for voiding a bill."""
+
+    reason: Optional[str] = Field(None, max_length=500, description="Reason for voiding")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "reason": "Customer cancelled appointment"
+            }
+        }
 
 
 class RefundCreate(BaseModel):
@@ -221,7 +256,7 @@ class BillListItem(BaseModel):
     """Simplified bill schema for list views."""
 
     id: str
-    invoice_number: str
+    invoice_number: Optional[str] = None
     status: BillStatus
     customer_name: Optional[str] = None
     rounded_total: int  # paise

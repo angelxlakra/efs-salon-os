@@ -23,6 +23,11 @@ from app.schemas.reports import (
     DaySummaryListResponse,
     MonthlyReportResponse,
     TaxReportResponse,
+    ProfitLossResponse,
+    PLRevenue,
+    PLCostOfGoodsSold,
+    PLOperatingExpenses,
+    PLProfitability,
     ReportFilters,
 )
 from app.auth.dependencies import get_current_user, require_owner_or_receptionist, require_owner
@@ -358,6 +363,133 @@ def get_tax_report(
     )
 
     return TaxReportResponse(**report_data)
+
+
+# ============ Profit & Loss Report Endpoint ============
+
+@router.get("/profit-loss", response_model=ProfitLossResponse)
+def get_profit_loss_report(
+    start_date: str = Query(..., description="Period start (YYYY-MM-DD)"),
+    end_date: str = Query(..., description="Period end (YYYY-MM-DD)"),
+    db: Session = Depends(get_db),
+    current_user = Depends(require_owner)
+):
+    """Generate detailed Profit & Loss statement.
+
+    **Permissions**: Owner only
+
+    Provides comprehensive P&L statement with:
+    - Revenue breakdown (gross, discounts, refunds, net)
+    - Cost of Goods Sold (service materials + retail products)
+    - Operating expenses by category (rent, salaries, utilities, etc.)
+    - Profitability metrics (gross profit, net profit, margins)
+
+    This report uses actual COGS from bill items and approved expenses.
+
+    Args:
+        start_date: Report period start (YYYY-MM-DD)
+        end_date: Report period end (YYYY-MM-DD)
+        db: Database session
+        current_user: Authenticated owner
+
+    Returns:
+        ProfitLossResponse: Complete P&L statement
+
+    Raises:
+        400: Invalid date format or date range
+    """
+    from app.models.accounting import DaySummary
+    from app.models.expense import Expense, ExpenseStatus, ExpenseCategory
+
+    # Parse dates
+    try:
+        start_date_obj = datetime.strptime(start_date, "%Y-%m-%d").date()
+        end_date_obj = datetime.strptime(end_date, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid date format. Use YYYY-MM-DD"
+        )
+
+    # Validate date range
+    if start_date_obj > end_date_obj:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="start_date must be before or equal to end_date"
+        )
+
+    # Get day summaries for the period
+    summaries = db.query(DaySummary).filter(
+        DaySummary.summary_date >= start_date_obj,
+        DaySummary.summary_date <= end_date_obj
+    ).all()
+
+    # Aggregate revenue
+    total_bills = sum(s.total_bills for s in summaries)
+    gross_revenue = sum(s.gross_revenue for s in summaries)
+    discount_amount = sum(s.discount_amount for s in summaries)
+    refund_amount = sum(s.refund_amount for s in summaries)
+    net_revenue = gross_revenue - discount_amount - refund_amount
+
+    # Aggregate COGS
+    service_cogs = sum(s.actual_service_cogs for s in summaries)
+    product_cogs = sum(s.actual_product_cogs for s in summaries)
+    total_cogs = service_cogs + product_cogs
+
+    # Get operating expenses for the period
+    expenses = db.query(Expense).filter(
+        Expense.expense_date >= start_date_obj,
+        Expense.expense_date <= end_date_obj,
+        Expense.status == ExpenseStatus.APPROVED
+    ).all()
+
+    # Breakdown expenses by category
+    expenses_by_category = {}
+    for exp in expenses:
+        category_name = exp.category.value
+        expenses_by_category[category_name] = expenses_by_category.get(category_name, 0) + exp.amount
+
+    total_expenses = sum(expenses_by_category.values())
+
+    # Calculate profitability
+    gross_profit = net_revenue - total_cogs
+    net_profit = gross_profit - total_expenses
+
+    # Calculate margins (avoid division by zero)
+    gross_margin_percent = (gross_profit / net_revenue * 100) if net_revenue > 0 else 0
+    net_margin_percent = (net_profit / net_revenue * 100) if net_revenue > 0 else 0
+
+    # Tips
+    total_tips = sum(s.total_tips for s in summaries)
+
+    return ProfitLossResponse(
+        period_start=start_date_obj,
+        period_end=end_date_obj,
+        revenue=PLRevenue(
+            gross_revenue=gross_revenue,
+            discount_amount=discount_amount,
+            refund_amount=refund_amount,
+            net_revenue=net_revenue
+        ),
+        cogs=PLCostOfGoodsSold(
+            service_cogs=service_cogs,
+            product_cogs=product_cogs,
+            total_cogs=total_cogs
+        ),
+        operating_expenses=PLOperatingExpenses(
+            by_category=expenses_by_category,
+            total_expenses=total_expenses
+        ),
+        profitability=PLProfitability(
+            gross_profit=gross_profit,
+            net_profit=net_profit,
+            gross_margin_percent=gross_margin_percent,
+            net_margin_percent=net_margin_percent
+        ),
+        total_bills=total_bills,
+        tips_collected=total_tips,
+        generated_at=datetime.now(IST)
+    )
 
 
 # ============ Export Endpoints ============

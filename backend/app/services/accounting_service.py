@@ -14,7 +14,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, or_
 
 from app.models.accounting import DaySummary, CashDrawer
-from app.models.billing import Bill, BillStatus, Payment, PaymentMethod
+from app.models.billing import Bill, BillItem, BillStatus, Payment, PaymentMethod
+from app.models.expense import Expense, ExpenseStatus
 from app.models.appointment import Appointment, WalkIn, AppointmentStatus
 from app.models.service import Service
 from app.models.user import Staff
@@ -56,7 +57,7 @@ class AccountingService:
         bills_query = self.db.query(Bill).filter(
             Bill.created_at >= start_of_day,
             Bill.created_at <= end_of_day,
-            Bill.status.in_([BillStatus.PAID, BillStatus.REFUNDED])
+            Bill.status.in_([BillStatus.POSTED, BillStatus.REFUNDED])
         )
 
         total_bills = bills_query.count()
@@ -72,25 +73,25 @@ class AccountingService:
         for bill in bills_query.all():
             if bill.status == BillStatus.REFUNDED:
                 # Refunded bills subtract from revenue
-                gross_revenue -= bill.total
+                gross_revenue -= bill.rounded_total
                 discount_amount -= bill.discount_amount
-                net_revenue -= bill.final_total
+                net_revenue -= bill.rounded_total
                 cgst_collected -= bill.cgst_amount
                 sgst_collected -= bill.sgst_amount
                 total_tax -= (bill.cgst_amount + bill.sgst_amount)
             else:
-                gross_revenue += bill.total
+                gross_revenue += bill.rounded_total
                 discount_amount += bill.discount_amount
-                net_revenue += bill.final_total
+                net_revenue += bill.rounded_total
                 cgst_collected += bill.cgst_amount
                 sgst_collected += bill.sgst_amount
                 total_tax += (bill.cgst_amount + bill.sgst_amount)
 
         # Get payment split
         payments_query = self.db.query(Payment).join(Bill).filter(
-            Payment.paid_at >= start_of_day,
-            Payment.paid_at <= end_of_day,
-            Bill.status == BillStatus.PAID
+            Payment.confirmed_at >= start_of_day,
+            Payment.confirmed_at <= end_of_day,
+            Bill.status == BillStatus.POSTED
         )
 
         cash_collected = 0
@@ -176,7 +177,7 @@ class AccountingService:
             Service.id,
             Service.name,
             func.count(BillItem.id).label('count'),
-            func.sum(BillItem.subtotal).label('total_revenue')
+            func.sum(BillItem.line_total).label('total_revenue')
         ).join(
             BillItem, BillItem.service_id == Service.id
         ).join(
@@ -184,11 +185,11 @@ class AccountingService:
         ).filter(
             Bill.created_at >= start_of_day,
             Bill.created_at <= end_of_day,
-            Bill.status == BillStatus.PAID
+            Bill.status == BillStatus.POSTED
         ).group_by(
             Service.id, Service.name
         ).order_by(
-            func.sum(BillItem.subtotal).desc()
+            func.sum(BillItem.line_total).desc()
         ).limit(limit).all()
 
         return [
@@ -285,10 +286,10 @@ class AccountingService:
         bills_query = self.db.query(Bill).filter(
             Bill.created_at >= start_of_day,
             Bill.created_at <= end_of_day,
-            Bill.status.in_([BillStatus.PAID, BillStatus.REFUNDED])
+            Bill.status.in_([BillStatus.POSTED, BillStatus.REFUNDED])
         )
 
-        total_bills = bills_query.filter(Bill.status == BillStatus.PAID).count()
+        total_bills = bills_query.filter(Bill.status == BillStatus.POSTED).count()
         refund_count = bills_query.filter(Bill.status == BillStatus.REFUNDED).count()
 
         # Calculate revenue and taxes
@@ -300,9 +301,9 @@ class AccountingService:
 
         for bill in bills_query.all():
             if bill.status == BillStatus.REFUNDED:
-                refund_amount += bill.final_total
+                refund_amount += bill.rounded_total
             else:
-                gross_revenue += bill.total
+                gross_revenue += bill.rounded_total
                 discount_amount += bill.discount_amount
                 cgst_collected += bill.cgst_amount
                 sgst_collected += bill.sgst_amount
@@ -312,9 +313,9 @@ class AccountingService:
 
         # Calculate payment split
         payments_query = self.db.query(Payment).join(Bill).filter(
-            Payment.paid_at >= start_of_day,
-            Payment.paid_at <= end_of_day,
-            Bill.status == BillStatus.PAID
+            Payment.confirmed_at >= start_of_day,
+            Payment.confirmed_at <= end_of_day,
+            Bill.status == BillStatus.POSTED
         )
 
         cash_collected = 0
@@ -326,8 +327,39 @@ class AccountingService:
             else:
                 digital_collected += payment.amount
 
-        # COGS estimation (placeholder - would need actual inventory tracking)
-        # Estimate COGS as 30% of net revenue
+        # Calculate actual COGS from bill items
+        actual_service_cogs = 0
+        actual_product_cogs = 0
+        total_tips = 0
+
+        for bill in bills_query.all():
+            if bill.status == BillStatus.POSTED:
+                # Sum COGS from bill items
+                for item in bill.items:
+                    if item.cogs_amount:
+                        if item.service_id:
+                            actual_service_cogs += item.cogs_amount
+                        elif item.sku_id:
+                            actual_product_cogs += item.cogs_amount
+
+                # Sum tips
+                if bill.tip_amount:
+                    total_tips += bill.tip_amount
+
+        total_cogs = actual_service_cogs + actual_product_cogs
+
+        # Calculate operating expenses for the day
+        expenses_query = self.db.query(Expense).filter(
+            Expense.expense_date == target_date,
+            Expense.status == ExpenseStatus.APPROVED
+        )
+        total_expenses = sum(exp.amount for exp in expenses_query.all())
+
+        # Calculate accurate profit
+        gross_profit = net_revenue - total_cogs
+        net_profit = gross_profit - total_expenses
+
+        # Keep estimated values for backward compatibility
         estimated_cogs = int(net_revenue * 0.30)
         estimated_profit = net_revenue - estimated_cogs
 
@@ -347,6 +379,13 @@ class AccountingService:
             existing.digital_collected = digital_collected
             existing.estimated_cogs = estimated_cogs
             existing.estimated_profit = estimated_profit
+            existing.actual_service_cogs = actual_service_cogs
+            existing.actual_product_cogs = actual_product_cogs
+            existing.total_cogs = total_cogs
+            existing.total_expenses = total_expenses
+            existing.gross_profit = gross_profit
+            existing.net_profit = net_profit
+            existing.total_tips = total_tips
             existing.generated_at = datetime.now(IST)
             existing.generated_by = generated_by
             existing.is_final = is_final
@@ -371,6 +410,13 @@ class AccountingService:
                 digital_collected=digital_collected,
                 estimated_cogs=estimated_cogs,
                 estimated_profit=estimated_profit,
+                actual_service_cogs=actual_service_cogs,
+                actual_product_cogs=actual_product_cogs,
+                total_cogs=total_cogs,
+                total_expenses=total_expenses,
+                gross_profit=gross_profit,
+                net_profit=net_profit,
+                total_tips=total_tips,
                 generated_at=datetime.now(IST),
                 generated_by=generated_by,
                 is_final=is_final

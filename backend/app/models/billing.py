@@ -1,7 +1,7 @@
 """Billing models for bills, bill items, and payments."""
 
 import enum
-from sqlalchemy import Column, DateTime, Enum, ForeignKey, Integer, String, Text
+from sqlalchemy import CheckConstraint, Column, DateTime, Enum, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
 from app.database import Base
 from app.models.base import TimestampMixin, ULIDMixin
@@ -32,7 +32,7 @@ class Bill(Base, ULIDMixin, TimestampMixin):
     """
     __tablename__ = "bills"
 
-    invoice_number = Column(String, nullable=False, unique=True, index=True)
+    invoice_number = Column(String, nullable=True, unique=True, index=True)
     customer_id = Column(String(26), ForeignKey("customers.id"), index=True)
 
     # Amounts in paise
@@ -46,6 +46,10 @@ class Bill(Base, ULIDMixin, TimestampMixin):
     # After rounding to nearest Rs 1
     rounded_total = Column(Integer, nullable=False)
     rounding_adjustment = Column(Integer, nullable=False, default=0)
+
+    # Tips
+    tip_amount = Column(Integer, nullable=False, default=0)
+    tip_staff_id = Column(String(26), ForeignKey("staff.id"))
 
     # Status
     status = Column(Enum(BillStatus), nullable=False, default=BillStatus.DRAFT, index=True)
@@ -76,6 +80,7 @@ class Bill(Base, ULIDMixin, TimestampMixin):
     discount_approver = relationship("User", foreign_keys=[discount_approved_by])
     refund_approver = relationship("User", foreign_keys=[refund_approved_by])
     original_bill = relationship("Bill", remote_side="Bill.id", foreign_keys=[original_bill_id])
+    tip_recipient = relationship("Staff", foreign_keys=[tip_staff_id])
 
     def __repr__(self):
         return f"<Bill {self.invoice_number} - Rs {self.rounded_total / 100:.2f}>"
@@ -90,14 +95,24 @@ class BillItem(Base, ULIDMixin, TimestampMixin):
     """
     Individual line items on a bill.
 
-    Links to services and optionally to appointments/walk-ins.
+    Links to services OR retail products (SKUs).
+    Exactly one of service_id or sku_id must be set.
     """
     __tablename__ = "bill_items"
+    __table_args__ = (
+        CheckConstraint(
+            "(service_id IS NOT NULL AND sku_id IS NULL) OR (service_id IS NULL AND sku_id IS NOT NULL)",
+            name="bill_item_service_or_sku_check"
+        ),
+    )
 
     bill_id = Column(String(26), ForeignKey("bills.id", ondelete="CASCADE"), nullable=False, index=True)
 
-    # Reference to service/appointment/walkin
-    service_id = Column(String(26), ForeignKey("services.id"), nullable=False, index=True)
+    # Reference to service OR product (mutually exclusive)
+    service_id = Column(String(26), ForeignKey("services.id"), nullable=True, index=True)
+    sku_id = Column(String(26), ForeignKey("skus.id"), nullable=True, index=True)
+
+    # For services: optional link to appointment/walkin
     appointment_id = Column(String(26), ForeignKey("appointments.id"))
     walkin_id = Column(String(26), ForeignKey("walkins.id"))
     staff_id = Column(String(26), ForeignKey("staff.id"))
@@ -108,12 +123,16 @@ class BillItem(Base, ULIDMixin, TimestampMixin):
     quantity = Column(Integer, nullable=False, default=1)
     line_total = Column(Integer, nullable=False)
 
+    # COGS tracking (actual cost, not estimate)
+    cogs_amount = Column(Integer, nullable=True)  # paise
+
     # Notes
     notes = Column(Text)
 
     # Relationships
     bill = relationship("Bill", back_populates="items")
     service = relationship("Service")
+    sku = relationship("SKU", back_populates="bill_items")
     appointment = relationship("Appointment")
     walkin = relationship("WalkIn")
     staff = relationship("Staff")

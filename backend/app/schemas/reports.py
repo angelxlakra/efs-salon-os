@@ -238,6 +238,82 @@ class TaxReportResponse(BaseModel):
         return self.total_tax / 100.0
 
 
+# ============ Profit & Loss Schemas ============
+
+class PLRevenue(BaseModel):
+    """Revenue breakdown for P&L statement."""
+    gross_revenue: int = Field(..., description="Total revenue before discounts (paise)")
+    discount_amount: int = Field(..., description="Total discounts (paise)")
+    refund_amount: int = Field(..., description="Total refunds (paise)")
+    net_revenue: int = Field(..., description="Revenue after discounts and refunds (paise)")
+
+    @property
+    def net_revenue_rupees(self) -> float:
+        return self.net_revenue / 100.0
+
+
+class PLCostOfGoodsSold(BaseModel):
+    """COGS breakdown for P&L statement."""
+    service_cogs: int = Field(..., description="Cost of materials used for services (paise)")
+    product_cogs: int = Field(..., description="Cost of retail products sold (paise)")
+    total_cogs: int = Field(..., description="Total COGS (paise)")
+
+    @property
+    def total_cogs_rupees(self) -> float:
+        return self.total_cogs / 100.0
+
+
+class PLOperatingExpenses(BaseModel):
+    """Operating expenses breakdown by category."""
+    by_category: Dict[str, int] = Field(default_factory=dict, description="Expenses by category (paise)")
+    total_expenses: int = Field(..., description="Total operating expenses (paise)")
+
+    @property
+    def total_expenses_rupees(self) -> float:
+        return self.total_expenses / 100.0
+
+
+class PLProfitability(BaseModel):
+    """Profitability metrics for P&L statement."""
+    gross_profit: int = Field(..., description="Revenue - COGS (paise)")
+    net_profit: int = Field(..., description="Gross profit - Operating expenses (paise)")
+    gross_margin_percent: float = Field(..., description="Gross profit / Revenue * 100")
+    net_margin_percent: float = Field(..., description="Net profit / Revenue * 100")
+
+    @property
+    def gross_profit_rupees(self) -> float:
+        return self.gross_profit / 100.0
+
+    @property
+    def net_profit_rupees(self) -> float:
+        return self.net_profit / 100.0
+
+
+class ProfitLossResponse(BaseModel):
+    """Detailed Profit & Loss statement."""
+    period_start: date
+    period_end: date
+
+    # Revenue
+    revenue: PLRevenue
+
+    # Cost of Goods Sold
+    cogs: PLCostOfGoodsSold
+
+    # Operating Expenses
+    operating_expenses: PLOperatingExpenses
+
+    # Profitability
+    profitability: PLProfitability
+
+    # Additional metrics
+    total_bills: int = Field(..., description="Number of bills in period")
+    tips_collected: int = Field(0, description="Total tips (paise)")
+
+    # Generation metadata
+    generated_at: datetime
+
+
 # ============ Filter/Query Schemas ============
 
 class ReportFilters(BaseModel):

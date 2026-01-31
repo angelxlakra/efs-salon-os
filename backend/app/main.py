@@ -19,6 +19,14 @@ from app.api.cash_drawer import router as cash_drawer_router
 from app.api.inventory import router as inventory_router
 from app.api.appointments import router as appointments_router
 from app.api.reports import router as reports_router
+from app.api.users import router as user_router
+from app.api.staff import router as staff_router
+from app.api.roles import router as roles_router
+from app.api.settings import router as settings_router
+from app.api.reconciliation import router as reconciliation_router
+from app.api.expenses import router as expenses_router
+from app.api.purchases import router as purchases_router
+from app.api.attendance import router as attendance_router
 
 # Initialize FastAPI application
 app = FastAPI(
@@ -45,7 +53,14 @@ app.include_router(cash_drawer_router, prefix="/api", tags=["Cash Drawer"])
 app.include_router(inventory_router, prefix="/api", tags=["Inventory"])
 app.include_router(appointments_router, prefix="/api", tags=["Appointments"])
 app.include_router(reports_router, prefix="/api", tags=["Reports"])
-
+app.include_router(user_router, prefix="/api", tags=["Users"])
+app.include_router(staff_router, prefix="/api", tags=["Staff"])
+app.include_router(roles_router, prefix="/api", tags=["Roles"])
+app.include_router(settings_router, prefix="/api", tags=["Settings"])
+app.include_router(reconciliation_router, prefix="/api", tags=["Reconciliation"])
+app.include_router(expenses_router, prefix="/api/expenses", tags=["Expenses"])
+app.include_router(purchases_router, prefix="/api/purchases", tags=["Purchases"])
+app.include_router(attendance_router, prefix="/api/attendance", tags=["Attendance"])
 
 @app.get("/healthz")
 def health_check():

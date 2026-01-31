@@ -12,12 +12,14 @@ from datetime import datetime, date, time, timedelta
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, or_, func
 
 from app.database import get_db
 from app.models.appointment import Appointment, WalkIn, AppointmentStatus
 from app.models.customer import Customer
+from app.models.billing import Bill, BillStatus
 from app.models.service import Service
+from app.models.user import User, Staff
 from app.schemas.appointment import (
     AppointmentCreate,
     AppointmentUpdate,
@@ -27,10 +29,19 @@ from app.schemas.appointment import (
     WalkInResponse,
     StatusUpdate,
     ServiceNotesUpdate,
+    CancelRequest,
+    BulkWalkInCreate,
+    BulkWalkInResponse,
+    ActiveWalkInsResponse,
+    CustomerSessionGroup,
+    WalkInWithDetails,
+    MyServicesResponse,
+    ServiceResponseBase,
+    StaffResponseBase,
 )
 from app.auth.dependencies import get_current_user, require_owner_or_receptionist
 from app.auth.permissions import PermissionChecker
-from app.utils import generate_ticket_number, generate_ulid, IST
+from app.utils import generate_ulid, IST
 
 router = APIRouter(prefix="/appointments", tags=["Appointments"])
 
@@ -88,6 +99,42 @@ def _get_or_create_customer(
     return new_customer.id
 
 
+def _can_manage_service(
+    current_user: User,
+    assigned_staff_id: Optional[str],
+    db: Session
+) -> bool:
+    """Check if current user can manage (start/complete) a service.
+
+    Args:
+        current_user: The authenticated user
+        assigned_staff_id: The staff ID assigned to the service
+        db: Database session
+
+    Returns:
+        bool: True if user can manage the service
+
+    Rules:
+        - Owner/Receptionist: Can manage any service
+        - Staff: Can only manage services assigned to them
+    """
+    # Owner and Receptionist can manage any service
+    if current_user.role.name in ["owner", "receptionist"]:
+        return True
+
+    # Staff can only manage their own services
+    if current_user.role.name == "staff":
+        # Find staff profile for current user
+        staff = db.query(Staff).filter(Staff.user_id == current_user.id).first()
+        if not staff:
+            return False
+
+        # Check if service is assigned to this staff member
+        return assigned_staff_id == staff.id
+
+    return False
+
+
 def _check_scheduling_conflict(
     db: Session,
     staff_id: Optional[str],
@@ -129,6 +176,50 @@ def _check_scheduling_conflict(
         conflict_query = conflict_query.filter(Appointment.id != exclude_appointment_id)
 
     return conflict_query.first() is not None
+
+
+def _generate_ticket_numbers(db: Session, count: int = 1) -> List[str]:
+    """Generate unique sequential ticket numbers.
+    
+    Queries the database to find the latest ticket number for today from both
+    appointments and walk-ins tables to ensure global uniqueness and sequentiality.
+    
+    Args:
+        db: Database session
+        count: Number of tickets to generate
+        
+    Returns:
+        List[str]: List of unique ticket numbers
+    """
+    now = datetime.now(IST)
+    date_str = now.strftime("%y%m%d")
+    prefix = f"TKT-{date_str}-"
+    
+    # Query max ticket number from both tables
+    # Tickets are formatted as TKT-YYMMDD-XXX
+    max_appt = db.query(func.max(Appointment.ticket_number))\
+        .filter(Appointment.ticket_number.like(f"{prefix}%")).scalar()
+        
+    max_walkin = db.query(func.max(WalkIn.ticket_number))\
+        .filter(WalkIn.ticket_number.like(f"{prefix}%")).scalar()
+    
+    current_max = 0
+    
+    for val in [max_appt, max_walkin]:
+        if val:
+            try:
+                # Extract the number part (XXX) from end of string
+                num_part = int(val.split('-')[-1])
+                current_max = max(current_max, num_part)
+            except (ValueError, IndexError):
+                continue
+    
+    tickets = []
+    for i in range(count):
+        # Generate next numbers: current_max + 1, current_max + 2, etc.
+        tickets.append(f"{prefix}{current_max + i + 1:03d}")
+        
+    return tickets
 
 
 # ============ Appointment Endpoints ============
@@ -195,7 +286,7 @@ def create_appointment(
 
     # Create appointment
     appointment = Appointment(
-        ticket_number=generate_ticket_number(),
+        ticket_number=_generate_ticket_numbers(db, 1)[0],
         visit_id=appointment_data.visit_id or generate_ulid(),
         customer_id=customer_id,
         customer_name=appointment_data.customer_name,
@@ -479,7 +570,9 @@ def start_appointment(
 
     Updates status to IN_PROGRESS and records start timestamp.
 
-    **Permissions**: All authenticated users (staff can start their own appointments)
+    **Permissions**:
+    - Owner/Receptionist: Can start any appointment
+    - Staff: Can only start appointments assigned to them
 
     Args:
         appointment_id: Appointment ID
@@ -491,6 +584,7 @@ def start_appointment(
 
     Raises:
         404: Appointment not found
+        403: Not authorized to manage this appointment
         400: Invalid status transition
     """
     appointment = db.query(Appointment).filter(Appointment.id == appointment_id).first()
@@ -499,6 +593,13 @@ def start_appointment(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Appointment not found"
+        )
+
+    # Check if user can manage this service
+    if not _can_manage_service(current_user, appointment.assigned_staff_id, db):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only start services assigned to you"
         )
 
     if appointment.status not in [AppointmentStatus.SCHEDULED, AppointmentStatus.CHECKED_IN]:
@@ -530,7 +631,9 @@ def complete_appointment(
 
     Updates status to COMPLETED and records completion timestamp.
 
-    **Permissions**: All authenticated users (staff can complete their own appointments)
+    **Permissions**:
+    - Owner/Receptionist: Can complete any appointment
+    - Staff: Can only complete appointments assigned to them
 
     Args:
         appointment_id: Appointment ID
@@ -542,6 +645,7 @@ def complete_appointment(
 
     Raises:
         404: Appointment not found
+        403: Not authorized to manage this appointment
         400: Invalid status transition
     """
     appointment = db.query(Appointment).filter(Appointment.id == appointment_id).first()
@@ -550,6 +654,13 @@ def complete_appointment(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Appointment not found"
+        )
+
+    # Check if user can manage this service
+    if not _can_manage_service(current_user, appointment.assigned_staff_id, db):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only complete services assigned to you"
         )
 
     if appointment.status != AppointmentStatus.IN_PROGRESS:
@@ -615,14 +726,16 @@ def update_service_notes(
 def create_walkin(
     walkin_data: WalkInCreate,
     db: Session = Depends(get_db),
-    current_user = Depends(require_owner_or_receptionist)
+    current_user = Depends(get_current_user)
 ):
     """Register a walk-in customer.
 
     Creates a walk-in record with status defaulting to CHECKED_IN.
     Similar to appointments but no scheduling required.
 
-    **Permissions**: Receptionist or Owner
+    **Permissions**:
+    - Receptionist/Owner: Can assign to any staff
+    - Staff: Can only create walk-ins assigned to themselves
 
     Args:
         walkin_data: Walk-in creation data
@@ -633,8 +746,19 @@ def create_walkin(
         WalkInResponse: Created walk-in record
 
     Raises:
-        400: Invalid service_id
+        400: Invalid service_id or unauthorized staff assignment
+        403: Staff trying to assign to someone else
     """
+    # Check permissions
+    has_permission = PermissionChecker.has_permission(
+        current_user.role.name, "walkins", "create"
+    )
+    if not has_permission:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have permission to create walk-ins"
+        )
+
     # Validate service exists
     service = db.query(Service).filter(Service.id == walkin_data.service_id).first()
     if not service:
@@ -642,6 +766,27 @@ def create_walkin(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Service not found: {walkin_data.service_id}"
         )
+
+    # For staff users, auto-assign to themselves and enforce it
+    assigned_staff_id = walkin_data.assigned_staff_id
+    if current_user.role.name == "staff":
+        # Find staff profile for current user
+        staff = db.query(Staff).filter(Staff.user_id == current_user.id).first()
+        if not staff:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No staff profile found for current user"
+            )
+
+        # Staff can only assign to themselves
+        if assigned_staff_id and assigned_staff_id != staff.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Staff members can only create walk-ins assigned to themselves"
+            )
+
+        # Auto-assign to themselves
+        assigned_staff_id = staff.id
 
     # Get or create customer
     customer_id = _get_or_create_customer(
@@ -653,13 +798,13 @@ def create_walkin(
 
     # Create walk-in
     walkin = WalkIn(
-        ticket_number=generate_ticket_number(),
+        ticket_number=_generate_ticket_numbers(db, 1)[0],
         visit_id=walkin_data.visit_id or generate_ulid(),
         customer_id=customer_id,
         customer_name=walkin_data.customer_name,
         customer_phone=walkin_data.customer_phone,
         service_id=walkin_data.service_id,
-        assigned_staff_id=walkin_data.assigned_staff_id,
+        assigned_staff_id=assigned_staff_id,
         duration_minutes=walkin_data.duration_minutes,
         status=AppointmentStatus.CHECKED_IN,
         created_by=current_user.id
@@ -731,6 +876,321 @@ def list_walkins(
     return walkins
 
 
+# ============ Specific Walk-In Endpoints (Must Come Before Parameterized Routes) ============
+
+@router.post("/walkins/bulk", response_model=BulkWalkInResponse, status_code=status.HTTP_201_CREATED)
+def create_bulk_walkins_v2(
+    data: BulkWalkInCreate,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_owner_or_receptionist)
+):
+    """Create multiple walk-in records at once (from POS cart).
+
+    Creates one walk-in per cart item (respecting quantity).
+    All walk-ins start in CHECKED_IN status and share the same session_id.
+
+    **Permissions**: Receptionist or Owner
+
+    **Use Case**: When receptionist adds multiple services to cart with staff
+    assignments and clicks "Create Service Orders".
+
+    Args:
+        data: Bulk walk-in creation data with session_id and items
+        db: Database session
+        current_user: Authenticated user
+
+    Returns:
+        BulkWalkInResponse: Created walk-ins with session info
+
+    Raises:
+        400: Invalid service_id or staff_id
+    """
+    # Use placeholder phone if not provided (walk-ins may not provide phone)
+    customer_phone = data.customer_phone or "0000000000"
+
+    # Get or create customer
+    customer_id = _get_or_create_customer(
+        db,
+        data.customer_id,
+        data.customer_name,
+        customer_phone
+    )
+
+    walkins = []
+    checked_in_at = datetime.now(IST)
+
+    # Calculate total quantity of tickets needed
+    total_quantity = sum(item.quantity for item in data.items)
+    ticket_numbers = _generate_ticket_numbers(db, total_quantity)
+    ticket_idx = 0
+
+    # Create walk-ins for each item
+    for item in data.items:
+        # Validate service exists
+        service = db.query(Service).filter(Service.id == item.service_id).first()
+        if not service:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Service not found: {item.service_id}"
+            )
+
+        # Validate staff exists if assigned
+        if item.assigned_staff_id:
+            staff = db.query(Staff).filter(Staff.id == item.assigned_staff_id).first()
+            if not staff:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Staff not found: {item.assigned_staff_id}"
+                )
+
+        # Create walk-in for each quantity
+        for _ in range(item.quantity):
+            walkin = WalkIn(
+                ticket_number=ticket_numbers[ticket_idx],
+                session_id=data.session_id,
+                customer_id=customer_id,
+                customer_name=data.customer_name,
+                customer_phone=customer_phone,
+                service_id=item.service_id,
+                assigned_staff_id=item.assigned_staff_id,
+                duration_minutes=service.duration_minutes,
+                status=AppointmentStatus.CHECKED_IN,
+                checked_in_at=checked_in_at,
+                created_by=current_user.id
+            )
+            db.add(walkin)
+            walkins.append(walkin)
+            ticket_idx += 1
+
+    db.commit()
+
+    # Refresh all walk-ins to get IDs and timestamps
+    for walkin in walkins:
+        db.refresh(walkin)
+
+    return BulkWalkInResponse(
+        session_id=data.session_id,
+        walkins=walkins,
+        total_items=len(walkins),
+        message=f"Created {len(walkins)} walk-in records successfully"
+    )
+
+
+@router.get("/walkins/active", response_model=ActiveWalkInsResponse)
+def get_active_walkins_v2(
+    db: Session = Depends(get_db),
+    current_user = Depends(require_owner_or_receptionist)
+):
+    """Get all active walk-ins (CHECKED_IN, IN_PROGRESS) grouped by session_id.
+
+    Returns walk-ins that are currently in progress, grouped by customer session.
+    Used by the live tracking dashboard to show real-time status.
+
+    **Permissions**: Receptionist or Owner
+
+    **Polling**: Frontend should poll this endpoint every 10 seconds for real-time updates.
+
+    Args:
+        db: Database session
+        current_user: Authenticated user
+
+    Returns:
+        ActiveWalkInsResponse: Active sessions with walk-ins and totals
+    """
+    # Query active walk-ins (CHECKED_IN, IN_PROGRESS, COMPLETED) that are NOT fully billed (Posted)
+    walkins_query = db.query(WalkIn).outerjoin(Bill, WalkIn.bill_id == Bill.id).filter(
+        WalkIn.session_id.isnot(None),
+        WalkIn.status.in_([
+            AppointmentStatus.CHECKED_IN, 
+            AppointmentStatus.IN_PROGRESS, 
+            AppointmentStatus.COMPLETED
+        ]),
+        or_(
+            WalkIn.bill_id.is_(None),
+            Bill.status == BillStatus.DRAFT
+        )
+    ).order_by(WalkIn.checked_in_at.asc())
+
+    walkins = walkins_query.all()
+
+    # Group by session_id
+    sessions_dict = {}
+    for walkin in walkins:
+        session_id = walkin.session_id
+        if session_id not in sessions_dict:
+            sessions_dict[session_id] = {
+                "session_id": session_id,
+                "customer_name": walkin.customer_name,
+                "customer_phone": walkin.customer_phone,
+                "customer_id": walkin.customer_id,
+                "walkins": [],
+                "checked_in_at": walkin.checked_in_at
+            }
+
+        # Build walk-in with details
+        walkin_detail = WalkInWithDetails(
+            id=walkin.id,
+            ticket_number=walkin.ticket_number,
+            customer_name=walkin.customer_name,
+            customer_phone=walkin.customer_phone,
+            customer_id=walkin.customer_id,
+            service=ServiceResponseBase(
+                id=walkin.service.id,
+                name=walkin.service.name,
+                base_price=walkin.service.base_price,
+                duration_minutes=walkin.service.duration_minutes
+            ),
+            assigned_staff=StaffResponseBase(
+                id=walkin.assigned_staff.id,
+                display_name=walkin.assigned_staff.display_name
+            ),
+            status=walkin.status,
+            checked_in_at=walkin.checked_in_at,
+            started_at=walkin.started_at,
+            completed_at=walkin.completed_at,
+            service_notes=walkin.service_notes,
+            duration_minutes=walkin.duration_minutes,
+            session_id=walkin.session_id
+        )
+        sessions_dict[session_id]["walkins"].append(walkin_detail)
+
+    # Build response sessions
+    sessions = []
+    for session_data in sessions_dict.values():
+        # Calculate total amount
+        total_amount = sum(w.service.base_price for w in session_data["walkins"])
+
+        # Calculate time since check-in
+        time_since_checkin = 0
+        if session_data["checked_in_at"]:
+            delta = datetime.now(IST) - session_data["checked_in_at"]
+            time_since_checkin = int(delta.total_seconds() / 60)
+
+        # Check if all completed
+        all_completed = all(w.status == AppointmentStatus.COMPLETED for w in session_data["walkins"])
+
+        session = CustomerSessionGroup(
+            session_id=session_data["session_id"],
+            customer_name=session_data["customer_name"],
+            customer_phone=session_data["customer_phone"],
+            customer_id=session_data["customer_id"],
+            walkins=session_data["walkins"],
+            total_amount=total_amount,
+            time_since_checkin=time_since_checkin,
+            all_completed=all_completed
+        )
+        sessions.append(session)
+
+    return ActiveWalkInsResponse(
+        sessions=sessions,
+        total_customers=len(sessions)
+    )
+
+
+@router.get("/walkins/my-services", response_model=MyServicesResponse)
+def get_my_services_v2(
+    date: Optional[str] = Query(None, description="Filter by date (YYYY-MM-DD), defaults to today"),
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    """Get all walk-ins assigned to current user's staff profile.
+
+    Returns services assigned to the logged-in staff member.
+    Used by staff dashboard to show their daily service queue.
+
+    **Permissions**: All authenticated users
+
+    **Staff Role**: Only sees their own assigned services
+    **Owner/Receptionist**: Can see services for date but filtered by staff if they have a staff profile
+
+    Args:
+        date: Filter by date (YYYY-MM-DD), defaults to today
+        db: Database session
+        current_user: Authenticated user
+
+    Returns:
+        MyServicesResponse: List of assigned walk-ins
+
+    Raises:
+        404: Staff profile not found for current user
+    """
+    # Find staff profile for current user
+    staff = db.query(Staff).filter(
+        Staff.user_id == current_user.id
+    ).first()
+
+    if not staff:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No staff profile found for current user"
+        )
+
+    # Parse date filter (default to today)
+    if date:
+        try:
+            filter_date = datetime.strptime(date, "%Y-%m-%d").date()
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid date format. Use YYYY-MM-DD"
+            )
+    else:
+        filter_date = datetime.now(IST).date()
+
+    start_of_day = datetime.combine(filter_date, time.min)
+    end_of_day = datetime.combine(filter_date, time.max)
+
+    # Query walk-ins assigned to this staff
+    walkins_query = db.query(WalkIn).filter(
+        WalkIn.assigned_staff_id == staff.id,
+        WalkIn.created_at >= start_of_day,
+        WalkIn.created_at <= end_of_day
+    ).order_by(
+        # Order by status priority, then by check-in time
+        WalkIn.status.desc(),
+        WalkIn.checked_in_at.asc()
+    )
+
+    walkins = walkins_query.all()
+
+    # Build detailed response
+    services = []
+    for walkin in walkins:
+        walkin_detail = WalkInWithDetails(
+            id=walkin.id,
+            ticket_number=walkin.ticket_number,
+            customer_name=walkin.customer_name,
+            customer_phone=walkin.customer_phone,
+            customer_id=walkin.customer_id,
+            service=ServiceResponseBase(
+                id=walkin.service.id,
+                name=walkin.service.name,
+                base_price=walkin.service.base_price,
+                duration_minutes=walkin.service.duration_minutes
+            ),
+            assigned_staff=StaffResponseBase(
+                id=walkin.assigned_staff.id,
+                display_name=walkin.assigned_staff.display_name
+            ),
+            status=walkin.status,
+            checked_in_at=walkin.checked_in_at,
+            started_at=walkin.started_at,
+            completed_at=walkin.completed_at,
+            service_notes=walkin.service_notes,
+            duration_minutes=walkin.duration_minutes,
+            session_id=walkin.session_id
+        )
+        services.append(walkin_detail)
+
+    return MyServicesResponse(
+        services=services,
+        date=filter_date.isoformat(),
+        total=len(services)
+    )
+
+
+# ============ Parameterized Walk-In Endpoints ============
+
 @router.get("/walkins/{walkin_id}", response_model=WalkInResponse)
 def get_walkin(
     walkin_id: str,
@@ -773,7 +1233,9 @@ def start_walkin(
 
     Updates status to IN_PROGRESS and records start timestamp.
 
-    **Permissions**: All authenticated users
+    **Permissions**:
+    - Owner/Receptionist: Can start any walk-in
+    - Staff: Can only start walk-ins assigned to them
 
     Args:
         walkin_id: Walk-in ID
@@ -785,6 +1247,7 @@ def start_walkin(
 
     Raises:
         404: Walk-in not found
+        403: Not authorized to manage this walk-in
         400: Invalid status transition
     """
     walkin = db.query(WalkIn).filter(WalkIn.id == walkin_id).first()
@@ -793,6 +1256,13 @@ def start_walkin(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Walk-in not found"
+        )
+
+    # Check if user can manage this service
+    if not _can_manage_service(current_user, walkin.assigned_staff_id, db):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only start services assigned to you"
         )
 
     if walkin.status != AppointmentStatus.CHECKED_IN:
@@ -820,7 +1290,9 @@ def complete_walkin(
 
     Updates status to COMPLETED and records completion timestamp.
 
-    **Permissions**: All authenticated users
+    **Permissions**:
+    - Owner/Receptionist: Can complete any walk-in
+    - Staff: Can only complete walk-ins assigned to them
 
     Args:
         walkin_id: Walk-in ID
@@ -832,6 +1304,7 @@ def complete_walkin(
 
     Raises:
         404: Walk-in not found
+        403: Not authorized to manage this walk-in
         400: Invalid status transition
     """
     walkin = db.query(WalkIn).filter(WalkIn.id == walkin_id).first()
@@ -840,6 +1313,13 @@ def complete_walkin(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Walk-in not found"
+        )
+
+    # Check if user can manage this service
+    if not _can_manage_service(current_user, walkin.assigned_staff_id, db):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only complete services assigned to you"
         )
 
     if walkin.status != AppointmentStatus.IN_PROGRESS:
@@ -892,6 +1372,66 @@ def update_walkin_notes(
 
     walkin.service_notes = notes_data.service_notes
     walkin.service_notes_updated_at = datetime.now(IST)
+
+    db.commit()
+    db.refresh(walkin)
+
+    return walkin
+
+
+@router.post("/walkins/{walkin_id}/cancel", response_model=WalkInResponse)
+def cancel_walkin(
+    walkin_id: str,
+    cancel_data: CancelRequest,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_owner_or_receptionist)
+):
+    """Cancel a walk-in service.
+
+    Used for customer cancellations, no-shows, or mistakes.
+    Only walk-ins that haven't been billed can be cancelled.
+
+    **Permissions**: Owner or Receptionist
+
+    Args:
+        walkin_id: Walk-in ID to cancel
+        cancel_data: Cancellation reason (optional)
+        db: Database session
+        current_user: Authenticated user
+
+    Returns:
+        WalkInResponse: Cancelled walk-in
+
+    Raises:
+        404: Walk-in not found
+        400: Walk-in already billed or already cancelled
+    """
+    walkin = db.query(WalkIn).filter(WalkIn.id == walkin_id).first()
+
+    if not walkin:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Walk-in not found"
+        )
+
+    # Can't cancel if already cancelled
+    if walkin.status == AppointmentStatus.CANCELLED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Walk-in is already cancelled"
+        )
+
+    # Can't cancel if already billed
+    if walkin.bill_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot cancel walk-in that has been billed. Void or refund the bill instead."
+        )
+
+    # Update status to cancelled
+    walkin.status = AppointmentStatus.CANCELLED
+    walkin.cancelled_at = datetime.now(IST)
+    walkin.cancellation_reason = cancel_data.reason
 
     db.commit()
     db.refresh(walkin)

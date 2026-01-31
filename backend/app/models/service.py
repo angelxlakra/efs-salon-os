@@ -1,6 +1,6 @@
 """Service catalog models for managing salon services."""
 
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.orm import relationship
 from app.database import Base
 from app.models.base import TimestampMixin, SoftDeleteMixin, ULIDMixin
@@ -38,13 +38,15 @@ class Service(Base, ULIDMixin, TimestampMixin, SoftDeleteMixin):
     name = Column(String, nullable=False)
     description = Column(Text)
     base_price = Column(Integer, nullable=False)  # in paise, tax-inclusive
-    duration_minutes = Column(Integer, nullable=False)
+    duration_minutes = Column(Integer, nullable=False)  # Estimated duration
+    average_duration_minutes = Column(Integer, nullable=True)  # Calculated from actual history
     is_active = Column(Boolean, nullable=False, default=True, index=True)
     display_order = Column(Integer, nullable=False, default=0)
 
     # Relationships
     category = relationship("ServiceCategory", back_populates="services")
     addons = relationship("ServiceAddon", back_populates="service")
+    material_usage = relationship("ServiceMaterialUsage", back_populates="service")
 
     def __repr__(self):
         return f"<Service {self.name}>"
@@ -77,3 +79,29 @@ class ServiceAddon(Base, ULIDMixin, TimestampMixin):
     def price_rupees(self) -> float:
         """Get price in rupees."""
         return self.price / 100.0
+
+
+class ServiceMaterialUsage(Base, ULIDMixin, TimestampMixin):
+    """
+    Track inventory items (SKUs) consumed when a service is performed.
+
+    Enables accurate COGS calculation for services.
+    Example: Men's haircut uses 5ml shampoo + 2ml conditioner.
+    """
+    __tablename__ = "service_material_usage"
+
+    service_id = Column(String(26), ForeignKey("services.id"), nullable=False, index=True)
+    sku_id = Column(String(26), ForeignKey("skus.id"), nullable=False, index=True)
+
+    # Quantity consumed per service performance
+    quantity_per_service = Column(Numeric(10, 2), nullable=False)
+
+    # Optional notes
+    notes = Column(Text)
+
+    # Relationships
+    service = relationship("Service", back_populates="material_usage")
+    sku = relationship("SKU")
+
+    def __repr__(self):
+        return f"<ServiceMaterialUsage {self.service.name if self.service else 'Unknown'} uses {self.quantity_per_service} {self.sku.uom if self.sku else ''}>"
