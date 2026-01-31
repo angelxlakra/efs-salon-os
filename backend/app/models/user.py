@@ -95,6 +95,7 @@ class Staff(Base, ULIDMixin, TimestampMixin):
 
     # Relationships
     user = relationship("User", back_populates="staff")
+    attendance_records = relationship("Attendance", back_populates="staff", order_by="desc(Attendance.date)")
 
     def __repr__(self):
         return f"<Staff {self.display_name}>"

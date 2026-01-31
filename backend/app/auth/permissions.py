@@ -30,6 +30,12 @@ class Permission(str, Enum):
     DELETE_APPOINTMENT = "appointments.delete"
     ASSIGN_STAFF = "appointments.assign_staff"
 
+    # Walk-in permissions
+    CREATE_WALKIN = "walkins.create"
+    READ_WALKIN = "walkins.read"
+    START_SERVICE = "walkins.start"
+    COMPLETE_SERVICE = "walkins.complete"
+
     # Inventory permissions
     CREATE_INVENTORY = "inventory.create"
     READ_INVENTORY = "inventory.read"
@@ -60,6 +66,19 @@ class Permission(str, Enum):
     MARK_SERVICE_COMPLETE = "services.mark_complete"
     ADD_SERVICE_NOTES = "services.add_notes"
 
+    # Purchase permissions
+    CREATE_PURCHASE = "purchases.create"
+    READ_PURCHASE = "purchases.read"
+    UPDATE_PURCHASE = "purchases.update"
+    DELETE_PURCHASE = "purchases.delete"
+
+    # Expense permissions
+    CREATE_EXPENSE = "expenses.create"
+    READ_EXPENSE = "expenses.read"
+    UPDATE_EXPENSE = "expenses.update"
+    DELETE_EXPENSE = "expenses.delete"
+    APPROVE_EXPENSE = "expenses.approve"
+
 
 class PermissionChecker:
     """Check if user has required permissions based on role."""
@@ -69,25 +88,32 @@ class PermissionChecker:
         RoleEnum.OWNER: {
             "billing": ["create", "read", "update", "refund", "discount", "view_totals"],
             "appointments": ["create", "read", "update", "delete", "assign_staff"],
+            "walkins": ["create", "read", "update", "delete", "start", "complete"],
             "inventory": ["create", "read", "update", "approve", "view_costs"],
             "accounting": ["view_dashboard", "view_profit", "export", "manage_drawer"],
             "users": ["create", "read", "update", "delete"],
             "settings": ["read", "update"],
             "schedule": ["view_all"],
-            "services": ["mark_complete", "add_notes"]
+            "services": ["mark_complete", "add_notes"],
+            "purchases": ["create", "read", "update", "delete"],
+            "expenses": ["create", "read", "update", "delete", "approve"]
         },
         RoleEnum.RECEPTIONIST: {
             "billing": ["create", "read", "discount", "view_totals"],
             "appointments": ["create", "read", "update", "assign_staff"],
+            "walkins": ["create", "read", "update", "start", "complete"],
             "inventory": ["read", "request"],
             "accounting": ["view_dashboard", "manage_drawer"],
             "users": ["read"],
             "schedule": ["view_all"],
-            "services": ["mark_complete", "add_notes"]
+            "services": ["mark_complete", "add_notes"],
+            "purchases": ["create", "read", "update"],
+            "expenses": ["create", "read", "update"]
         },
         RoleEnum.STAFF: {
             "schedule": ["view_own", "view_all"],
-            "services": ["mark_complete", "add_notes"]
+            "services": ["mark_complete", "add_notes"],
+            "walkins": ["create", "read", "start", "complete"]
         }
     }
 
