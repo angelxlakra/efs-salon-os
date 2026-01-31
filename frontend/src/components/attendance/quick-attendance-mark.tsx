@@ -15,7 +15,7 @@ interface Staff {
   display_name: string;
   full_name: string;
   is_active: boolean;
-  user: {
+  user?: {
     id: string;
     full_name: string;
   };
@@ -176,7 +176,7 @@ export function QuickAttendanceMark({ selectedDate, onRefresh }: QuickAttendance
                     <div>
                       <p className="font-medium">{staff.display_name}</p>
                       <p className="text-sm text-muted-foreground">
-                        {staff.user.full_name}
+                        {staff.user?.full_name || staff.full_name}
                       </p>
                     </div>
                   </div>
@@ -245,12 +245,12 @@ export function QuickAttendanceMark({ selectedDate, onRefresh }: QuickAttendance
                             <Clock className="h-3 w-3" />
                             In: {record.signed_in_at ? format(new Date(record.signed_in_at), 'h:mm a') : '-'}
                           </span>
-                          {hasCheckedOut && (
-                            <span className="flex items-center gap-1">
-                              <LogOut className="h-3 w-3" />
-                              Out: {format(new Date(record.signed_out_at), 'h:mm a')}
-                            </span>
-                          )}
+                            {hasCheckedOut && record.signed_out_at && (
+                              <span className="flex items-center gap-1">
+                                <LogOut className="h-3 w-3" />
+                                Out: {format(new Date(record.signed_out_at), 'h:mm a')}
+                              </span>
+                            )}
                         </div>
                       </div>
                     </div>

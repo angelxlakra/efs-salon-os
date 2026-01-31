@@ -28,7 +28,7 @@ interface Staff {
   display_name: string;
   full_name: string;
   is_active: boolean;
-  user: {
+  user?: {
     id: string;
     full_name: string;
   };
@@ -175,7 +175,7 @@ export function AttendanceMarkDialog({
               <SelectContent>
                 {allStaff.map((staff) => (
                   <SelectItem key={staff.id} value={staff.id}>
-                    {staff.display_name} ({staff.user.full_name})
+                    {staff.display_name} ({staff.user?.full_name || staff.full_name})
                   </SelectItem>
                 ))}
               </SelectContent>

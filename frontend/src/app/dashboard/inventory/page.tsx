@@ -14,7 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { apiClient } from '@/lib/api-client';
 import { toast } from 'sonner';
-import { useAuth } from '@/lib/auth-context';
+import { useAuthStore } from '@/stores/auth-store';
 
 interface SKU {
   id: string;
@@ -50,7 +50,7 @@ interface ChangeRequest {
 }
 
 export default function InventoryPage() {
-  const { user } = useAuth();
+  const { user } = useAuthStore();
   const [skus, setSkus] = useState<SKU[]>([]);
   const [filteredSkus, setFilteredSkus] = useState<SKU[]>([]);
   const [loading, setLoading] = useState(true);
@@ -267,7 +267,7 @@ export default function InventoryPage() {
     );
   }
 
-  const isOwner = user?.role?.name === 'owner';
+  const isOwner = user?.role === 'owner';
 
   return (
     <div className="p-6 space-y-6">
