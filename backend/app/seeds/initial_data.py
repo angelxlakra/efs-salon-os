@@ -20,6 +20,7 @@ import bcrypt
 from app.database import SessionLocal
 from app.models.user import Role, RoleEnum, User
 from app.models.service import ServiceCategory
+from app.models.settings import SalonSettings
 
 
 def seed_roles(db: Session):
@@ -173,6 +174,43 @@ def seed_service_categories(db: Session):
     return categories
 
 
+def seed_salon_settings(db: Session):
+    """Create default salon settings."""
+    print("Creating salon settings...")
+
+    # Check if settings already exist
+    existing_settings = db.query(SalonSettings).first()
+    if existing_settings:
+        print("  [INFO] Salon settings already exist. Skipping...")
+        return existing_settings
+
+    settings = SalonSettings(
+        salon_name="SalonOS",
+        salon_tagline="Premium Salon Services",
+        salon_address="123 Main Street",
+        salon_city="City",
+        salon_state="State",
+        salon_pincode="400001",
+        contact_phone="+91 98765 43210",
+        contact_email="info@salon.local",
+        receipt_header_text="Welcome! We're glad to serve you.",
+        receipt_footer_text="Thank you for your visit! See you soon.",
+        receipt_show_gstin=True,
+        receipt_show_logo=False,
+        primary_color="#000000",
+        invoice_prefix="SAL",
+        invoice_terms="All services are non-refundable. Please arrive 10 minutes before your appointment."
+    )
+
+    db.add(settings)
+    db.commit()
+
+    print("  [OK] Created default salon settings")
+    print("  [INFO] Update these settings from the Settings page in the dashboard")
+
+    return settings
+
+
 def main():
     """Main seeding function."""
     print("\n" + "=" * 60)
@@ -191,6 +229,9 @@ def main():
         # Seed service categories
         categories = seed_service_categories(db)
 
+        # Seed salon settings
+        settings = seed_salon_settings(db)
+
         print("\n" + "=" * 60)
         print("[SUCCESS] Seeding completed successfully!")
         print("=" * 60)
@@ -198,6 +239,7 @@ def main():
         print(f"  - Roles: {len(roles)}")
         print(f"  - Users: 1 (owner)")
         print(f"  - Service Categories: {len(categories)}")
+        print(f"  - Salon Settings: Initialized")
         print("\nDefault Login:")
         print("  Username: owner")
         print("  Password: change_me_123")

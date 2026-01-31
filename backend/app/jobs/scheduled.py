@@ -13,7 +13,8 @@ from sqlalchemy.orm import Session
 from app.database import SessionLocal
 from app.services.accounting_service import AccountingService
 from app.models.accounting import DaySummary
-from app.utils import IST
+from app.models.expense import Expense, ExpenseStatus, RecurrenceType
+from app.utils import IST, generate_ulid
 
 logger = logging.getLogger(__name__)
 
@@ -174,6 +175,133 @@ def nightly_backup_job():
 
     except Exception as e:
         logger.error(f"❌ Backup job failed: {str(e)}", exc_info=True)
+
+
+def generate_recurring_expenses_job():
+    """Generate recurring expense entries.
+
+    Scheduled to run daily at 00:05 IST (12:05 AM).
+    Creates expense entries for recurring expenses (rent, salaries, etc.).
+
+    This job:
+    - Runs early morning to prepare for the new business day
+    - Checks all recurring expense templates
+    - Creates new expense entries based on recurrence type
+    - Auto-approves if template doesn't require approval
+    """
+    db = SessionLocal()
+    logger.info("Starting recurring expense generation job...")
+
+    try:
+        now = datetime.now(IST)
+        today = now.date()
+
+        # Get all active recurring expense templates
+        recurring_expenses = db.query(Expense).filter(
+            Expense.is_recurring == True,
+            Expense.status == ExpenseStatus.APPROVED,
+            Expense.parent_expense_id.is_(None)  # Only templates, not instances
+        ).all()
+
+        if not recurring_expenses:
+            logger.info("No recurring expenses found")
+            return
+
+        logger.info(f"Found {len(recurring_expenses)} recurring expense templates")
+
+        expenses_created = 0
+
+        for template in recurring_expenses:
+            try:
+                # Check if we should create an expense today
+                should_create = False
+
+                if template.recurrence_type == RecurrenceType.DAILY:
+                    should_create = True
+
+                elif template.recurrence_type == RecurrenceType.WEEKLY:
+                    # Check if today matches the weekday of the template date
+                    should_create = today.weekday() == template.expense_date.weekday()
+
+                elif template.recurrence_type == RecurrenceType.MONTHLY:
+                    # Check if today is the same day of month
+                    should_create = today.day == template.expense_date.day
+
+                elif template.recurrence_type == RecurrenceType.QUARTERLY:
+                    # Check if today is the first day of a quarter and matches template day
+                    is_quarter_start = today.month in [1, 4, 7, 10] and today.day == 1
+                    should_create = is_quarter_start and template.expense_date.day == 1
+
+                elif template.recurrence_type == RecurrenceType.YEARLY:
+                    # Check if today matches month and day of template
+                    should_create = (
+                        today.month == template.expense_date.month and
+                        today.day == template.expense_date.day
+                    )
+
+                if not should_create:
+                    continue
+
+                # Check if expense already exists for today
+                existing = db.query(Expense).filter(
+                    Expense.parent_expense_id == template.id,
+                    Expense.expense_date == today
+                ).first()
+
+                if existing:
+                    logger.info(f"Expense already exists for template {template.id} on {today}")
+                    continue
+
+                # Create new expense instance
+                new_expense = Expense(
+                    id=generate_ulid(),
+                    category=template.category,
+                    amount=template.amount,
+                    expense_date=today,
+                    description=f"{template.description} (Auto-generated)",
+                    vendor_name=template.vendor_name,
+                    invoice_number=template.invoice_number,
+                    notes=f"Auto-generated from recurring template on {today}",
+                    is_recurring=False,  # Instance, not template
+                    recurrence_type=None,
+                    parent_expense_id=template.id,
+                    staff_id=template.staff_id,
+                    status=ExpenseStatus.APPROVED if not template.requires_approval else ExpenseStatus.PENDING,
+                    requires_approval=template.requires_approval,
+                    recorded_by=template.recorded_by,
+                    recorded_at=now,
+                    approved_by=template.recorded_by if not template.requires_approval else None,
+                    approved_at=now if not template.requires_approval else None
+                )
+
+                db.add(new_expense)
+                expenses_created += 1
+
+                logger.info(
+                    f"✅ Created expense: {template.category.value} - "
+                    f"₹{template.amount / 100:.2f} for {today}"
+                )
+
+            except Exception as e:
+                logger.error(
+                    f"❌ Failed to create expense from template {template.id}: {str(e)}",
+                    exc_info=True
+                )
+                # Continue with next template even if one fails
+
+        db.commit()
+
+        if expenses_created > 0:
+            logger.info(f"✅ Recurring expense generation complete: created {expenses_created} expense(s)")
+        else:
+            logger.info("No recurring expenses needed for today")
+
+    except Exception as e:
+        logger.error(f"❌ Recurring expense job failed: {str(e)}", exc_info=True)
+        db.rollback()
+
+    finally:
+        db.close()
 
 
 def test_job():

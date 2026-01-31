@@ -8,6 +8,7 @@ from decimal import Decimal
 import os
 from typing import Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import field_validator
 
 
 class Settings(BaseSettings):
@@ -66,7 +67,16 @@ class Settings(BaseSettings):
 
     # API
     api_prefix: str = "/api"
-    cors_origins: list[str] = ["http://salon.local", "http://localhost:3000"]
+    cors_origins: str | list[str] = "http://salon.local,http://localhost:3000"
+
+    @field_validator('cors_origins', mode='before')
+    @classmethod
+    def parse_cors_origins(cls, v):
+        """Parse CORS_ORIGINS from comma-separated string or return list as-is."""
+        if isinstance(v, str):
+            # Split by comma and strip whitespace
+            return [origin.strip() for origin in v.split(',') if origin.strip()]
+        return v
 
 
 # Create global settings instance

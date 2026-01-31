@@ -23,6 +23,7 @@ from app.jobs.scheduled import (
     generate_daily_summary_job,
     catchup_missing_summaries,
     nightly_backup_job,
+    generate_recurring_expenses_job,
     test_job,
 )
 
@@ -72,6 +73,19 @@ def start_worker():
         misfire_grace_time=600  # 10 minutes grace period
     )
     logger.info("✅ Scheduled: Daily Summary Generation (21:45 IST)")
+
+    # Recurring Expenses Generation (00:05 IST)
+    # Runs early morning to create recurring expenses for the day
+    scheduler.add_job(
+        generate_recurring_expenses_job,
+        trigger=CronTrigger(hour=0, minute=5, timezone=IST),
+        id='recurring_expenses',
+        name='Recurring Expenses Generation',
+        replace_existing=True,
+        max_instances=1,
+        misfire_grace_time=300  # 5 minutes grace period
+    )
+    logger.info("✅ Scheduled: Recurring Expenses Generation (00:05 IST)")
 
     # Nightly Backup (23:30 IST)
     # Runs late at night for database backup

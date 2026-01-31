@@ -86,9 +86,24 @@ class DaySummary(Base, ULIDMixin, TimestampMixin):
     cash_collected = Column(Integer, nullable=False, default=0)
     digital_collected = Column(Integer, nullable=False, default=0)
 
-    # COGS estimate (owner only)
+    # COGS estimate (deprecated - kept for backward compatibility)
     estimated_cogs = Column(Integer, nullable=False, default=0)
     estimated_profit = Column(Integer, nullable=False, default=0)
+
+    # Actual COGS and profit (owner only)
+    actual_service_cogs = Column(Integer, nullable=False, default=0)  # From service materials
+    actual_product_cogs = Column(Integer, nullable=False, default=0)  # From retail products
+    total_cogs = Column(Integer, nullable=False, default=0)  # Sum of service + product COGS
+
+    # Operating expenses
+    total_expenses = Column(Integer, nullable=False, default=0)  # Rent, salaries, utilities, etc.
+
+    # Accurate profit
+    gross_profit = Column(Integer, nullable=False, default=0)  # Revenue - COGS
+    net_profit = Column(Integer, nullable=False, default=0)  # Gross profit - Expenses
+
+    # Tips
+    total_tips = Column(Integer, nullable=False, default=0)
 
     # Generation tracking
     generated_at = Column(DateTime(timezone=True), nullable=False)
