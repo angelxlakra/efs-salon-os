@@ -150,8 +150,21 @@ def redis_url():
 
     Uses localhost instead of 'redis' hostname for local testing.
     Database 1 is used for tests (not 0) to avoid interfering with dev data.
+
+    Password support:
+    - Set REDIS_TEST_PASSWORD environment variable if your test Redis requires auth
+    - Leave unset for passwordless Redis (development only)
+
+    Examples:
+        Passwordless: redis://localhost:6379/1
+        With auth:    redis://:password@localhost:6379/1
     """
-    return "redis://localhost:6379/1"
+    import os
+
+    password = os.getenv("REDIS_TEST_PASSWORD", "")
+    auth = f":{password}@" if password else ""
+
+    return f"redis://{auth}localhost:6379/1"
 
 
 @pytest.fixture(scope="function")

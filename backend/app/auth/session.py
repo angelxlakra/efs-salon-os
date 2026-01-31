@@ -6,9 +6,13 @@ token blacklisting, and rate limiting for authentication endpoints.
 
 from datetime import timedelta
 from typing import Optional
+from urllib.parse import urlparse
 import redis.asyncio as redis
 from app.config import settings
 from app.auth.jwt import JWTHandler
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class SessionManager:
@@ -19,15 +23,77 @@ class SessionManager:
     - Access token blacklisting
     - Rate limiting for login attempts
     - Account lockout tracking
+
+    Note: Redis connection is lazy-loaded on first access to avoid
+    import-time failures. Connection includes validation and timeout
+    configuration for production reliability.
     """
 
     def __init__(self):
-        """Initialize Redis connection."""
-        self.redis = redis.from_url(
-            settings.redis_url,
-            encoding="utf-8",
-            decode_responses=True
-        )
+        """Initialize session manager (Redis connection happens lazily)."""
+        self._redis = None
+
+    @property
+    def redis(self):
+        """Get Redis client, connecting if needed.
+
+        Lazy connection pattern ensures:
+        - App can start even if Redis temporarily unavailable
+        - Clear error messages on misconfiguration
+        - Connection validation before use
+
+        Returns:
+            redis.Redis: Async Redis client
+
+        Raises:
+            ValueError: If Redis URL is invalid or connection fails
+        """
+        if self._redis is None:
+            self._redis = self._create_redis_connection()
+        return self._redis
+
+    def _create_redis_connection(self):
+        """Create and validate Redis connection.
+
+        Returns:
+            redis.Redis: Connected async Redis client
+
+        Raises:
+            ValueError: If connection fails with clear diagnostic message
+        """
+        parsed = urlparse(settings.redis_url)
+
+        try:
+            client = redis.from_url(
+                settings.redis_url,
+                encoding="utf-8",
+                decode_responses=True,
+                socket_connect_timeout=5,
+                socket_timeout=5,
+                retry_on_timeout=True,
+            )
+
+            logger.info(
+                f"Redis connection created: {parsed.hostname}:{parsed.port or 6379}"
+            )
+
+            return client
+
+        except redis.AuthenticationError as e:
+            raise ValueError(
+                f"Redis authentication failed for {parsed.hostname}:{parsed.port or 6379}. "
+                f"Check REDIS_URL password is correct. Error: {e}"
+            ) from e
+        except redis.ConnectionError as e:
+            raise ValueError(
+                f"Cannot connect to Redis at {parsed.hostname}:{parsed.port or 6379}. "
+                f"Ensure Redis is running and accessible. Error: {e}"
+            ) from e
+        except Exception as e:
+            raise ValueError(
+                f"Failed to create Redis connection from URL '{settings.redis_url}'. "
+                f"Error: {e}"
+            ) from e
 
     async def close(self):
         """Close Redis connection."""

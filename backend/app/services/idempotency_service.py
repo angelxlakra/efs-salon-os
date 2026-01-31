@@ -19,14 +19,22 @@
 """
 
 from typing import Optional
+from urllib.parse import urlparse
 import redis
 from app.config import settings
+import logging
+
+logger = logging.getLogger(__name__)
 
 class IdempotencyService:
     """Manage idempotency keys using Redis.
 
       Prevents duplicate bill creation by tracking request keys.
       Keys are stored with 24-hour TTL (time-to-live).
+
+      Note: Redis connection is lazy-loaded on first access to avoid
+      import-time failures. Connection includes validation and timeout
+      configuration for production reliability.
 
       Attributes:
           KEY_PREFIX: Redis key prefix ("idempotency:")
@@ -37,15 +45,73 @@ class IdempotencyService:
     TTL_SECONDS = 86400
 
     def __init__(self):
-        """Initialize Redis connection.
+        """Initialize idempotency service (Redis connection happens lazily)."""
+        self._redis_client = None
 
-            Connects to Redis using URL from settings.
+    @property
+    def redis_client(self):
+        """Get Redis client, connecting if needed.
+
+        Lazy connection pattern ensures:
+        - App can start even if Redis temporarily unavailable
+        - Clear error messages on misconfiguration
+        - Connection validation before use
+
+        Returns:
+            redis.Redis: Synchronous Redis client
+
+        Raises:
+            ValueError: If Redis URL is invalid or connection fails
         """
+        if self._redis_client is None:
+            self._redis_client = self._create_redis_connection()
+        return self._redis_client
 
-        self.redis_client = redis.from_url(
-            settings.redis_url,
-            decode_responses=True
-        )
+    def _create_redis_connection(self):
+        """Create and validate Redis connection.
+
+        Returns:
+            redis.Redis: Connected sync Redis client
+
+        Raises:
+            ValueError: If connection fails with clear diagnostic message
+        """
+        parsed = urlparse(settings.redis_url)
+
+        try:
+            client = redis.from_url(
+                settings.redis_url,
+                decode_responses=True,
+                socket_connect_timeout=5,
+                socket_timeout=5,
+                retry_on_timeout=True,
+            )
+
+            # Test connection
+            client.ping()
+
+            logger.info(
+                f"Idempotency Redis connection created: "
+                f"{parsed.hostname}:{parsed.port or 6379}"
+            )
+
+            return client
+
+        except redis.AuthenticationError as e:
+            raise ValueError(
+                f"Redis authentication failed for {parsed.hostname}:{parsed.port or 6379}. "
+                f"Check REDIS_URL password is correct. Error: {e}"
+            ) from e
+        except redis.ConnectionError as e:
+            raise ValueError(
+                f"Cannot connect to Redis at {parsed.hostname}:{parsed.port or 6379}. "
+                f"Ensure Redis is running and accessible. Error: {e}"
+            ) from e
+        except Exception as e:
+            raise ValueError(
+                f"Failed to create Redis connection from URL '{settings.redis_url}'. "
+                f"Error: {e}"
+            ) from e
 
     def check_key(self, key: str) -> Optional[str]:
         """Check if idempotency key was used before.

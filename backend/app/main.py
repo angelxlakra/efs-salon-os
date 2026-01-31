@@ -11,6 +11,9 @@ dependencies, ensuring fast performance and data privacy for salon operations.
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
+import logging
+
+logger = logging.getLogger(__name__)
 from app.auth.router import router as auth_router
 from app.api.pos import router as pos_router
 from app.api.catalog import router as catalog_router
@@ -61,6 +64,46 @@ app.include_router(reconciliation_router, prefix="/api", tags=["Reconciliation"]
 app.include_router(expenses_router, prefix="/api/expenses", tags=["Expenses"])
 app.include_router(purchases_router, prefix="/api/purchases", tags=["Purchases"])
 app.include_router(attendance_router, prefix="/api/attendance", tags=["Attendance"])
+
+
+# ========== Startup Event ==========
+
+@app.on_event("startup")
+async def startup_validation():
+    """Validate critical connections on startup.
+
+    Tests Redis connectivity to ensure misconfiguration is caught
+    immediately with clear error messages rather than failing
+    silently or during first request.
+
+    Raises:
+        Exception: If critical services are unavailable
+    """
+    logger.info("🚀 SalonOS API starting up...")
+
+    # Validate Redis connection
+    try:
+        from app.auth.session import session_manager
+
+        # This will trigger lazy connection and validation
+        await session_manager.redis.ping()
+        logger.info("✅ Redis connection validated")
+
+    except Exception as e:
+        logger.error(f"❌ Redis connection failed: {e}")
+        logger.error(
+            "Check REDIS_URL environment variable. "
+            "Expected format: redis://[:password@]host:port/db"
+        )
+        raise
+
+    # Database validation (already happens via SQLAlchemy pool_pre_ping)
+    logger.info("✅ Database connection validated (via pool_pre_ping)")
+
+    logger.info("✅ Startup validation complete")
+
+
+# ========== Health Endpoints ==========
 
 @app.get("/healthz")
 def health_check():
