@@ -46,6 +46,10 @@ salon-data/
 salon-data/postgres/
 salon-data/redis/
 salon-data/backups/
+backend/*.db
+backend/*.db-journal
+backend/*.db-shm
+backend/*.db-wal
 
 # Docker
 *.pid
@@ -57,10 +61,21 @@ nginx/*.log
 # System files
 .DS_Store
 Thumbs.db
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
 
 # Output files
 *.out
 
 # Node/npm (if in future frontend)
 node_modules/
+.next/
+dist/
+build/
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 

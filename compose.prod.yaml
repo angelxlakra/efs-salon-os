@@ -1,0 +1,107 @@
+# Production Docker Compose Configuration for SalonOS
+# This file contains production-specific overrides
+# Usage: docker compose -f compose.yaml -f compose.prod.yaml up -d
+
+name: efs-salon-os
+
+services:
+  postgres:
+    # Production-specific overrides
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
+    # Ensure no port exposure
+    ports: []
+
+  redis:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    # Ensure no port exposure
+    ports: []
+
+  api:
+    # Use production build
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: runtime  # Multi-stage build target
+    # Remove development volumes
+    volumes:
+      - ./salon-data/logs:/app/logs
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
+    environment:
+      - ENVIRONMENT=production
+      - DEBUG=false
+
+  worker:
+    # Use production build
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: runtime
+    # Remove development volumes
+    volumes:
+      - ./salon-data/backups:/backups
+      - ./salon-data/logs:/app/logs
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    environment:
+      - ENVIRONMENT=production
+      - DEBUG=false
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - NODE_ENV=production
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  nginx:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    # Production-specific nginx config can be added here if needed
+    # volumes:
+    #   - ./nginx/nginx.prod.conf:/etc/nginx/nginx.conf:ro
+
+networks:
+  salon_internal:
+    # Isolate from external networks in production
+    internal: false  # Set to true for maximum isolation (prevents internet access)

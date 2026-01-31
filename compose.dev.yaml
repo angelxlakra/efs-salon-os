@@ -1,0 +1,58 @@
+# Development Docker Compose Configuration for SalonOS
+# This file contains development-specific overrides
+# Usage: docker compose -f compose.yaml -f compose.dev.yaml up -d
+
+name: efs-salon-os
+
+services:
+  postgres:
+    # Expose for development tools (e.g., pgAdmin, DBeaver)
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-dev_password_123}
+
+  redis:
+    # Expose for development tools (e.g., RedisInsight)
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes  # No password in dev
+
+  api:
+    # Enable hot reload with volume mounts
+    volumes:
+      - ./backend:/app
+      - ./salon-data/logs:/app/logs
+    environment:
+      - ENVIRONMENT=development
+      - DEBUG=true
+      - REDIS_URL=redis://redis:6379/0  # No password in dev
+    # Override CMD for development with reload
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  worker:
+    # Enable hot reload with volume mounts
+    volumes:
+      - ./backend:/app
+      - ./salon-data/backups:/backups
+      - ./salon-data/logs:/app/logs
+    environment:
+      - ENVIRONMENT=development
+      - DEBUG=true
+      - REDIS_URL=redis://redis:6379/0  # No password in dev
+
+  frontend:
+    # Development build with hot reload
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+    command: npm run dev
+
+networks:
+  salon_internal:
+    internal: false  # Allow external access in development

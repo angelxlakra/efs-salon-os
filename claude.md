@@ -258,22 +258,24 @@ curl http://salon.local/api/readyz
 
 ## Troubleshooting
 
+docker compose {COMMAND}
+
 ### Services Won't Start
 ```bash
 # Check status
-docker-compose ps
+docker compose ps
 
 # View logs
-docker-compose logs api postgres redis
+docker compose logs api postgres redis
 
 # Restart all
-docker-compose down && docker-compose up -d
+docker compose down && docker-compose up -d
 ```
 
 ### Database Connection Issues
 ```bash
 # Verify PostgreSQL is running
-docker-compose exec postgres pg_isready -U salon_user
+docker compose exec postgres pg_isready -U salon_user
 
 # Check credentials in .env
 cat .env | grep DB_PASSWORD

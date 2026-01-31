@@ -21,6 +21,7 @@ dependencies = [
     "python-ulid>=2.2.0",
     "pytz>=2023.3",
     "python-dotenv>=1.1.1",
+    "reportlab>=4.0.0",
 ]
 
 [project.optional-dependencies]
