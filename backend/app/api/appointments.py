@@ -344,8 +344,9 @@ def list_appointments(
     if date:
         try:
             filter_date = datetime.strptime(date, "%Y-%m-%d").date()
-            start_of_day = datetime.combine(filter_date, time.min)
-            end_of_day = datetime.combine(filter_date, time.max)
+            # Create timezone-aware datetimes for comparison
+            start_of_day = IST.localize(datetime.combine(filter_date, time.min))
+            end_of_day = IST.localize(datetime.combine(filter_date, time.max))
             query = query.filter(
                 Appointment.scheduled_at >= start_of_day,
                 Appointment.scheduled_at <= end_of_day
@@ -849,8 +850,9 @@ def list_walkins(
     if date:
         try:
             filter_date = datetime.strptime(date, "%Y-%m-%d").date()
-            start_of_day = datetime.combine(filter_date, time.min)
-            end_of_day = datetime.combine(filter_date, time.max)
+            # Create timezone-aware datetimes for comparison
+            start_of_day = IST.localize(datetime.combine(filter_date, time.min))
+            end_of_day = IST.localize(datetime.combine(filter_date, time.max))
             query = query.filter(
                 WalkIn.created_at >= start_of_day,
                 WalkIn.created_at <= end_of_day
@@ -1137,8 +1139,9 @@ def get_my_services_v2(
     else:
         filter_date = datetime.now(IST).date()
 
-    start_of_day = datetime.combine(filter_date, time.min)
-    end_of_day = datetime.combine(filter_date, time.max)
+    # Create timezone-aware datetimes for comparison
+    start_of_day = IST.localize(datetime.combine(filter_date, time.min))
+    end_of_day = IST.localize(datetime.combine(filter_date, time.max))
 
     # Query walk-ins assigned to this staff
     walkins_query = db.query(WalkIn).filter(

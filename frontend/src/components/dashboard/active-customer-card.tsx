@@ -3,7 +3,10 @@
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
-import { Clock, CheckCircle, Circle, Loader } from 'lucide-react';
+import { Clock, CheckCircle, Circle, Loader, Play, Check } from 'lucide-react';
+import { apiClient } from '@/lib/api-client';
+import { toast } from 'sonner';
+import { useAuthStore } from '@/stores/auth-store';
 
 interface Service {
   id: string;
@@ -48,12 +51,38 @@ interface CustomerSession {
 interface ActiveCustomerCardProps {
   session: CustomerSession;
   onCheckout: (sessionId: string) => void;
+  onRefresh?: () => void;
 }
 
 export function ActiveCustomerCard({
   session,
   onCheckout,
+  onRefresh,
 }: ActiveCustomerCardProps) {
+  const { user } = useAuthStore();
+  const canManageServices = user?.role === 'owner' || user?.role === 'receptionist';
+
+  const handleStartService = async (walkinId: string) => {
+    try {
+      await apiClient.post(`/appointments/walkins/${walkinId}/start`);
+      toast.success('Service started');
+      onRefresh?.();
+    } catch (error: any) {
+      console.error('Error starting service:', error);
+      toast.error(error.response?.data?.detail || 'Failed to start service');
+    }
+  };
+
+  const handleCompleteService = async (walkinId: string) => {
+    try {
+      await apiClient.post(`/appointments/walkins/${walkinId}/complete`);
+      toast.success('Service completed');
+      onRefresh?.();
+    } catch (error: any) {
+      console.error('Error completing service:', error);
+      toast.error(error.response?.data?.detail || 'Failed to complete service');
+    }
+  };
   const formatPrice = (paise: number) => {
     return `₹${(paise / 100).toFixed(2)}`;
   };
@@ -97,7 +126,7 @@ export function ActiveCustomerCard({
           {session.walkins.map((walkin) => (
             <div
               key={walkin.id}
-              className="flex items-center justify-between text-sm"
+              className="flex items-center justify-between text-sm gap-2"
             >
               <div className="flex items-center gap-2 min-w-0 flex-1">
                 {getStatusIcon(walkin.status)}
@@ -108,6 +137,32 @@ export function ActiveCustomerCard({
                   • {walkin.assigned_staff.display_name}
                 </span>
               </div>
+              {canManageServices && (
+                <div className="flex gap-1">
+                  {walkin.status === 'checked_in' && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0"
+                      onClick={() => handleStartService(walkin.id)}
+                      title="Start service"
+                    >
+                      <Play className="h-3 w-3" />
+                    </Button>
+                  )}
+                  {walkin.status === 'in_progress' && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0"
+                      onClick={() => handleCompleteService(walkin.id)}
+                      title="Complete service"
+                    >
+                      <Check className="h-3 w-3" />
+                    </Button>
+                  )}
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -125,8 +180,9 @@ export function ActiveCustomerCard({
           className="w-full h-8 text-xs"
           size="sm"
           onClick={() => onCheckout(session.session_id)}
+          disabled={!session.all_completed}
         >
-          Checkout
+          {session.all_completed ? 'Checkout' : 'Complete Services First'}
         </Button>
       </CardFooter>
     </Card>

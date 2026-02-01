@@ -176,15 +176,29 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
     // Convert rupees to paise
     const discountPaise = Math.round(amount * 100);
 
-    // Check permission for large discounts
-    const maxDiscount = user?.role === 'owner' ? Infinity : 50000; // ₹500 for non-owners
-    if (discountPaise > maxDiscount) {
-      alert(`You can only apply discounts up to ${formatPrice(maxDiscount)}`);
-      return;
-    }
-
     setGlobalDiscount(discountPaise);
     setDiscountInput('');
+  };
+
+  const handlePercentageDiscount = (percentage: number) => {
+    // Check if this percentage is currently active
+    const currentPercentage = subtotal > 0 ? Math.round((discount / subtotal) * 100) : 0;
+
+    if (currentPercentage === percentage) {
+      // If already active, remove discount
+      setGlobalDiscount(0);
+    } else {
+      // Calculate and apply discount as percentage of subtotal
+      const discountPaise = Math.round((subtotal * percentage) / 100);
+      setGlobalDiscount(discountPaise);
+    }
+  };
+
+  // Check if a percentage discount is currently active
+  const isPercentageActive = (percentage: number): boolean => {
+    if (subtotal === 0 || discount === 0) return false;
+    const currentPercentage = Math.round((discount / subtotal) * 100);
+    return currentPercentage === percentage;
   };
 
   const handleClearCart = () => {
@@ -357,7 +371,7 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
   return (
     <div className="w-full bg-white md:rounded-xl md:border border-gray-200 flex flex-col md:sticky md:top-0 h-full md:h-[calc(100vh-7rem)] md:shadow-sm">
       {/* Header */}
-      <div className="p-4 border-b border-gray-200 flex-shrink-0 relative z-10">
+      <div className="p-4 pr-12 md:pr-4 border-b border-gray-200 flex-shrink-0 relative">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <ShoppingCart className="h-5 w-5 text-gray-700" />
@@ -525,22 +539,41 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
       {items.length > 0 && (
         <div className="border-t border-gray-200 p-4 space-y-3 flex-shrink-0">
           {/* Discount Input */}
-          <div className="flex gap-2">
-            <Input
-              type="number"
-              placeholder="Discount (₹)"
-              value={discountInput}
-              onChange={(e) => setDiscountInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleApplyDiscount()}
-              className="flex-1"
-            />
-            <Button
-              variant="outline"
-              onClick={handleApplyDiscount}
-              disabled={!discountInput}
-            >
-              Apply
-            </Button>
+          <div className="space-y-2">
+            <div className="flex gap-2">
+              <Input
+                type="number"
+                placeholder="Discount (₹)"
+                value={discountInput}
+                onChange={(e) => setDiscountInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleApplyDiscount()}
+                className="flex-1"
+              />
+              <Button
+                variant="outline"
+                onClick={handleApplyDiscount}
+                disabled={!discountInput}
+              >
+                Apply
+              </Button>
+            </div>
+            {/* Preset Percentage Discounts */}
+            <div className="flex gap-2">
+              {[5, 10, 15, 20].map((percentage) => {
+                const isActive = isPercentageActive(percentage);
+                return (
+                  <Button
+                    key={percentage}
+                    variant={isActive ? "default" : "secondary"}
+                    size="sm"
+                    onClick={() => handlePercentageDiscount(percentage)}
+                    className="flex-1"
+                  >
+                    {percentage}%
+                  </Button>
+                );
+              })}
+            </div>
           </div>
 
           {/* Price Breakdown */}
@@ -551,7 +584,14 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
             </div>
             {discountAmount > 0 && (
               <div className="flex justify-between text-green-600">
-                <span>Discount</span>
+                <span>
+                  Discount
+                  {subtotal > 0 && (
+                    <span className="ml-1 text-xs">
+                      ({((discountAmount / subtotal) * 100).toFixed(1)}%)
+                    </span>
+                  )}
+                </span>
                 <span>-{formatPrice(discountAmount)}</span>
               </div>
             )}

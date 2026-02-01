@@ -275,8 +275,15 @@ class ReceiptService:
 
         # Discount
         if bill.discount_amount > 0:
+            # Calculate discount percentage
+            discount_pct = 0.0
+            if bill.subtotal > 0:
+                discount_pct = (bill.discount_amount / bill.subtotal) * 100
+
+            discount_label = f"Discount ({discount_pct:.1f}%):" if discount_pct > 0 else "Discount:"
+
             totals_data.append([
-                Paragraph("Discount:", ParagraphStyle('TL', parent=styles['Normal'], fontSize=8, alignment=TA_RIGHT, textColor=colors.HexColor('#E53935'))),
+                Paragraph(discount_label, ParagraphStyle('TL', parent=styles['Normal'], fontSize=8, alignment=TA_RIGHT, textColor=colors.HexColor('#E53935'))),
                 Paragraph(f"- {ReceiptService.format_currency(bill.discount_amount)}", ParagraphStyle('TV', parent=styles['Normal'], fontSize=8, alignment=TA_RIGHT, textColor=colors.HexColor('#E53935')))
             ])
 

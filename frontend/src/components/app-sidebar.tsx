@@ -81,7 +81,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       title: 'Point of Sale',
       url: '/dashboard/pos',
       icon: CreditCard,
-      roles: ['owner', 'receptionist'],
+      roles: ['owner', 'receptionist', 'staff'],
     },
     {
       title: 'Bills',

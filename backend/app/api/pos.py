@@ -100,17 +100,7 @@ def create_bill(
             if existing_bill:
                 return BillResponse.model_validate(existing_bill)
 
-    # Validate discount limit for receptionist
-    limit = settings.receptionist_discount_limit
-    if limit != -1:
-        if current_user.is_receptionist and bill_data.discount_amount > limit:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"""
-                    Receptionists can only apply discounts up to ₹{limit}.
-                    Please ask owner for approval.
-                """
-            )
+    # Note: Discount limit removed - receptionists can apply any discount
 
     # Create bill
     billing_service = BillingService(db)

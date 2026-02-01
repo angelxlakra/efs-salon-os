@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { apiClient } from '@/lib/api-client';
 import { toast } from 'sonner';
 import { useCartStore } from '@/stores/cart-store';
+import { useAuthStore } from '@/stores/auth-store';
 import { ActiveCustomerCard } from '@/components/dashboard/active-customer-card';
 
 interface Service {
@@ -61,6 +62,7 @@ interface DashboardStats {
 
 export default function DashboardPage() {
   const router = useRouter();
+  const { user } = useAuthStore();
   const { addItem, setCustomer, setSessionId, clearCart } = useCartStore();
 
   const [stats, setStats] = useState<DashboardStats>({
@@ -72,6 +74,13 @@ export default function DashboardPage() {
   });
   const [activeSessions, setActiveSessions] = useState<CustomerSession[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Redirect staff users to their My Services page
+  useEffect(() => {
+    if (user?.role === 'staff') {
+      router.push('/dashboard/staff');
+    }
+  }, [user, router]);
 
   useEffect(() => {
     fetchDashboardData();
@@ -289,6 +298,7 @@ export default function DashboardPage() {
                       key={session.session_id}
                       session={session}
                       onCheckout={handleCheckoutSession}
+                      onRefresh={() => fetchDashboardData(true)}
                     />
                   ))}
                 </div>

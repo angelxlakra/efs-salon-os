@@ -89,7 +89,7 @@ export default function InventoryPage() {
     setLoading(true);
     try {
       const response = await apiClient.get('/inventory/skus', {
-        params: { size: 1000 } // Get all SKUs
+        params: { size: 100 } // Get SKUs with pagination limit
       });
       setSkus(response.data.items || []);
       setFilteredSkus(response.data.items || []);

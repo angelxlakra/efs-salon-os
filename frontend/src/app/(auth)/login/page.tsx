@@ -13,7 +13,7 @@ import { AlertCircle, Loader2 } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, isLoading } = useAuthStore();
+  const { login, user, isLoading } = useAuthStore();
   const { settings, fetchSettings } = useSettingsStore();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -31,7 +31,16 @@ export default function LoginPage() {
 
     try {
       await login({ username, password });
-      router.push('/dashboard');
+
+      // Get the user from the store after login
+      const currentUser = useAuthStore.getState().user;
+
+      // Redirect staff to their My Services page
+      if (currentUser?.role === 'staff') {
+        router.push('/dashboard/staff');
+      } else {
+        router.push('/dashboard');
+      }
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Invalid credentials');
     }

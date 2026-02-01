@@ -8,7 +8,7 @@ import { useSettingsStore } from '@/stores/settings-store';
 
 export default function HomePage() {
   const router = useRouter();
-  const { isAuthenticated, _hasHydrated } = useAuthStore();
+  const { isAuthenticated, user, _hasHydrated } = useAuthStore();
   const { settings, fetchSettings } = useSettingsStore();
 
   useEffect(() => {
@@ -21,12 +21,17 @@ export default function HomePage() {
     // Wait for hydration to complete before redirecting
     if (_hasHydrated) {
       if (isAuthenticated) {
-        router.push('/dashboard');
+        // Redirect staff to their My Services page
+        if (user?.role === 'staff') {
+          router.push('/dashboard/staff');
+        } else {
+          router.push('/dashboard');
+        }
       } else {
         router.push('/login');
       }
     }
-  }, [isAuthenticated, _hasHydrated, router]);
+  }, [isAuthenticated, user, _hasHydrated, router]);
 
   // Show loading while determining where to redirect
   return (

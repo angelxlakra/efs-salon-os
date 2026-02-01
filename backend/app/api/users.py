@@ -13,7 +13,7 @@ from app.schemas.user import (
     UserPasswordChange,
     UserPasswordReset
 )
-from app.models.user import User, Role, RoleEnum
+from app.models.user import User, Role, RoleEnum, Staff
 from app.database import get_db
 
 router = APIRouter(prefix="/users", tags=["Users"])
@@ -92,6 +92,18 @@ def create_user(
     db.add(user)
     db.commit()
     db.refresh(user)
+
+    # Automatically create Staff profile if user has STAFF role
+    if role.name == RoleEnum.STAFF:
+        staff = Staff(
+            user_id=user.id,
+            display_name=user.full_name,
+            specialization=[],
+            is_active=True
+        )
+        db.add(staff)
+        db.commit()
+
     return user
 
 @router.get("/{id}", response_model=UserResponse)

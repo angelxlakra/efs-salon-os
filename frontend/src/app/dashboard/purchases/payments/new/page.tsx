@@ -40,7 +40,7 @@ export default function RecordPaymentPage() {
 
   const loadSuppliers = async () => {
     try {
-      const response = await purchaseApi.listSuppliers({ active_only: true, size: 1000 });
+      const response = await purchaseApi.listSuppliers({ active_only: true, size: 100 });
       setSuppliers(response.items || []);
     } catch (error) {
       console.error('Error loading suppliers:', error);

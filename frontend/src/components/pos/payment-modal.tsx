@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { CreditCard, Wallet, Banknote, Loader2, CheckCircle2, Printer } from 'lucide-react';
 import {
   Dialog,
@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useCartStore } from '@/stores/cart-store';
 import { apiClient } from '@/lib/api-client';
 import { toast } from 'sonner';
@@ -45,7 +46,9 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
   const [status, setStatus] = useState<PaymentStatus>('idle');
   const [billId, setBillId] = useState<string | null>(null);
   const [successData, setSuccessData] = useState<{ total: number; change: number } | null>(null);
-  
+  const [incompleteServices, setIncompleteServices] = useState<string[]>([]);
+  const [isCheckingServices, setIsCheckingServices] = useState(false);
+
   // Track payments and remaining amount
   const [payments, setPayments] = useState<any[]>([]);
   const total = getTotal(); // Total bill amount in paise
@@ -60,6 +63,38 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
     setAmountToPay(remainingRupees.toString());
   });
 
+  // Check for incomplete services when modal opens
+  useEffect(() => {
+    const checkIncompleteServices = async () => {
+      if (!isOpen || !sessionId) {
+        setIncompleteServices([]);
+        return;
+      }
+
+      setIsCheckingServices(true);
+      try {
+        // Fetch all walk-ins for this session
+        const { data } = await apiClient.get('/appointments/walkins/active');
+        const session = data.sessions?.find((s: any) => s.session_id === sessionId);
+
+        if (session) {
+          // Find services that are not completed
+          const incomplete = session.walkins
+            .filter((w: any) => w.status !== 'completed')
+            .map((w: any) => w.service.name);
+
+          setIncompleteServices(incomplete);
+        }
+      } catch (error) {
+        console.error('Error checking services:', error);
+      } finally {
+        setIsCheckingServices(false);
+      }
+    };
+
+    checkIncompleteServices();
+  }, [isOpen, sessionId]);
+
   // Calculate change for cash payment
   const changeAmount = paymentMethod === 'cash' && amountToPay
     ? Math.max(0, parseFloat(amountToPay) - remainingRupees)
@@ -73,6 +108,12 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
   };
 
   const handlePayment = async () => {
+    // Check for incomplete services
+    if (incompleteServices.length > 0) {
+      toast.error('Please complete all services before checkout');
+      return;
+    }
+
     // Validation
     const amount = parseFloat(amountToPay);
     if (isNaN(amount) || amount <= 0) {
@@ -257,6 +298,21 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
           </div>
         ) : (
           <div className="space-y-6">
+            {/* Incomplete Services Warning */}
+            {incompleteServices.length > 0 && (
+              <Alert variant="destructive">
+                <AlertDescription>
+                  <strong>Cannot checkout:</strong> The following services are not completed yet:
+                  <ul className="mt-2 ml-4 list-disc">
+                    {incompleteServices.map((service, index) => (
+                      <li key={index}>{service}</li>
+                    ))}
+                  </ul>
+                  Please mark all services as completed before processing payment.
+                </AlertDescription>
+              </Alert>
+            )}
+
             {/* Amount Information */}
             <div className="bg-gray-50 rounded-lg p-4">
               <div className="flex justify-between items-end mb-2">
@@ -367,7 +423,7 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
               </Button>
               <Button
                 onClick={handlePayment}
-                disabled={status === 'processing' || remainingPaise <= 0}
+                disabled={status === 'processing' || remainingPaise <= 0 || incompleteServices.length > 0}
                 className="flex-1"
               >
                 {status === 'processing' ? (

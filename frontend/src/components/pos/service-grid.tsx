@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useCartStore } from '@/stores/cart-store';
+import { useAuthStore } from '@/stores/auth-store';
 import { apiClient } from '@/lib/api-client';
 import { toast } from 'sonner';
 
@@ -28,6 +29,7 @@ interface Staff {
   id: string;
   display_name: string;
   is_active: boolean;
+  user_id: string;
 }
 
 interface StaffBusyness {
@@ -56,11 +58,13 @@ export function ServiceGrid({ searchInputRef, hideStaffSelection = false, onServ
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [isLoading, setIsLoading] = useState(true);
   const { addItem } = useCartStore();
+  const { user } = useAuthStore();
 
   // Staff selection state
   const [expandedServiceId, setExpandedServiceId] = useState<string | null>(null);
   const [staff, setStaff] = useState<StaffWithBusyness[]>([]);
   const [isLoadingStaff, setIsLoadingStaff] = useState(false);
+  const [currentUserStaff, setCurrentUserStaff] = useState<StaffWithBusyness | null>(null);
   const expandedCardRef = useRef<HTMLDivElement | null>(null);
 
   // Fetch services and staff on mount
@@ -154,6 +158,14 @@ export function ServiceGrid({ searchInputRef, hideStaffSelection = false, onServ
       });
 
       setStaff(staffWithBusyness);
+
+      // If current user is staff, find their staff profile
+      if (user?.role === 'staff') {
+        const userStaff = staffWithBusyness.find(s => s.user_id === user.id);
+        if (userStaff) {
+          setCurrentUserStaff(userStaff);
+        }
+      }
     } catch (error: any) {
       console.error('Error fetching staff:', error);
       toast.error('Failed to load staff members');
@@ -164,6 +176,12 @@ export function ServiceGrid({ searchInputRef, hideStaffSelection = false, onServ
   };
 
   const handleServiceClick = (service: Service) => {
+    // If user is staff, auto-assign service to themselves
+    if (user?.role === 'staff' && currentUserStaff) {
+      handleStaffClick(service, currentUserStaff.id, currentUserStaff.display_name);
+      return;
+    }
+
     // If hiding staff selection, call the callback immediately
     if (hideStaffSelection && onServiceSelect) {
       onServiceSelect(

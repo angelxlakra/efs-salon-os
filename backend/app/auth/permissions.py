@@ -111,6 +111,7 @@ class PermissionChecker:
             "expenses": ["create", "read", "update"]
         },
         RoleEnum.STAFF: {
+            "billing": ["create", "read"],
             "schedule": ["view_own", "view_all"],
             "services": ["mark_complete", "add_notes"],
             "walkins": ["create", "read", "start", "complete"]
@@ -269,8 +270,7 @@ class PermissionChecker:
     def can_apply_discount(cls, role: RoleEnum, discount_amount: int) -> bool:
         """Check if role can apply discount of given amount.
 
-        Receptionists can apply discounts up to ₹500.
-        Owners can apply any discount.
+        Receptionists and Owners can apply any discount.
         Staff cannot apply discounts.
 
         Args:
@@ -281,17 +281,17 @@ class PermissionChecker:
             bool: True if role can apply discount.
 
         Example:
-            >>> # Receptionist can apply ₹300 discount
-            >>> PermissionChecker.can_apply_discount(RoleEnum.RECEPTIONIST, 30000)
+            >>> # Receptionist can apply any discount
+            >>> PermissionChecker.can_apply_discount(RoleEnum.RECEPTIONIST, 100000)
             True
-            >>> # Receptionist cannot apply ₹600 discount
-            >>> PermissionChecker.can_apply_discount(RoleEnum.RECEPTIONIST, 60000)
+            >>> # Staff cannot apply discount
+            >>> PermissionChecker.can_apply_discount(RoleEnum.STAFF, 10000)
             False
         """
         if role == RoleEnum.OWNER:
             return True
         elif role == RoleEnum.RECEPTIONIST:
-            # Receptionist can apply up to ₹500 (50000 paise)
-            return discount_amount <= 50000
+            # Receptionist can apply any discount
+            return True
         else:
             return False
