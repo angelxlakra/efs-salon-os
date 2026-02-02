@@ -116,8 +116,8 @@ class BillingService:
                 'draft'
         """
 
-        if not customer_id and (not customer_name or not customer_phone):
-            raise ValueError("Customer name and phone required if no customer_id")
+        if not customer_id and not customer_name:
+            raise ValueError("Customer name required if no customer_id")
 
         if session_id:
             # Check for existing draft bill for this session to prevent duplicates

@@ -7,6 +7,7 @@ export interface User {
   permissions: Record<string, string[]>;
   lastLoginAt?: string;
   avatar_url?: string;
+  staff_id?: string;
 }
 
 export interface LoginCredentials {

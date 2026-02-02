@@ -87,8 +87,9 @@ export default function CustomersPage() {
     });
   };
 
-  const formatPhone = (phone: string) => {
+  const formatPhone = (phone: string | null) => {
     // Format: +91 XXXXX XXXXX
+    if (!phone) return '-';
     if (phone.length === 10) {
       return `+91 ${phone.slice(0, 5)} ${phone.slice(5)}`;
     }
@@ -101,7 +102,7 @@ export default function CustomersPage() {
     return (
       customer.first_name.toLowerCase().includes(query) ||
       customer.last_name.toLowerCase().includes(query) ||
-      customer.phone.includes(query) ||
+      customer.phone?.includes(query) ||
       customer.email?.toLowerCase().includes(query)
     );
   });

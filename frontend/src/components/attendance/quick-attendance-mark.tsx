@@ -78,7 +78,8 @@ export function QuickAttendanceMark({ selectedDate, onRefresh }: QuickAttendance
     try {
       setIsMarking(staff.id);
       const now = new Date();
-      const signedInAt = `${selectedDate}T${format(now, 'HH:mm:ss')}`;
+      // Send ISO 8601 format with timezone
+      const signedInAt = now.toISOString();
 
       await apiClient.post('/attendance', {
         staff_id: staff.id,
@@ -102,7 +103,8 @@ export function QuickAttendanceMark({ selectedDate, onRefresh }: QuickAttendance
     try {
       setIsMarking(staff.id);
       const now = new Date();
-      const signedOutAt = `${selectedDate}T${format(now, 'HH:mm:ss')}`;
+      // Send ISO 8601 format with timezone
+      const signedOutAt = now.toISOString();
 
       await apiClient.post('/attendance', {
         staff_id: staff.id,

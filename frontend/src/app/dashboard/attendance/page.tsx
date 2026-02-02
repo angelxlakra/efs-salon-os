@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AttendanceTable } from '@/components/attendance/attendance-table';
 import { AttendanceMarkDialog } from '@/components/attendance/attendance-mark-dialog';
 import { QuickAttendanceMark } from '@/components/attendance/quick-attendance-mark';
+import { MyAttendanceCard } from '@/components/attendance/my-attendance-card';
 import { apiClient } from '@/lib/api-client';
 import { toast } from 'sonner';
 import { useAuthStore } from '@/stores/auth-store';
@@ -148,6 +149,9 @@ export default function AttendancePage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* My Attendance Card - Show for users with staff profiles */}
+      {user?.staff_id && <MyAttendanceCard />}
 
       {/* Summary Cards */}
       {isLoading ? (

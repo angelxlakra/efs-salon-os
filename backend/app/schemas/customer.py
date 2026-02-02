@@ -5,7 +5,7 @@ from pydantic import BaseModel, EmailStr, Field
 class CustomerBase(BaseModel):
     first_name: str = Field(..., min_length=1, max_length=100)
     last_name: Optional[str] = Field(None, max_length=100)
-    phone: str = Field(..., pattern=r"^\+?[1-9]\d{1,14}$")
+    phone: Optional[str] = Field(None, pattern=r"^\+?[1-9]\d{1,14}$")  # Optional for walk-ins
     email: Optional[EmailStr] = None
     date_of_birth: Optional[date] = None
     gender: Optional[str] = None
@@ -25,6 +25,7 @@ class CustomerUpdate(BaseModel):
 
 class CustomerResponse(CustomerBase):
     id: str
+    phone: Optional[str]  # Override to remove pattern validation for responses, nullable for walk-ins
     total_visits: int
     total_spent: int
     total_spent_rupees: float

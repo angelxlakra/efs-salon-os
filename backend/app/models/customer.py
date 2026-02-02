@@ -15,7 +15,7 @@ class Customer(Base, ULIDMixin, TimestampMixin, SoftDeleteMixin):
 
     first_name = Column(String, nullable=False)
     last_name = Column(String)
-    phone = Column(String, nullable=False, unique=True, index=True)  # Encrypted
+    phone = Column(String, nullable=True, index=True)  # Encrypted, nullable for walk-ins
     email = Column(String)  # Encrypted
     date_of_birth = Column(Date)
     gender = Column(String)

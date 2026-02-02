@@ -57,8 +57,9 @@ export function StaffSelector({
       setIsLoading(true);
 
       // Fetch staff list and busyness data in parallel
+      // Only show service providers (exclude receptionists)
       const [staffResponse, busynessResponse] = await Promise.all([
-        apiClient.get('/staff', { params: { is_active: true } }),
+        apiClient.get('/staff', { params: { is_active: true, service_providers_only: true } }),
         apiClient.get('/staff/availability/busyness'),
       ]);
 

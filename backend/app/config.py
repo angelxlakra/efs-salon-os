@@ -68,7 +68,7 @@ class Settings(BaseSettings):
 
     # API
     api_prefix: str = "/api"
-    cors_origins: str | list[str] = "http://salon.local,http://localhost:3000"
+    cors_origins: str | list[str] = "http://localhost:3000"
 
     @field_validator('cors_origins', mode='before')
     @classmethod

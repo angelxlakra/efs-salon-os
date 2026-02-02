@@ -11,11 +11,6 @@ const nextConfig: NextConfig = {
   images: {
     remotePatterns: [],
   },
-
-  // Environment variables to expose to the browser
-  env: {
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://salon.local/api',
-  },
 };
 
 export default nextConfig;

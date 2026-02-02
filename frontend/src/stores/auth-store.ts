@@ -36,6 +36,7 @@ export const useAuthStore = create<AuthStateInternal>()(
             fullName: data.user.full_name,
             role: data.user.role,
             permissions: data.user.permissions,
+            staff_id: data.user.staff_id,
           };
 
           set({

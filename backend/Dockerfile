@@ -26,6 +26,7 @@ RUN apk add --no-cache \
     postgresql-libs \
     curl \
     libffi \
+    ttf-dejavu \
     && pip install --no-cache-dir uv
 
 # Copy installed packages from builder

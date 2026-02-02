@@ -48,7 +48,7 @@ class Appointment(Base, ULIDMixin, TimestampMixin):
 
     # Customer info (required even if no customer record)
     customer_name = Column(String, nullable=False)
-    customer_phone = Column(String, nullable=False)
+    customer_phone = Column(String, nullable=True)  # Nullable for walk-ins without phone
 
     # Notes
     booking_notes = Column(Text)
@@ -101,7 +101,7 @@ class WalkIn(Base, ULIDMixin, TimestampMixin):
     completed_at = Column(DateTime(timezone=True))
 
     customer_name = Column(String, nullable=False)
-    customer_phone = Column(String, nullable=False)
+    customer_phone = Column(String, nullable=True)  # Nullable for walk-ins without phone
     service_notes = Column(Text)
     service_notes_updated_at = Column(DateTime(timezone=True))
 

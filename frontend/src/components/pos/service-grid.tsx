@@ -129,9 +129,36 @@ export function ServiceGrid({ searchInputRef, hideStaffSelection = false, onServ
     try {
       setIsLoadingStaff(true);
 
-      // Fetch staff list and busyness data in parallel
+      // If current user is staff, only fetch staff list (no busyness - they can't access it)
+      if (user?.role === 'staff') {
+        console.log('Staff user detected:', user);
+        const staffResponse = await apiClient.get('/staff', {
+          params: { is_active: true, service_providers_only: true }
+        });
+        const staffList = staffResponse.data.items || staffResponse.data || [];
+        console.log('Staff list fetched:', staffList);
+        console.log('Looking for user_id:', user.id);
+
+        // Find their own staff profile
+        const userStaff = staffList.find((s: Staff) => s.user_id === user.id);
+        console.log('Found user staff profile:', userStaff);
+
+        if (userStaff) {
+          setCurrentUserStaff(userStaff);
+          console.log('Set currentUserStaff:', userStaff);
+        } else {
+          console.error('Staff profile not found. User ID:', user.id, 'Staff list:', staffList);
+          toast.error('No staff profile found for your account. Please contact admin.');
+        }
+
+        // Don't set staff list for staff users - they don't need to see other staff
+        return;
+      }
+
+      // For owner/receptionist: Fetch staff list and busyness data in parallel
+      // Only show service providers (exclude receptionists)
       const [staffResponse, busynessResponse] = await Promise.all([
-        apiClient.get('/staff', { params: { is_active: true } }),
+        apiClient.get('/staff', { params: { is_active: true, service_providers_only: true } }),
         apiClient.get('/staff/availability/busyness'),
       ]);
 
@@ -158,17 +185,12 @@ export function ServiceGrid({ searchInputRef, hideStaffSelection = false, onServ
       });
 
       setStaff(staffWithBusyness);
-
-      // If current user is staff, find their staff profile
-      if (user?.role === 'staff') {
-        const userStaff = staffWithBusyness.find(s => s.user_id === user.id);
-        if (userStaff) {
-          setCurrentUserStaff(userStaff);
-        }
-      }
     } catch (error: any) {
       console.error('Error fetching staff:', error);
-      toast.error('Failed to load staff members');
+      // Don't show error toast for staff users if they can't access busyness endpoint
+      if (user?.role !== 'staff') {
+        toast.error('Failed to load staff members');
+      }
       setStaff([]);
     } finally {
       setIsLoadingStaff(false);
@@ -176,9 +198,31 @@ export function ServiceGrid({ searchInputRef, hideStaffSelection = false, onServ
   };
 
   const handleServiceClick = (service: Service) => {
-    // If user is staff, auto-assign service to themselves
-    if (user?.role === 'staff' && currentUserStaff) {
-      handleStaffClick(service, currentUserStaff.id, currentUserStaff.display_name);
+    // If user is staff, auto-assign service to themselves using staff_id from user object
+    if (user?.role === 'staff') {
+      if (!user.staff_id) {
+        toast.error('No staff profile found. Please contact admin to create your staff profile.');
+        return;
+      }
+
+      // Use user's full name as staff name
+      const staffName = user.fullName || 'Staff';
+
+      // Add directly to cart with staff assigned
+      addItem({
+        isProduct: false,
+        serviceId: service.id,
+        serviceName: service.name,
+        quantity: 1,
+        unitPrice: service.base_price,
+        discount: 0,
+        taxRate: service.tax_rate,
+        staffId: user.staff_id,
+        staffName: staffName,
+        duration: service.duration_minutes,
+      });
+
+      toast.success(`${service.name} added to cart (assigned to you)`);
       return;
     }
 

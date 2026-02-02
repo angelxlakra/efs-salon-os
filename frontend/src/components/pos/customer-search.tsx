@@ -60,7 +60,8 @@ export function CustomerSearch({ value, onChange, isOpen, onOpenChange }: Custom
     }
   };
 
-  const formatPhone = (phone: string) => {
+  const formatPhone = (phone: string | null) => {
+    if (!phone) return '-';
     if (phone.length === 10) {
       return `+91 ${phone.slice(0, 5)} ${phone.slice(5)}`;
     }
@@ -72,7 +73,7 @@ export function CustomerSearch({ value, onChange, isOpen, onOpenChange }: Custom
     return (
       customer.first_name.toLowerCase().includes(query) ||
       customer.last_name.toLowerCase().includes(query) ||
-      customer.phone.includes(query)
+      customer.phone?.includes(query)
     );
   });
 
@@ -137,7 +138,7 @@ export function CustomerSearch({ value, onChange, isOpen, onOpenChange }: Custom
                 onValueChange={setSearch}
               />
               <CommandList>
-                {filteredCustomers.length > 0 ? (
+                {search && filteredCustomers.length > 0 && (
                   <CommandGroup heading="Customers">
                     {filteredCustomers.map((customer) => (
                       <CommandItem
@@ -171,12 +172,11 @@ export function CustomerSearch({ value, onChange, isOpen, onOpenChange }: Custom
                       </CommandItem>
                     ))}
                   </CommandGroup>
-                ) : (
-                  search && (
-                    <div className="py-6 text-center text-sm text-gray-500">
-                      No customers found
-                    </div>
-                  )
+                )}
+                {search && filteredCustomers.length === 0 && (
+                  <div className="py-6 text-center text-sm text-gray-500">
+                    No customers found
+                  </div>
                 )}
                 <CommandGroup>
                   <CommandItem

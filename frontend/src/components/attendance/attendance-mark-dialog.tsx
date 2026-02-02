@@ -110,12 +110,13 @@ export function AttendanceMarkDialog({
     try {
       setIsSubmitting(true);
 
-      // Combine date with time
+      // Combine date with time and convert to ISO 8601 with timezone
+      // Create Date objects from the local date+time inputs, then convert to ISO
       const signedInAt = signInTime
-        ? `${selectedDate}T${signInTime}:00`
+        ? new Date(`${selectedDate}T${signInTime}:00`).toISOString()
         : null;
       const signedOutAt = signOutTime
-        ? `${selectedDate}T${signOutTime}:00`
+        ? new Date(`${selectedDate}T${signOutTime}:00`).toISOString()
         : null;
 
       await apiClient.post('/attendance', {

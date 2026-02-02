@@ -134,7 +134,7 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
 
       // 1. Create bill if it doesn't exist
       if (!currentBillId) {
-        const billPayload = {
+        const billPayload: any = {
           items: items.map(item => {
             // For services
             if (!item.isProduct) {
@@ -155,11 +155,17 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
             };
           }),
           customer_name: customerName || 'Walk-in Customer',
-          customer_phone: customerPhone,
-          customer_id: customerId,
           discount_amount: discount,
           session_id: sessionId,
         };
+
+        // Only include customer_phone and customer_id if they exist
+        if (customerPhone) {
+          billPayload.customer_phone = customerPhone;
+        }
+        if (customerId) {
+          billPayload.customer_id = customerId;
+        }
 
         const { data: billData } = await apiClient.post('/pos/bills', billPayload);
         currentBillId = billData.id;

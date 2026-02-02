@@ -87,6 +87,7 @@ class UserInfoResponse(BaseModel):
     permissions: dict
     last_login_at: Optional[datetime]
     is_active: bool
+    staff_id: Optional[str] = None
 
 
 # ========== Router ==========
@@ -193,17 +194,23 @@ async def login(
     # Get user permissions
     permissions = PermissionChecker.get_role_permissions(user.role.name)
 
+    # Include staff_id if user has a staff profile
+    user_data = {
+        "id": user.id,
+        "username": user.username,
+        "full_name": user.full_name,
+        "role": user.role.name.value,
+        "permissions": permissions
+    }
+
+    if user.staff:
+        user_data["staff_id"] = user.staff.id
+
     return LoginResponse(
         access_token=access_token,
         refresh_token=refresh_token,
         expires_in=JWTHandler.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        user={
-            "id": user.id,
-            "username": user.username,
-            "full_name": user.full_name,
-            "role": user.role.name.value,
-            "permissions": permissions
-        }
+        user=user_data
     )
 
 
@@ -386,7 +393,8 @@ async def get_current_user_info(
         role=current_user.role.name.value,
         permissions=permissions,
         last_login_at=current_user.last_login_at,
-        is_active=current_user.is_active
+        is_active=current_user.is_active,
+        staff_id=current_user.staff.id if current_user.staff else None
     )
 
 

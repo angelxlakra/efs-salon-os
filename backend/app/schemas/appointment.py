@@ -40,7 +40,7 @@ class AppointmentResponse(BaseModel):
     visit_id: Optional[str]
     customer_id: Optional[str]
     customer_name: str
-    customer_phone: str
+    customer_phone: Optional[str]  # Nullable for walk-ins without phone
     service_id: str
     assigned_staff_id: Optional[str]
     scheduled_at: datetime
@@ -88,7 +88,7 @@ class WalkInResponse(BaseModel):
     session_id: Optional[str]
     customer_id: Optional[str]
     customer_name: str
-    customer_phone: str
+    customer_phone: Optional[str]  # Nullable for walk-ins without phone
     service_id: str
     assigned_staff_id: Optional[str]
     duration_minutes: int
@@ -186,7 +186,7 @@ class WalkInWithDetails(BaseModel):
     id: str
     ticket_number: str
     customer_name: str
-    customer_phone: str
+    customer_phone: Optional[str]  # Nullable for walk-ins without phone
     customer_id: Optional[str]
     service: ServiceResponseBase
     assigned_staff: StaffResponseBase
@@ -212,7 +212,7 @@ class CustomerSessionGroup(BaseModel):
     """Group of walk-ins for a single customer session."""
     session_id: str
     customer_name: str
-    customer_phone: str
+    customer_phone: Optional[str]  # Nullable for walk-ins without phone
     customer_id: Optional[str]
     walkins: List[WalkInWithDetails]
     total_amount: int = Field(..., description="Total amount in paise")

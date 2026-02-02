@@ -52,7 +52,7 @@ def _get_or_create_customer(
     db: Session,
     customer_id: Optional[str],
     customer_name: str,
-    customer_phone: str
+    customer_phone: Optional[str]
 ) -> Optional[str]:
     """Get existing customer or create new one if phone doesn't exist.
 
@@ -60,7 +60,7 @@ def _get_or_create_customer(
         db: Database session
         customer_id: Optional existing customer ID
         customer_name: Customer name
-        customer_phone: Customer phone number
+        customer_phone: Optional customer phone number (None for walk-ins without phone)
 
     Returns:
         Customer ID if found/created, None otherwise
@@ -74,14 +74,15 @@ def _get_or_create_customer(
         if customer:
             return customer.id
 
-    # Try to find by phone
-    customer = db.query(Customer).filter(
-        Customer.phone == customer_phone,
-        Customer.deleted_at.is_(None)
-    ).first()
+    # Try to find by phone (only if phone is provided)
+    if customer_phone:
+        customer = db.query(Customer).filter(
+            Customer.phone == customer_phone,
+            Customer.deleted_at.is_(None)
+        ).first()
 
-    if customer:
-        return customer.id
+        if customer:
+            return customer.id
 
     # Create new customer
     # Split name into first/last (simple split on first space)
@@ -92,7 +93,7 @@ def _get_or_create_customer(
     new_customer = Customer(
         first_name=first_name,
         last_name=last_name,
-        phone=customer_phone
+        phone=customer_phone  # Can be None for walk-ins
     )
     db.add(new_customer)
     db.flush()
@@ -907,8 +908,8 @@ def create_bulk_walkins_v2(
     Raises:
         400: Invalid service_id or staff_id
     """
-    # Use placeholder phone if not provided (walk-ins may not provide phone)
-    customer_phone = data.customer_phone or "0000000000"
+    # Use None if phone not provided (walk-ins may not have phone)
+    customer_phone = data.customer_phone or None
 
     # Get or create customer
     customer_id = _get_or_create_customer(

@@ -90,6 +90,7 @@ def list_staff(
     size: int = Query(20, ge=1, le=100),
     search: Optional[str] = None,
     is_active: Optional[bool] = None,
+    service_providers_only: bool = Query(False, description="Exclude receptionists (show only service providers)"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_owner_or_receptionist)
 ):
@@ -100,9 +101,14 @@ def list_staff(
     - **size**: Items per page (max 100)
     - **search**: Search by display name (case-insensitive)
     - **is_active**: Filter by active status
+    - **service_providers_only**: If true, exclude receptionists (only show staff who provide services)
     """
     # Query Staff and join with User (filter deleted users)
     query = db.query(Staff).join(User).filter(User.deleted_at.is_(None))
+
+    # Exclude receptionists if service_providers_only is true
+    if service_providers_only:
+        query = query.join(User.role).filter(Role.name == RoleEnum.STAFF)
 
     # Apply search filter on display_name
     if search:

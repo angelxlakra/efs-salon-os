@@ -498,3 +498,59 @@ def get_my_attendance(
         size=size,
         pages=pages
     )
+
+
+@router.post("/my-attendance/mark", response_model=AttendanceResponse, status_code=status.HTTP_201_CREATED)
+def mark_my_attendance(
+    attendance_data: AttendanceCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Mark own attendance (for any user with a staff profile).
+
+    - Allows any authenticated user (including receptionists) to mark their own attendance
+    - User must have a staff profile
+    - Upserts attendance record (creates or updates if exists for same date)
+    - Requires PRESENT/HALF_DAY status to have signed_in_at timestamp
+    """
+    # Ensure user has a staff profile
+    if not current_user.staff:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No staff profile found for current user"
+        )
+
+    # Ensure user is marking their own attendance
+    if attendance_data.staff_id != current_user.staff.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only mark your own attendance"
+        )
+
+    # Check if attendance already exists (upsert behavior)
+    existing = db.query(Attendance).filter(
+        Attendance.staff_id == attendance_data.staff_id,
+        Attendance.date == attendance_data.date
+    ).first()
+
+    if existing:
+        # Update existing record
+        for field, value in attendance_data.model_dump(exclude_unset=True).items():
+            if field not in ['staff_id', 'date']:  # Don't update keys
+                setattr(existing, field, value)
+        existing.marked_by_id = current_user.id
+        db.commit()
+        db.refresh(existing)
+        return existing
+
+    # Create new record
+    new_attendance = Attendance(
+        **attendance_data.model_dump(),
+        marked_by_id=current_user.id
+    )
+    db.add(new_attendance)
+    db.commit()
+    db.refresh(new_attendance)
+
+    return new_attendance
