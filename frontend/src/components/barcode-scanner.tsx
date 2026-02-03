@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
-import { Camera, X, AlertCircle, Check } from 'lucide-react';
+import { Camera, X, AlertCircle, Check, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -27,6 +27,9 @@ export function BarcodeScanner({ onScan, onClose, autoClose = false, disabled = 
   const [selectedCamera, setSelectedCamera] = useState<string>('');
   const [scannedItems, setScannedItems] = useState<ScannedItem[]>([]);
   const [scanFeedback, setScanFeedback] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
+  const [permissionDenied, setPermissionDenied] = useState(false);
+  const [isBackCamera, setIsBackCamera] = useState(true); // Track if using back camera
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const scannerIdRef = useRef('barcode-scanner-' + Math.random().toString(36).substr(2, 9));
   const lastScanRef = useRef<string>('');
@@ -43,36 +46,7 @@ export function BarcodeScanner({ onScan, onClose, autoClose = false, disabled = 
   }, [disabled]);
 
   useEffect(() => {
-    // Get available cameras
-    Html5Qrcode.getCameras()
-      .then((devices) => {
-        if (devices && devices.length > 0) {
-          const cameraList = devices.map((device) => ({
-            id: device.id,
-            label: device.label || `Camera ${device.id}`,
-          }));
-          setCameras(cameraList);
-
-          // Prefer back camera on mobile
-          const backCamera = devices.find((d) =>
-            d.label.toLowerCase().includes('back') ||
-            d.label.toLowerCase().includes('rear')
-          );
-          const cameraId = backCamera?.id || devices[0].id;
-          setSelectedCamera(cameraId);
-
-          // Auto-start scanning with the selected camera
-          setTimeout(() => {
-            startScanningWithCamera(cameraId);
-          }, 500);
-        } else {
-          setError('No cameras found on this device');
-        }
-      })
-      .catch((err) => {
-        console.error('Error getting cameras:', err);
-        setError('Could not access cameras. Please allow camera permissions.');
-      });
+    initializeCamera();
 
     return () => {
       // Cleanup scanner on unmount
@@ -84,6 +58,95 @@ export function BarcodeScanner({ onScan, onClose, autoClose = false, disabled = 
     };
   }, []);
 
+  const initializeCamera = async () => {
+    setIsInitializing(true);
+    setError(null);
+    setPermissionDenied(false);
+
+    try {
+      // Check if browser supports camera API
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setError('Your browser does not support camera access. Please use a modern browser like Chrome or Safari.');
+        setIsInitializing(false);
+        return;
+      }
+
+      // Check if we're on HTTPS or localhost
+      const isSecure = window.location.protocol === 'https:' ||
+                      window.location.hostname === 'localhost' ||
+                      window.location.hostname === '127.0.0.1';
+
+      // Request camera permission explicitly
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' }
+      });
+
+      // Stop the test stream immediately
+      stream.getTracks().forEach(track => track.stop());
+
+      // Now get the list of cameras
+      const devices = await Html5Qrcode.getCameras();
+
+      if (devices && devices.length > 0) {
+        const cameraList = devices.map((device) => ({
+          id: device.id,
+          label: device.label || `Camera ${device.id}`,
+        }));
+        setCameras(cameraList);
+
+        // Prefer back camera on mobile
+        const backCamera = devices.find((d) =>
+          d.label.toLowerCase().includes('back') ||
+          d.label.toLowerCase().includes('rear') ||
+          d.label.toLowerCase().includes('environment')
+        );
+        const cameraId = backCamera?.id || devices[0].id;
+        setSelectedCamera(cameraId);
+
+        // Determine if selected camera is back camera
+        const isBack = backCamera ? true : !devices[0].label.toLowerCase().includes('front');
+        setIsBackCamera(isBack);
+
+        // Auto-start scanning with the selected camera
+        setTimeout(() => {
+          startScanningWithCamera(cameraId);
+        }, 500);
+      } else {
+        setError('No cameras found on this device');
+      }
+    } catch (err: any) {
+      console.error('Error initializing camera:', err);
+
+      // Check if this is an HTTPS requirement error
+      const isSecure = window.location.protocol === 'https:' ||
+                      window.location.hostname === 'localhost' ||
+                      window.location.hostname === '127.0.0.1';
+
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        setPermissionDenied(true);
+        if (!isSecure) {
+          setError('Camera access requires HTTPS or localhost. Your browser is blocking camera access on HTTP connections for security reasons.');
+        } else {
+          setError('Camera access was denied. Please allow camera permissions in your browser settings and try again.');
+        }
+      } else if (err.name === 'NotFoundError') {
+        setError('No camera found on this device');
+      } else if (err.name === 'NotReadableError') {
+        setError('Camera is already in use by another application');
+      } else if (err.name === 'NotSupportedError' || err.name === 'TypeError') {
+        if (!isSecure) {
+          setError('Camera access requires HTTPS. Most modern browsers block camera on HTTP for security. Please access via HTTPS or localhost.');
+        } else {
+          setError('Camera access is not supported in this browser or context');
+        }
+      } else {
+        setError(err.message || 'Could not access camera. Please check your browser permissions.');
+      }
+    } finally {
+      setIsInitializing(false);
+    }
+  };
+
   const startScanningWithCamera = async (cameraId: string) => {
     if (!cameraId) {
       setError('No camera selected');
@@ -92,6 +155,16 @@ export function BarcodeScanner({ onScan, onClose, autoClose = false, disabled = 
 
     try {
       setError(null);
+
+      // Determine if this is a back camera based on camera ID and label
+      const camera = cameras.find(c => c.id === cameraId);
+      const isBack = camera ?
+        (camera.label.toLowerCase().includes('back') ||
+         camera.label.toLowerCase().includes('rear') ||
+         camera.label.toLowerCase().includes('environment')) :
+        true; // Default to back camera if can't determine
+      setIsBackCamera(isBack);
+
       const scanner = new Html5Qrcode(scannerIdRef.current);
       scannerRef.current = scanner;
 
@@ -183,6 +256,15 @@ export function BarcodeScanner({ onScan, onClose, autoClose = false, disabled = 
       await stopScanning();
     }
     setSelectedCamera(cameraId);
+
+    // Update back camera state based on selected camera
+    const camera = cameras.find(c => c.id === cameraId);
+    const isBack = camera ?
+      (camera.label.toLowerCase().includes('back') ||
+       camera.label.toLowerCase().includes('rear') ||
+       camera.label.toLowerCase().includes('environment')) :
+      true;
+    setIsBackCamera(isBack);
   };
 
   return (
@@ -199,7 +281,50 @@ export function BarcodeScanner({ onScan, onClose, autoClose = false, disabled = 
           {error && (
             <Alert variant="destructive" className="mb-4">
               <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{error}</AlertDescription>
+              <AlertDescription>
+                <div className="space-y-2">
+                  <p>{error}</p>
+                  {error.includes('HTTPS') && (
+                    <div className="text-xs space-y-2 mt-3 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded">
+                      <p className="font-semibold">Quick Fix Options:</p>
+                      <div className="space-y-2">
+                        <div>
+                          <p className="font-medium">Option 1: Use Desktop Scanner</p>
+                          <p className="text-muted-foreground">Use a USB barcode scanner on a desktop/laptop connected to the local network</p>
+                        </div>
+                        <div>
+                          <p className="font-medium">Option 2: Manual Entry</p>
+                          <p className="text-muted-foreground">Close this dialog and type the barcode manually</p>
+                        </div>
+                        <div>
+                          <p className="font-medium">Option 3: Enable HTTPS (Recommended)</p>
+                          <p className="text-muted-foreground">Contact your system administrator to set up HTTPS for the local server</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  {permissionDenied && !error.includes('HTTPS') && (
+                    <div className="text-xs space-y-1 mt-2">
+                      <p className="font-semibold">To enable camera access:</p>
+                      <ul className="list-disc list-inside space-y-1 pl-2">
+                        <li>On Chrome/Safari: Tap the lock/info icon in the address bar</li>
+                        <li>Find "Camera" or "Permissions" settings</li>
+                        <li>Select "Allow" for camera access</li>
+                        <li>Refresh the page and try again</li>
+                      </ul>
+                    </div>
+                  )}
+                  <Button
+                    onClick={initializeCamera}
+                    variant="outline"
+                    size="sm"
+                    className="mt-3"
+                  >
+                    <Camera className="mr-2 h-4 w-4" />
+                    Try Again
+                  </Button>
+                </div>
+              </AlertDescription>
             </Alert>
           )}
 
@@ -245,11 +370,20 @@ export function BarcodeScanner({ onScan, onClose, autoClose = false, disabled = 
               id={scannerIdRef.current}
               className="w-full h-full"
               style={{
-                transform: 'scaleX(-1)', // Mirror the camera feed
+                transform: isBackCamera ? 'none' : 'scaleX(-1)', // Mirror only for front camera
               }}
             />
 
-            {!isScanning && !error && (
+            {isInitializing && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                <div className="text-center text-white">
+                  <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
+                  <p className="text-sm">Requesting camera access...</p>
+                </div>
+              </div>
+            )}
+
+            {!isScanning && !error && !isInitializing && (
               <div className="absolute inset-0 flex items-center justify-center">
                 <Button onClick={startScanning} size="lg">
                   <Camera className="mr-2 h-5 w-5" />
@@ -280,7 +414,8 @@ export function BarcodeScanner({ onScan, onClose, autoClose = false, disabled = 
           {isScanning && (
             <div className="mt-4 space-y-3">
               <p className="text-sm text-muted-foreground text-center">
-                Position the barcode within the square frame • Camera is mirrored for easier scanning
+                Position the barcode within the square frame
+                {!isBackCamera && ' • Front camera is mirrored for easier viewing'}
               </p>
 
               {scannedItems.length > 0 && (

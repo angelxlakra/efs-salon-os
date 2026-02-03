@@ -144,14 +144,14 @@ export default function SuppliersPage() {
 
   if (view === 'form') {
     return (
-      <div className="p-6 space-y-6">
-        <div className="flex items-center gap-4">
+      <div className="p-4 md:p-6 space-y-4 md:space-y-6">
+        <div className="flex items-center gap-3 md:gap-4">
           <Button variant="ghost" size="icon" onClick={handleCloseForm}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <div>
-            <h1 className="text-3xl font-bold">{editingSupplier ? 'Edit Supplier' : 'Add New Supplier'}</h1>
-            <p className="text-muted-foreground">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-2xl md:text-3xl font-bold truncate">{editingSupplier ? 'Edit Supplier' : 'Add New Supplier'}</h1>
+            <p className="text-sm md:text-base text-muted-foreground truncate">
               {editingSupplier ? `Updating ${editingSupplier.name}` : 'Create a new supplier profile'}
             </p>
           </div>
@@ -173,9 +173,9 @@ export default function SuppliersPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="contactPerson">Contact Person</Label>
+                  <Label htmlFor="contactPerson" className="text-sm">Contact Person</Label>
                   <Input
                     id="contactPerson"
                     value={contactPerson}
@@ -184,7 +184,7 @@ export default function SuppliersPage() {
                   />
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="phone">Phone</Label>
+                  <Label htmlFor="phone" className="text-sm">Phone</Label>
                   <Input
                     id="phone"
                     value={phone}
@@ -216,9 +216,9 @@ export default function SuppliersPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="gstin">GSTIN</Label>
+                  <Label htmlFor="gstin" className="text-sm">GSTIN</Label>
                   <Input
                     id="gstin"
                     value={gstin}
@@ -228,7 +228,7 @@ export default function SuppliersPage() {
                   />
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="paymentTerms">Payment Terms</Label>
+                  <Label htmlFor="paymentTerms" className="text-sm">Payment Terms</Label>
                   <Input
                     id="paymentTerms"
                     value={paymentTerms}
@@ -260,11 +260,11 @@ export default function SuppliersPage() {
                 </div>
               )}
             </CardContent>
-            <CardFooter className="flex justify-end gap-3 border-t pt-6">
-              <Button variant="outline" onClick={handleCloseForm}>
+            <CardFooter className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 border-t pt-4 sm:pt-6">
+              <Button variant="outline" onClick={handleCloseForm} className="w-full sm:w-auto">
                 Cancel
               </Button>
-              <Button onClick={handleSave}>
+              <Button onClick={handleSave} className="w-full sm:w-auto">
                 {editingSupplier ? 'Update' : 'Create'} Supplier
               </Button>
             </CardFooter>
@@ -275,21 +275,21 @@ export default function SuppliersPage() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 md:p-6 space-y-4 md:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Suppliers</h1>
-          <p className="text-muted-foreground">Manage your suppliers and vendors</p>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-2xl md:text-3xl font-bold">Suppliers</h1>
+          <p className="text-sm md:text-base text-muted-foreground">Manage your suppliers and vendors</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => router.push('/dashboard/purchases/invoices')}>
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <Button variant="outline" onClick={() => router.push('/dashboard/purchases/invoices')} className="w-full sm:w-auto">
             <Receipt className="mr-2 h-4 w-4" />
-            Invoices
+            <span className="sm:inline">Invoices</span>
           </Button>
-          <Button onClick={() => handleOpenForm()}>
+          <Button onClick={() => handleOpenForm()} className="w-full sm:w-auto">
             <Plus className="mr-2 h-4 w-4" />
-            Add Supplier
+            <span className="sm:inline">Add Supplier</span>
           </Button>
         </div>
       </div>

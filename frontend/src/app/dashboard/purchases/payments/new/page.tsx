@@ -133,15 +133,15 @@ export default function RecordPaymentPage() {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 md:p-6 space-y-4 md:space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3 md:gap-4">
         <Button variant="ghost" size="icon" onClick={() => router.back()}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
-        <div>
-          <h1 className="text-3xl font-bold">Record Payment</h1>
-          <p className="text-muted-foreground">Record a payment to supplier</p>
+        <div className="min-w-0 flex-1">
+          <h1 className="text-2xl md:text-3xl font-bold truncate">Record Payment</h1>
+          <p className="text-sm md:text-base text-muted-foreground truncate">Record a payment to supplier</p>
         </div>
       </div>
 
@@ -192,17 +192,17 @@ export default function RecordPaymentPage() {
                 {invoiceIdParam && invoice && (
                   <div className="p-4 bg-muted rounded-lg space-y-2">
                     <p className="text-sm font-medium">Invoice: {invoice.invoice_number}</p>
-                    <div className="grid grid-cols-3 gap-4 text-sm">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 text-sm">
                       <div>
-                        <p className="text-muted-foreground">Total Amount</p>
+                        <p className="text-muted-foreground text-xs sm:text-sm">Total Amount</p>
                         <p className="font-semibold">{formatCurrency(invoice.total_amount)}</p>
                       </div>
                       <div>
-                        <p className="text-muted-foreground">Paid Amount</p>
+                        <p className="text-muted-foreground text-xs sm:text-sm">Paid Amount</p>
                         <p className="font-semibold text-green-600">{formatCurrency(invoice.paid_amount)}</p>
                       </div>
                       <div>
-                        <p className="text-muted-foreground">Balance Due</p>
+                        <p className="text-muted-foreground text-xs sm:text-sm">Balance Due</p>
                         <p className="font-semibold text-orange-600">{formatCurrency(invoice.balance_due)}</p>
                       </div>
                     </div>
@@ -293,16 +293,17 @@ export default function RecordPaymentPage() {
                 </div>
 
                 {/* Actions */}
-                <div className="flex gap-2 justify-end pt-4">
+                <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end pt-4">
                   <Button
                     type="button"
                     variant="outline"
                     onClick={() => router.back()}
                     disabled={submitting}
+                    className="w-full sm:w-auto"
                   >
                     Cancel
                   </Button>
-                  <Button type="submit" disabled={submitting || loading}>
+                  <Button type="submit" disabled={submitting || loading} className="w-full sm:w-auto">
                     {submitting ? (
                       <>Saving...</>
                     ) : (

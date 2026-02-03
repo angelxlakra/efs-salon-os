@@ -268,15 +268,15 @@ export default function NewPurchaseInvoicePage() {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 md:p-6 space-y-4 md:space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3 md:gap-4">
         <Button variant="ghost" size="icon" onClick={() => router.back()}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <div>
-          <h1 className="text-3xl font-bold">New Purchase Invoice</h1>
-          <p className="text-muted-foreground">Create a new supplier invoice</p>
+        <div className="min-w-0 flex-1">
+          <h1 className="text-2xl md:text-3xl font-bold truncate">New Purchase Invoice</h1>
+          <p className="text-sm md:text-base text-muted-foreground truncate">Create a new supplier invoice</p>
         </div>
       </div>
 
@@ -356,7 +356,7 @@ export default function NewPurchaseInvoicePage() {
               <CardTitle>Quick Add by Barcode</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <Input
                   placeholder="Enter barcode and press Enter"
                   value={barcodeSearch}
@@ -367,15 +367,20 @@ export default function NewPurchaseInvoicePage() {
                       handleBarcodeSearch();
                     }
                   }}
+                  className="flex-1"
                 />
-                <Button onClick={() => handleBarcodeSearch()} disabled={searchingBarcode} variant="secondary">
-                  <Search className="mr-2 h-4 w-4" />
-                  Search
-                </Button>
-                <Button onClick={() => setShowScanner(true)} variant="default">
-                  <Camera className="mr-2 h-4 w-4" />
-                  Scan
-                </Button>
+                <div className="flex gap-2">
+                  <Button onClick={() => handleBarcodeSearch()} disabled={searchingBarcode} variant="secondary" className="flex-1 sm:flex-none">
+                    <Search className="mr-2 h-4 w-4" />
+                    <span className="hidden sm:inline">Search</span>
+                    <span className="sm:hidden">Search</span>
+                  </Button>
+                  <Button onClick={() => setShowScanner(true)} variant="default" className="flex-1 sm:flex-none">
+                    <Camera className="mr-2 h-4 w-4" />
+                    <span className="hidden sm:inline">Scan</span>
+                    <span className="sm:hidden">Scan</span>
+                  </Button>
+                </div>
               </div>
               <p className="text-xs text-muted-foreground mt-2">
                 Type barcode manually or use camera to scan
@@ -419,14 +424,14 @@ export default function NewPurchaseInvoicePage() {
                           </div>
                         </div>
 
-                        <div className="grid gap-4 md:grid-cols-4">
+                        <div className="grid gap-4 grid-cols-2 sm:grid-cols-4">
                           <div className="space-y-2">
-                            <Label>Unit</Label>
+                            <Label className="text-xs sm:text-sm">Unit</Label>
                             <Select
                               value={item.uom}
                               onValueChange={(value) => handleItemChange(index, 'uom', value)}
                             >
-                              <SelectTrigger>
+                              <SelectTrigger className="h-9 sm:h-10">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
@@ -442,7 +447,7 @@ export default function NewPurchaseInvoicePage() {
                           </div>
 
                           <div className="space-y-2">
-                            <Label>Quantity *</Label>
+                            <Label className="text-xs sm:text-sm">Quantity *</Label>
                             <Input
                               type="number"
                               step="1"
@@ -458,11 +463,12 @@ export default function NewPurchaseInvoicePage() {
                                   handleItemChange(index, 'quantity', 1);
                                 }
                               }}
+                              className="h-9 sm:h-10"
                             />
                           </div>
 
                           <div className="space-y-2">
-                            <Label>Unit Cost (₹) *</Label>
+                            <Label className="text-xs sm:text-sm">Unit Cost (₹) *</Label>
                             <Input
                               type="number"
                               step="1"
@@ -472,12 +478,13 @@ export default function NewPurchaseInvoicePage() {
                                 const val = e.target.value;
                                 handleItemChange(index, 'unit_cost', val === '' ? 0 : Math.round(parseFloat(val) * 100) || 0);
                               }}
+                              className="h-9 sm:h-10"
                             />
                           </div>
 
                           <div className="space-y-2">
-                            <Label>Total</Label>
-                            <div className="flex items-center h-10 px-3 border rounded-md bg-muted">
+                            <Label className="text-xs sm:text-sm">Total</Label>
+                            <div className="flex items-center h-9 sm:h-10 px-2 sm:px-3 border rounded-md bg-muted text-sm">
                               {formatCurrency(item.quantity * item.unit_cost)}
                             </div>
                           </div>
@@ -599,9 +606,9 @@ export default function NewPurchaseInvoicePage() {
               />
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="quickUom">Unit</Label>
+                <Label htmlFor="quickUom" className="text-sm">Unit</Label>
                 <Select
                   value={quickAddForm.uom}
                   onValueChange={(value) => setQuickAddForm({ ...quickAddForm, uom: value })}
@@ -622,7 +629,7 @@ export default function NewPurchaseInvoicePage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="quickQty">Quantity</Label>
+                <Label htmlFor="quickQty" className="text-sm">Quantity</Label>
                 <Input
                   id="quickQty"
                   type="number"

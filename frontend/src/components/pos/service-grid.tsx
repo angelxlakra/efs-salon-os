@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, RefObject, useRef } from 'react';
-import { Plus, Search, Loader2, User, Check, Clock } from 'lucide-react';
+import { Plus, Search, Loader2, User, Check, Clock, ShoppingCart } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -57,7 +57,7 @@ export function ServiceGrid({ searchInputRef, hideStaffSelection = false, onServ
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [isLoading, setIsLoading] = useState(true);
-  const { addItem } = useCartStore();
+  const { addItem, items } = useCartStore();
   const { user } = useAuthStore();
 
   // Staff selection state
@@ -317,6 +317,11 @@ export function ServiceGrid({ searchInputRef, hideStaffSelection = false, onServ
     return `${staffMember.display_name} has ${totalServices} pending ${serviceText}${waitText}`;
   };
 
+  // Get count of how many times a service is in the cart
+  const getServiceCartCount = (serviceId: string) => {
+    return items.filter(item => !item.isProduct && item.serviceId === serviceId).length;
+  };
+
   // Get unique categories
   const categories = ['All', ...Array.from(new Set(services.map(s => s.category.name)))];
   console.log({categories, services});
@@ -392,14 +397,18 @@ export function ServiceGrid({ searchInputRef, hideStaffSelection = false, onServ
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredServices.map((service) => {
               const isExpanded = expandedServiceId === service.id;
+              const cartCount = getServiceCartCount(service.id);
+              const isInCart = cartCount > 0;
 
               return (
                 <div
                   key={service.id}
                   ref={isExpanded ? expandedCardRef : null}
-                  className={`relative bg-white rounded-xl border transition-all ${
+                  className={`relative bg-white rounded-xl border-2 transition-all ${
                     isExpanded
                       ? 'border-black shadow-lg col-span-2 lg:col-span-3'
+                      : isInCart
+                      ? 'border-green-500 shadow-md'
                       : 'border-gray-200'
                   }`}
                 >
@@ -410,6 +419,16 @@ export function ServiceGrid({ searchInputRef, hideStaffSelection = false, onServ
                       isExpanded ? '' : 'hover:border-black hover:shadow-lg'
                     }`}
                   >
+                    {/* Cart Count Badge - Top Left */}
+                    {isInCart && (
+                      <Badge
+                        className="absolute top-2 left-2 bg-green-600 text-white text-xs flex items-center gap-1"
+                      >
+                        <ShoppingCart className="h-3 w-3" />
+                        {cartCount}
+                      </Badge>
+                    )}
+
                     {/* Category Badge */}
                     <Badge
                       variant="secondary"
