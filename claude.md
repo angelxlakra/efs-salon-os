@@ -4,6 +4,20 @@
 
 SalonOS is a comprehensive Point of Sale (POS), scheduling, inventory, and accounting system designed specifically for a unisex beauty salon. It operates entirely on the local network (LAN) with no cloud dependencies, ensuring fast performance and data privacy.
 
+## Documentation Guidelines for Claude
+
+**When to create summary/documentation files**:
+- ✅ **DO create docs for**: Major features, architectural changes, new subsystems, breaking changes
+- ✅ **DO create docs for**: API version updates, migration guides, deployment changes
+- ❌ **DON'T create docs for**: Routine bug fixes, small patches, minor code improvements
+- ❌ **DON'T create docs for**: Code refactoring without functional changes, typo fixes
+
+**How to document**:
+- **Bug fixes**: Add inline comments in code, update existing docs if needed
+- **Minor changes**: Update relevant existing documentation
+- **Major features**: Create new dedicated documentation file with examples and testing steps
+- **Keep it practical**: Focus on what developers need to know, not exhaustive details
+
 ## Repository Structure
 
 ```
@@ -48,7 +62,7 @@ salon-os/
 ```
 LAN (192.168.1.0/24)
     │
-    └─── nginx:80 (http://salon.local)
+    └─── nginx:80 (http://localhost)
            │
            ├─── frontend:3000 (internal)
            └─── api:8000 (internal)
@@ -94,8 +108,30 @@ docker-compose exec api alembic upgrade head
 docker-compose exec api python -m app.seeds.initial_data
 
 # Access application
-# http://salon.local (or http://192.168.1.50)
+# http://localhost (or http://192.168.1.50)
 ```
+
+### Windows/WSL2 Deployment
+
+**For Windows 10/11 + WSL2 + Docker Desktop:**
+
+SalonOS fully supports Windows deployment with WSL2. However, WSL2 networking requires additional configuration for external access (LAN devices, Tailscale).
+
+**Quick Fix:**
+```powershell
+# In PowerShell as Administrator
+.\wsl-port-forward.ps1
+```
+
+**Detailed Guides:**
+- Quick setup: `WSL2-QUICKSTART.md`
+- Full documentation: `WSL2-NETWORK-SETUP.md`
+- Troubleshooting: `diagnose-network.ps1`
+
+**Included Scripts:**
+- `wsl-port-forward.ps1` - Configure port forwarding (run after reboot)
+- `setup-auto-forward.ps1` - Auto-configure on Windows startup
+- `diagnose-network.ps1` - Network diagnostics tool
 
 ### Default Credentials
 ```
@@ -167,8 +203,8 @@ docker-compose logs -f worker
 ## API Documentation
 
 Once running, access interactive API docs:
-- **Swagger UI**: http://salon.local/api/docs
-- **ReDoc**: http://salon.local/api/redoc
+- **Swagger UI**: http://localhost/api/docs
+- **ReDoc**: http://localhost/api/redoc
 
 ### Key Endpoints
 
@@ -243,10 +279,10 @@ docker-compose up -d
 ### Health Checks
 ```bash
 # Basic health
-curl http://salon.local/api/healthz
+curl http://localhost/api/healthz
 
 # Readiness (DB + Redis)
-curl http://salon.local/api/readyz
+curl http://localhost/api/readyz
 ```
 
 ### Metrics to Watch
@@ -287,7 +323,7 @@ cat .env | grep DB_PASSWORD
 docker stats
 
 # Verify network connectivity
-ping salon.local
+ping localhost
 
 # Check for slow queries
 docker-compose exec postgres psql -U salon_user -d salon_db -c "SELECT * FROM pg_stat_activity WHERE state = 'active';"
@@ -344,9 +380,9 @@ Check the troubleshooting guide in each technical spec:
 - And more...
 
 ### Health Status
-- Dashboard: http://salon.local
-- API Health: http://salon.local/api/healthz
-- API Docs: http://salon.local/api/docs
+- Dashboard: http://localhost
+- API Health: http://localhost/api/healthz
+- API Docs: http://localhost/api/docs
 
 ## License
 

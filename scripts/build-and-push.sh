@@ -177,17 +177,34 @@ create_deployment_package() {
     sed -i.bak "s/VERSION:-latest/VERSION:-$VERSION/g" "$PACKAGE_DIR/docker-compose.yml"
     rm "$PACKAGE_DIR/docker-compose.yml.bak"
 
-    # Copy nginx config
-    cp nginx/nginx.conf "$PACKAGE_DIR/"
+    # Copy nginx config directory (includes SSL setup for HTTPS)
+    mkdir -p "$PACKAGE_DIR/nginx"
+    cp nginx/nginx.conf "$PACKAGE_DIR/nginx/"
 
     # Copy environment example
     cp .env.example "$PACKAGE_DIR/"
+
+    # Copy HTTPS setup files (CRITICAL for mobile camera)
+    cp setup-https.sh "$PACKAGE_DIR/"
+    chmod +x "$PACKAGE_DIR/setup-https.sh"
+    cp HTTPS-SETUP.md "$PACKAGE_DIR/" 2>/dev/null || true
+
+    # Copy quick start guide
+    cp QUICKSTART.md "$PACKAGE_DIR/" 2>/dev/null || true
+
+    # Copy main documentation
+    cp README.md "$PACKAGE_DIR/" 2>/dev/null || true
 
     # Copy installation guide
     cp CLIENT_INSTALL_DOCKERHUB.md "$PACKAGE_DIR/INSTALL.md" 2>/dev/null || true
 
     # Copy utility scripts
     mkdir -p "$PACKAGE_DIR/scripts"
+
+    # Copy Windows/WSL2 networking scripts
+    cp wsl-port-forward.ps1 "$PACKAGE_DIR/scripts/" 2>/dev/null || true
+    cp setup-auto-forward.ps1 "$PACKAGE_DIR/scripts/" 2>/dev/null || true
+    cp diagnose-network.ps1 "$PACKAGE_DIR/scripts/" 2>/dev/null || true
 
     # Create start script
     cat > "$PACKAGE_DIR/scripts/start.sh" << 'EOF'
@@ -223,14 +240,35 @@ Version: ${VERSION}
 DockerHub: ${DOCKERHUB_USERNAME}/salon-backend:${VERSION}
            ${DOCKERHUB_USERNAME}/salon-frontend:${VERSION}
 
+IMPORTANT: This version requires HTTPS for mobile camera scanning!
+
 Quick Start:
 1. Install Docker and Docker Compose
 2. Copy .env.example to .env and configure
-3. Run: docker compose pull
-4. Run: docker compose up -d
-5. Access: http://salon.local (or your server IP)
+3. Run HTTPS setup: ./setup-https.sh
+4. Run: docker compose pull
+5. Run: docker compose up -d
+6. Install SSL certificate on mobile devices
+7. Access: https://[YOUR-SERVER-IP]
 
-For detailed instructions, see INSTALL.md
+For detailed instructions, see:
+- QUICKSTART.md - Simple 6-step setup
+- HTTPS-SETUP.md - Mobile certificate installation
+- INSTALL.md - DockerHub deployment
+
+HTTPS Setup (Required for Mobile):
+The setup-https.sh script will:
+- Generate SSL certificates
+- Configure nginx for HTTPS
+- Enable camera access on mobile devices
+
+Certificate location: nginx/ssl/salon.crt
+Install this certificate on mobile devices for camera scanning.
+
+Default Login:
+Username: owner
+Password: change_me_123
+(Change immediately after first login!)
 
 Support: [Your contact information]
 EOF
@@ -260,10 +298,22 @@ print_summary() {
     echo ""
     echo "Client Package:   dist/salon-os-${VERSION}.tar.gz"
     echo ""
+    echo "Package Contents:"
+    echo "  ✓ Docker Compose configuration"
+    echo "  ✓ Nginx config (HTTPS-enabled)"
+    echo "  ✓ setup-https.sh (HTTPS setup script)"
+    echo "  ✓ HTTPS-SETUP.md (Mobile certificate guide)"
+    echo "  ✓ QUICKSTART.md (Simple setup guide)"
+    echo "  ✓ .env.example (Environment template)"
+    echo "  ✓ Utility scripts (start, stop, backup)"
+    echo "  ✓ Windows/WSL2 scripts (port forwarding, diagnostics)"
+    echo ""
     echo "Next Steps:"
     echo "  1. Test the images: docker compose -f compose.production.yaml pull"
     echo "  2. Distribute: dist/salon-os-${VERSION}.tar.gz to clients"
-    echo "  3. Clients run: docker compose pull && docker compose up -d"
+    echo "  3. Clients setup HTTPS: ./setup-https.sh"
+    echo "  4. Clients run: docker compose pull && docker compose up -d"
+    echo "  5. Install SSL certificate on mobile devices (see HTTPS-SETUP.md)"
     echo ""
     echo "DockerHub URLs:"
     echo "  Backend:  https://hub.docker.com/r/${DOCKERHUB_USERNAME}/salon-backend"

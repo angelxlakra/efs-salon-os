@@ -221,6 +221,18 @@ echo "Backup created: $BACKUP_DIR/$BACKUP_FILE"
 EOF
     chmod +x "${PACKAGE_DIR}/scripts/backup.sh"
 
+    # Copy Windows/WSL2 networking scripts
+    log_info "Copying Windows/WSL2 networking scripts..."
+    if [ -f "wsl-port-forward.ps1" ]; then
+        cp wsl-port-forward.ps1 "${PACKAGE_DIR}/scripts/"
+    fi
+    if [ -f "setup-auto-forward.ps1" ]; then
+        cp setup-auto-forward.ps1 "${PACKAGE_DIR}/scripts/"
+    fi
+    if [ -f "diagnose-network.ps1" ]; then
+        cp diagnose-network.ps1 "${PACKAGE_DIR}/scripts/"
+    fi
+
     log_success "Scripts copied"
 }
 
@@ -236,6 +248,15 @@ copy_documentation() {
     # Copy deployment guides
     if [ -f "DEPLOYMENT_GUIDE.md" ]; then
         cp DEPLOYMENT_GUIDE.md "${PACKAGE_DIR}/docs/"
+    fi
+
+    # Copy Windows/WSL2 networking documentation
+    log_info "Copying Windows/WSL2 documentation..."
+    if [ -f "WSL2-QUICKSTART.md" ]; then
+        cp WSL2-QUICKSTART.md "${PACKAGE_DIR}/docs/"
+    fi
+    if [ -f "WSL2-NETWORK-SETUP.md" ]; then
+        cp WSL2-NETWORK-SETUP.md "${PACKAGE_DIR}/docs/"
     fi
 
     log_success "Documentation copied"
@@ -295,13 +316,15 @@ print_summary() {
     echo "Contents:"
     echo "  - Docker images (backend, frontend, postgres, redis, nginx)"
     echo "  - Configuration files (compose.yaml, .env.example, nginx.conf)"
-    echo "  - Installation scripts"
-    echo "  - Documentation"
+    echo "  - Installation scripts (Linux/Mac + Windows/WSL2)"
+    echo "  - Windows/WSL2 networking scripts (PowerShell)"
+    echo "  - Documentation (including WSL2 setup guides)"
     echo ""
     echo "Next Steps:"
     echo "  1. Test the package on a clean machine"
     echo "  2. Distribute to clients: ${DIST_DIR}/${PACKAGE_NAME}.tar.gz"
-    echo "  3. Include the installation guide: docs/CLIENT_INSTALL.md"
+    echo "  3. Linux/Mac users: See docs/CLIENT_INSTALL.md"
+    echo "  4. Windows/WSL2 users: See docs/WSL2-QUICKSTART.md"
     echo ""
     echo "Checksum:"
     echo "  $(cat "${DIST_DIR}/${PACKAGE_NAME}.tar.gz.sha256")"

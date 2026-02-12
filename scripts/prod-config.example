@@ -1,0 +1,31 @@
+# Production Server Configuration
+# Copy this file to prod-config and fill in your details
+# cp prod-config.example prod-config
+
+# Production SSH Details
+PROD_HOST="your-production-server.com"     # e.g., salon.example.com or 192.168.1.100
+PROD_USER="your-ssh-user"                  # e.g., ubuntu, root, deploy
+PROD_SSH_PORT="22"                         # Default SSH port
+PROD_SSH_KEY="~/.ssh/id_rsa"              # Path to SSH private key
+
+# Production Salon-OS Installation Path
+PROD_PATH="/path/to/salon-os"             # e.g., /home/ubuntu/salon-os
+
+# PostgreSQL Configuration (usually same as .env)
+PROD_DB_USER="salon_user"
+PROD_DB_NAME="salon_db"
+
+# Local Backup Directory
+LOCAL_BACKUP_DIR="backups"
+
+# Optional: Slack/Discord webhook for notifications
+NOTIFICATION_WEBHOOK=""
+
+# Optional: S3 bucket for backup storage
+S3_BACKUP_BUCKET=""
+AWS_PROFILE="default"
+
+# Safety Settings
+AUTO_SANITIZE=false                        # Automatically sanitize PII after import
+KEEP_LOCAL_BACKUPS_DAYS=30                # Delete local backups older than N days
+KEEP_PROD_DUMPS_ON_SERVER=false           # Keep dumps on production server after download

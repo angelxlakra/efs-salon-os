@@ -109,6 +109,27 @@ docker compose exec api python -m app.seeds.initial_data
 # ⚠️ CHANGE IMMEDIATELY after first login!
 ```
 
+### Windows 10/11 + WSL2 Deployment
+
+If you're deploying on Windows with WSL2 and Docker Desktop:
+
+**Quick Setup:**
+1. Deploy normally in WSL2 following the Quick Start above
+2. Run the port forwarding script in Windows PowerShell (as Administrator):
+   ```powershell
+   .\wsl-port-forward.ps1
+   ```
+3. Access from any device on your network: `https://<your-windows-ip>`
+
+**For detailed WSL2 setup and troubleshooting**, see:
+- **Quick Start**: [WSL2-QUICKSTART.md](WSL2-QUICKSTART.md)
+- **Full Guide**: [WSL2-NETWORK-SETUP.md](WSL2-NETWORK-SETUP.md)
+
+**Common WSL2 Issues:**
+- Works on Windows PC but not on phones/other laptops? → Run `wsl-port-forward.ps1`
+- Need Tailscale access? → Install Tailscale in WSL2 (see full guide)
+- Issues after Windows reboot? → Run `setup-auto-forward.ps1` once for automatic setup
+
 ## Development
 
 ### Running in Development Mode
