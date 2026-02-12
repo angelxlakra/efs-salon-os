@@ -1,5 +1,7 @@
 """Pydantic schemas for accounting reports and dashboards."""
 
+from __future__ import annotations
+
 from datetime import date, datetime
 from typing import Optional, List, Dict
 from pydantic import BaseModel, Field, ConfigDict
@@ -37,6 +39,9 @@ class DashboardMetrics(BaseModel):
     cash_drawer_open: bool = Field(..., description="Is cash drawer currently open")
     cash_drawer_opening_float: Optional[int] = Field(None, description="Opening float if drawer open (paise)")
     cash_drawer_expected_cash: Optional[int] = Field(None, description="Expected cash in drawer (paise)")
+
+    # Service duration average
+    avg_service_duration_minutes: Optional[int] = Field(None, description="Average service duration in minutes")
 
     # Rupee convenience properties
     @property
@@ -81,6 +86,55 @@ class DashboardResponse(BaseModel):
     metrics: DashboardMetrics
     top_services: List[ServicePerformance] = Field(default_factory=list, description="Top 5 performing services")
     staff_performance: List[StaffPerformance] = Field(default_factory=list, description="Staff performance today")
+
+
+class MetricComparison(BaseModel):
+    """Comparison of metrics between two consecutive days."""
+    revenue_change_paise: int = Field(..., description="Change in net revenue (paise)")
+    revenue_percent_change: float = Field(..., description="Percentage change in revenue")
+    services_change: int = Field(..., description="Change in completed services count")
+    services_percent_change: float = Field(..., description="Percentage change in services")
+    customers_change: int = Field(..., description="Change in total bills/customers")
+    customers_percent_change: float = Field(..., description="Percentage change in customers")
+
+
+class DashboardWithComparison(BaseModel):
+    """Dashboard metrics with comparison to previous day."""
+    today: DashboardMetrics = Field(..., description="Today's metrics")
+    yesterday: Optional[DashboardMetrics] = Field(None, description="Yesterday's metrics (if available)")
+    comparison: Optional[MetricComparison] = Field(None, description="Comparison data")
+    yesterday_available: bool = Field(..., description="Whether yesterday data is available")
+
+
+class HourlyMetrics(BaseModel):
+    """Metrics for a specific hour of the day."""
+    hour: int
+    hour_label: str
+    bills_count: int
+    revenue_paise: int
+    services_count: int
+
+
+class HourlyBreakdown(BaseModel):
+    """Hourly breakdown of business metrics for a day."""
+    date: date
+    hourly_data: List[HourlyMetrics]
+    peak_hour: int
+    peak_hour_revenue: int
+
+
+class DailyTrendMetrics(BaseModel):
+    """Simple daily metrics for trend analysis."""
+    date: date
+    revenue_paise: int
+    services_count: int
+    customers_count: int
+
+
+class TrendsResponse(BaseModel):
+    """Historical trends data for sparklines and charts."""
+    days: int
+    daily_metrics: List[DailyTrendMetrics]
 
 
 # ============ Day Summary Schemas ============

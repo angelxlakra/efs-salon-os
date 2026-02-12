@@ -118,6 +118,9 @@ class ChangeRequestCreate(BaseModel):
     change_type: ChangeType
     quantity: float = Field(..., gt=0)
     unit_cost: Optional[int] = None  # in paise, required for RECEIVE
+    supplier_invoice_number: Optional[str] = Field(None, max_length=100, description="Supplier invoice number")
+    supplier_discount_percent: Optional[float] = Field(None, ge=0, le=100, description="Supplier discount percentage")
+    supplier_discount_fixed: Optional[int] = Field(None, ge=0, description="Supplier fixed discount in paise")
     reason_code: str
     notes: Optional[str] = None
 
@@ -127,6 +130,9 @@ class ChangeRequestResponse(BaseModel):
     change_type: ChangeType
     quantity: float
     unit_cost: Optional[int]
+    supplier_invoice_number: Optional[str] = None
+    supplier_discount_percent: Optional[float] = None
+    supplier_discount_fixed: Optional[int] = None
     reason_code: str
     notes: Optional[str]
     status: ChangeStatus
@@ -135,7 +141,7 @@ class ChangeRequestResponse(BaseModel):
     reviewed_by: Optional[str]
     reviewed_at: Optional[datetime]
     review_notes: Optional[str]
-    
+
     # Include SKU details for display
     sku_code: Optional[str] = None
     sku_name: Optional[str] = None

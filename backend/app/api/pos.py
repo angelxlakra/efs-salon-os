@@ -25,7 +25,11 @@ from app.schemas.billing import (
     BillCreate,
     BillResponse,
     PaymentCreate,
+    PaymentUpdate,
     PaymentResponseWithBill,
+    CompleteBillCreate,
+    PendingPaymentCollect,
+    PendingPaymentCollectionResponse,
     VoidCreate,
     RefundCreate,
     RefundResponse,
@@ -217,6 +221,160 @@ def add_payment(
         )
 
 
+@router.patch(
+    "/bills/{bill_id}/payments/{payment_id}",
+    response_model=PaymentResponseWithBill,
+    status_code=status.HTTP_200_OK,
+    summary="Update an existing payment"
+)
+def update_payment(
+    bill_id: str,
+    payment_id: str,
+    payment_data: PaymentUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Update an existing payment on a bill.
+
+    Allows modification of payment method, amount, reference number, and notes.
+    Automatically recalculates bill status if amount changes.
+
+    **Permissions**: Receptionist or Owner
+
+    **Restrictions**:
+    - Cannot update payments on refunded bills
+    - Updated amount cannot cause overpayment
+
+    Args:
+        bill_id: ID of the bill (for validation).
+        payment_id: ID of the payment to update.
+        payment_data: Updated payment details.
+        db: Database session.
+        current_user: Authenticated user.
+
+    Returns:
+        PaymentResponseWithBill: Updated payment + bill status.
+
+    Raises:
+        400: Invalid data or would cause overpayment.
+        403: Insufficient permissions.
+        404: Payment or bill not found.
+    """
+    # Check permissions - same as add_payment
+    if not PermissionChecker.has_permission(current_user.role.name, "billing", "create"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions to edit payments"
+        )
+
+    billing_service = BillingService(db)
+
+    try:
+        # Convert amount to paise if provided
+        amount_paise = None
+        if payment_data.amount is not None:
+            amount_paise = int(round(payment_data.amount * 100))
+
+        payment = billing_service.update_payment(
+            payment_id=payment_id,
+            payment_method=payment_data.method,
+            amount=amount_paise,
+            reference_number=payment_data.reference_number,
+            notes=payment_data.notes,
+            updated_by_id=current_user.id
+        )
+
+        # Get updated bill
+        bill = billing_service.get_bill(bill_id)
+
+        if not bill:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Bill not found"
+            )
+
+        # Return payment with updated bill status
+        return PaymentResponseWithBill(
+            id=payment.id,
+            bill_id=payment.bill_id,
+            payment_method=payment.payment_method,
+            amount=payment.amount,
+            reference_number=payment.reference_number,
+            notes=payment.notes,
+            confirmed_at=payment.confirmed_at,
+            confirmed_by=payment.confirmed_by,
+            bill_status=bill.status,
+            invoice_number=bill.invoice_number
+        )
+
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
+
+@router.delete(
+    "/bills/{bill_id}/payments/{payment_id}",
+    response_model=BillResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Delete a payment"
+)
+def delete_payment(
+    bill_id: str,
+    payment_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Delete a payment from a bill.
+
+    Removes the payment and recalculates bill status.
+    If bill was posted and becomes underpaid, reverts to draft.
+
+    **Permissions**: Receptionist or Owner
+
+    **Restrictions**:
+    - Cannot delete payments from refunded bills
+    - Stock and customer stats are not reversed (audit trail preserved)
+
+    Args:
+        bill_id: ID of the bill (for validation).
+        payment_id: ID of the payment to delete.
+        db: Database session.
+        current_user: Authenticated user.
+
+    Returns:
+        BillResponse: Updated bill after payment deletion.
+
+    Raises:
+        400: Invalid operation (e.g., refunded bill).
+        403: Insufficient permissions.
+        404: Payment or bill not found.
+    """
+    # Check permissions - same as add_payment
+    if not PermissionChecker.has_permission(current_user.role.name, "billing", "create"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions to delete payments"
+        )
+
+    billing_service = BillingService(db)
+
+    try:
+        bill = billing_service.delete_payment(
+            payment_id=payment_id,
+            deleted_by_id=current_user.id
+        )
+
+        return BillResponse.model_validate(bill)
+
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
+
 @router.get(
     "/bills/{bill_id}",
     response_model=BillResponse,
@@ -315,6 +473,178 @@ def get_bill_receipt(
             "Content-Disposition": f'inline; filename="receipt_{bill.invoice_number or "draft"}.pdf"'
         }
     )
+
+
+@router.post(
+    "/bills/{bill_id}/complete",
+    response_model=BillResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Complete bill with pending balance"
+)
+def complete_bill(
+    bill_id: str,
+    complete_data: CompleteBillCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Complete a bill even with pending balance.
+
+    Allows posting a bill that hasn't been fully paid yet. Generates invoice
+    number and marks bill as posted. Useful for:
+    - Free services (family members, complimentary services)
+    - Credit customers who will pay later
+    - Partial payments with pending balance
+
+    **Permissions**: Owner or Receptionist
+
+    **Note**: Customer stats are updated with actual paid amount, not bill total.
+    Pending balance is tracked and can be collected later.
+
+    Args:
+        bill_id: ID of bill to complete.
+        complete_data: Optional notes about pending payment.
+        db: Database session.
+        current_user: Authenticated user.
+
+    Returns:
+        BillResponse: Completed bill with invoice number and pending balance info.
+
+    Raises:
+        403: Insufficient permissions.
+        404: Bill not found.
+        400: Bill is not in draft status.
+    """
+    # Check permissions (same as create bills and add payments)
+    if not PermissionChecker.has_permission(current_user.role.name, "billing", "create"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions to complete bills"
+        )
+
+    billing_service = BillingService(db)
+
+    try:
+        completed_bill = billing_service.complete_bill(
+            bill_id=bill_id,
+            completed_by_id=current_user.id,
+            notes=complete_data.notes
+        )
+
+        return BillResponse.model_validate(completed_bill)
+
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
+
+@router.post(
+    "/pending-payments/collect",
+    response_model=PendingPaymentCollectionResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Collect pending payment from customer"
+)
+def collect_pending_payment(
+    payment_data: PendingPaymentCollect,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Collect pending payment from customer without creating a bill.
+
+    Used when customers want to pay off their pending balance without
+    making a new purchase. The payment reduces their pending_balance and
+    creates a permanent record of the collection.
+
+    **Permissions**: Owner or Receptionist
+
+    **Records Created**: PendingPaymentCollection (permanent audit trail)
+
+    Args:
+        payment_data: Payment collection details (customer, amount, method).
+        db: Database session.
+        current_user: Authenticated user.
+
+    Returns:
+        PendingPaymentCollectionResponse: Complete payment collection record with audit info.
+
+    Raises:
+        400: Invalid data or amount exceeds pending balance.
+        403: Insufficient permissions.
+        404: Customer not found or no pending balance.
+    """
+    # Check permissions (same as billing operations)
+    if not PermissionChecker.has_permission(current_user.role.name, "billing", "create"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions to collect payments"
+        )
+
+    billing_service = BillingService(db)
+
+    try:
+        collection = billing_service.collect_pending_payment(
+            customer_id=payment_data.customer_id,
+            amount=int(payment_data.amount * 100),  # Convert to paise
+            payment_method=payment_data.payment_method,
+            collected_by_id=current_user.id,
+            reference_number=payment_data.reference_number,
+            notes=payment_data.notes
+        )
+
+        return PendingPaymentCollectionResponse.model_validate(collection)
+
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
+
+@router.get(
+    "/pending-payments/customer/{customer_id}",
+    response_model=list[PendingPaymentCollectionResponse],
+    status_code=status.HTTP_200_OK,
+    summary="Get pending payment collection history for customer"
+)
+def get_customer_pending_payment_history(
+    customer_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get all pending payment collections for a customer.
+
+    Returns complete history of pending balance collections, including:
+    - Direct collections (without bills)
+    - Overpayments applied to pending balance
+
+    **Permissions**: Owner or Receptionist
+
+    Args:
+        customer_id: Customer ID to get history for.
+        db: Database session.
+        current_user: Authenticated user.
+
+    Returns:
+        List[PendingPaymentCollectionResponse]: All payment collections, newest first.
+
+    Raises:
+        403: Insufficient permissions.
+    """
+    # Check permissions
+    if not PermissionChecker.has_permission(current_user.role.name, "billing", "read"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions to view payment history"
+        )
+
+    from app.models.pending_payment import PendingPaymentCollection
+
+    collections = db.query(PendingPaymentCollection).filter(
+        PendingPaymentCollection.customer_id == customer_id
+    ).order_by(PendingPaymentCollection.collected_at.desc()).all()
+
+    return [PendingPaymentCollectionResponse.model_validate(c) for c in collections]
 
 
 @router.post(

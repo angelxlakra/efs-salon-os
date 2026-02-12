@@ -1,19 +1,24 @@
-"""Service for managing salon settings."""
+"""Service for managing salon settings with Redis caching."""
 
 from typing import Optional, Dict, Any
 from sqlalchemy.orm import Session
 from app.models.settings import SalonSettings
+from app.services.cache_service import cache
 
+SETTINGS_CACHE_KEY = "settings:singleton"
+SETTINGS_CACHE_TTL = 3600  # 1 hour
 
 class SettingsService:
-    """Service for managing salon settings (singleton pattern)."""
+    """Service for managing salon settings (singleton pattern with caching)."""
 
     @staticmethod
     def get_settings(db: Session) -> Optional[SalonSettings]:
-        """
-        Get salon settings.
+        """Get salon settings with Redis caching.
 
-        Returns the first (and should be only) settings record.
+        Implements cache-aside pattern:
+        1. Check cache first
+        2. On miss, query database
+        3. Store in cache for future requests
 
         Args:
             db: Database session
@@ -21,7 +26,24 @@ class SettingsService:
         Returns:
             SalonSettings or None if not initialized
         """
-        return db.query(SalonSettings).first()
+        # Try cache first
+        cached_data = cache.get_json(SETTINGS_CACHE_KEY)
+        if cached_data:
+            # Reconstruct model from cached data
+            settings = SalonSettings(**cached_data)
+            # Attach to session to avoid detached instance issues
+            # merge() returns the attached instance
+            settings = db.merge(settings)
+            return settings
+
+        # Cache miss - query database
+        settings = db.query(SalonSettings).first()
+
+        if settings:
+            # Cache for 1 hour
+            cache.set(SETTINGS_CACHE_KEY, settings.to_dict(), ttl=SETTINGS_CACHE_TTL)
+
+        return settings
 
     @staticmethod
     def get_or_create_settings(db: Session) -> SalonSettings:
@@ -83,6 +105,9 @@ class SettingsService:
         db.commit()
         db.refresh(settings)
 
+        # Invalidate cache after update
+        cache.delete(SETTINGS_CACHE_KEY)
+
         return settings
 
     @staticmethod
@@ -121,5 +146,8 @@ class SettingsService:
 
         db.commit()
         db.refresh(settings)
+
+        # Invalidate cache after reset
+        cache.delete(SETTINGS_CACHE_KEY)
 
         return settings

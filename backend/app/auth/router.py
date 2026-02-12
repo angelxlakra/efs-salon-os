@@ -22,6 +22,7 @@ from app.auth.dependencies import (
     get_current_user,
     check_rate_limit
 )
+from app.utils import IST
 
 
 # ========== Request/Response Models ==========
@@ -188,7 +189,7 @@ async def login(
     )
 
     # Update last login timestamp
-    user.last_login_at = datetime.utcnow()
+    user.last_login_at = datetime.now(IST)
     db.commit()
 
     # Get user permissions

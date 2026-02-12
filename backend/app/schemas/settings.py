@@ -32,6 +32,9 @@ class SalonSettingsBase(BaseModel):
     invoice_prefix: str = Field("SAL", min_length=1, max_length=10)
     invoice_terms: Optional[str] = None
 
+    daily_revenue_target_paise: int = Field(2000000, ge=0, description="Daily revenue target in paise (₹20,000 default)")
+    daily_services_target: int = Field(25, ge=0, description="Daily services count target")
+
     @field_validator('gstin')
     @classmethod
     def validate_gstin(cls, v):
@@ -85,6 +88,9 @@ class SalonSettingsUpdate(BaseModel):
 
     invoice_prefix: Optional[str] = Field(None, min_length=1, max_length=10)
     invoice_terms: Optional[str] = None
+
+    daily_revenue_target_paise: Optional[int] = Field(None, ge=0)
+    daily_services_target: Optional[int] = Field(None, ge=0)
 
 
 class SalonSettingsResponse(SalonSettingsBase):

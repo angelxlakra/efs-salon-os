@@ -7,6 +7,14 @@ for the service catalog endpoints (categories, services, and addons).
 from datetime import datetime
 from typing import List, Optional
 from pydantic import BaseModel, Field
+from enum import Enum
+
+
+class ContributionTypeEnum(str, Enum):
+    """How staff contribution is calculated."""
+    PERCENTAGE = "percentage"
+    FIXED = "fixed"
+    EQUAL = "equal"
 
 
 # ========== Service Category Schemas ==========
@@ -195,6 +203,86 @@ class ServiceWithAddons(ServiceResponse):
 class ServiceWithCategory(ServiceResponse):
     """Service response with category info."""
 
+    category: Optional[ServiceCategoryResponse] = None
+
+
+# ========== Service Staff Template Schemas ==========
+
+class ServiceStaffTemplateCreate(BaseModel):
+    """Schema for creating a staff template for multi-person services."""
+
+    role_name: str = Field(..., min_length=1, max_length=100, description="Role name (e.g., 'Botox Application')")
+    role_description: Optional[str] = Field(None, max_length=500)
+    sequence_order: int = Field(..., ge=1, description="Order in workflow (1, 2, 3...)")
+    contribution_type: ContributionTypeEnum = Field(default=ContributionTypeEnum.PERCENTAGE)
+    default_contribution_percent: Optional[int] = Field(None, ge=0, le=100, description="Percentage for PERCENTAGE type")
+    default_contribution_fixed: Optional[int] = Field(None, gt=0, description="Fixed amount in paise for FIXED type")
+    estimated_duration_minutes: int = Field(..., gt=0, le=480, description="Estimated time for this role")
+    is_required: bool = Field(default=True, description="Can this role be skipped?")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "role_name": "Botox Application",
+                "role_description": "Apply botox to designated areas",
+                "sequence_order": 1,
+                "contribution_type": "percentage",
+                "default_contribution_percent": 50,
+                "estimated_duration_minutes": 30,
+                "is_required": True
+            }
+        }
+
+
+class ServiceStaffTemplateUpdate(BaseModel):
+    """Schema for updating a staff template."""
+
+    role_name: Optional[str] = Field(None, min_length=1, max_length=100)
+    role_description: Optional[str] = Field(None, max_length=500)
+    sequence_order: Optional[int] = Field(None, ge=1)
+    contribution_type: Optional[ContributionTypeEnum] = None
+    default_contribution_percent: Optional[int] = Field(None, ge=0, le=100)
+    default_contribution_fixed: Optional[int] = Field(None, gt=0)
+    estimated_duration_minutes: Optional[int] = Field(None, gt=0, le=480)
+    is_required: Optional[bool] = None
+    is_active: Optional[bool] = None
+
+
+class ServiceStaffTemplateResponse(BaseModel):
+    """Schema for staff template in response."""
+
+    id: str
+    service_id: str
+    role_name: str
+    role_description: Optional[str] = None
+    sequence_order: int
+    contribution_type: str
+    default_contribution_percent: Optional[int] = None
+    default_contribution_fixed: Optional[int] = None
+    estimated_duration_minutes: int
+    is_required: bool
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+    @property
+    def contribution_display(self) -> str:
+        """Human-readable contribution display."""
+        if self.contribution_type == "percentage":
+            return f"{self.default_contribution_percent}%"
+        elif self.contribution_type == "fixed":
+            return f"₹{self.default_contribution_fixed / 100:.2f}" if self.default_contribution_fixed else "N/A"
+        else:
+            return "Equal Split"
+
+
+class ServiceWithTemplates(ServiceResponse):
+    """Service response including staff templates for multi-person services."""
+
+    staff_templates: List[ServiceStaffTemplateResponse] = []
     category: Optional[ServiceCategoryResponse] = None
 
 

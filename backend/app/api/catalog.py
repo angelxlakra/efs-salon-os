@@ -8,6 +8,7 @@ This module provides REST API endpoints for:
 - Bulk importing catalog data
 """
 
+from app.utils import generate_ulid
 from typing import Optional, List
 import csv
 import io
@@ -17,11 +18,12 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
 from app.models.user import User
-from app.models.service import ServiceCategory, Service, ServiceAddon
+from app.models.service import ServiceCategory, Service, ServiceAddon, ServiceStaffTemplate
 from app.models.inventory import SKU
-from app.auth.dependencies import get_current_user, require_owner
+from app.auth.dependencies import get_current_user, require_owner, require_owner_or_receptionist
 from app.services.staff_availability_service import StaffAvailabilityService
 from app.services.inventory_service import InventoryService
+from app.services.cache_service import cache
 from app.schemas.expense import RetailProductResponse
 from app.schemas.catalog import (
     # Category schemas
@@ -37,16 +39,24 @@ from app.schemas.catalog import (
     ServiceListResponse,
     ServiceWithAddons,
     ServiceWithCategory,
+    ServiceWithTemplates,
     # Addon schemas
     ServiceAddonCreate,
     ServiceAddonUpdate,
     ServiceAddonResponse,
+    # Staff template schemas
+    ServiceStaffTemplateCreate,
+    ServiceStaffTemplateUpdate,
+    ServiceStaffTemplateResponse,
     # Full catalog
     CatalogResponse,
 )
 
 
 router = APIRouter(prefix="/catalog", tags=["Catalog"])
+
+# Cache TTL for catalog data (30 minutes)
+CATALOG_CACHE_TTL = 1800
 
 
 # ========== Service Categories ==========
@@ -62,7 +72,7 @@ def list_categories(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """List all service categories.
+    """List all service categories with caching.
 
     **Permissions**: Any authenticated user
 
@@ -74,6 +84,12 @@ def list_categories(
     Returns:
         ServiceCategoryListResponse: List of categories.
     """
+    # Check cache first
+    cache_key = f"catalog:categories:active={not include_inactive}"
+    cached_response = cache.get_json(cache_key)
+    if cached_response:
+        return ServiceCategoryListResponse(**cached_response)
+
     query = db.query(ServiceCategory)
 
     if not include_inactive:
@@ -81,10 +97,15 @@ def list_categories(
 
     categories = query.order_by(ServiceCategory.display_order).all()
 
-    return ServiceCategoryListResponse(
+    response = ServiceCategoryListResponse(
         categories=[ServiceCategoryResponse.model_validate(c) for c in categories],
         total=len(categories)
     )
+
+    # Cache for 30 minutes
+    cache.set(cache_key, response.model_dump(), ttl=CATALOG_CACHE_TTL)
+
+    return response
 
 
 @router.post(
@@ -96,16 +117,16 @@ def list_categories(
 def create_category(
     category_data: ServiceCategoryCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_owner)
+    current_user: User = Depends(require_owner_or_receptionist)
 ):
     """Create a new service category.
 
-    **Permissions**: Owner only
+    **Permissions**: Owner or Receptionist
 
     Args:
         category_data: Category details.
         db: Database session.
-        current_user: Authenticated owner.
+        current_user: Authenticated user (owner or receptionist).
 
     Returns:
         ServiceCategoryResponse: Created category.
@@ -134,6 +155,9 @@ def create_category(
     db.add(category)
     db.commit()
     db.refresh(category)
+
+    # Invalidate category cache
+    cache.delete_pattern("catalog:categories:*")
 
     return ServiceCategoryResponse.model_validate(category)
 
@@ -208,17 +232,17 @@ def update_category(
     category_id: str,
     category_data: ServiceCategoryUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_owner)
+    current_user: User = Depends(require_owner_or_receptionist)
 ):
     """Update a service category.
 
-    **Permissions**: Owner only
+    **Permissions**: Owner or Receptionist
 
     Args:
         category_id: Category ID.
         category_data: Fields to update.
         db: Database session.
-        current_user: Authenticated owner.
+        current_user: Authenticated user (owner or receptionist).
 
     Returns:
         ServiceCategoryResponse: Updated category.
@@ -258,6 +282,9 @@ def update_category(
     db.commit()
     db.refresh(category)
 
+    # Invalidate category cache
+    cache.delete_pattern("catalog:categories:*")
+
     return ServiceCategoryResponse.model_validate(category)
 
 
@@ -269,11 +296,11 @@ def update_category(
 def delete_category(
     category_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_owner)
+    current_user: User = Depends(require_owner_or_receptionist)
 ):
     """Deactivate a service category.
 
-    **Permissions**: Owner only
+    **Permissions**: Owner or Receptionist
 
     Note: This will mark the category as inactive and soft-delete all services in it.
     The category and its services are preserved in the database for historical records.
@@ -281,7 +308,7 @@ def delete_category(
     Args:
         category_id: Category ID.
         db: Database session.
-        current_user: Authenticated owner.
+        current_user: Authenticated user (owner or receptionist).
 
     Raises:
         404: Category not found.
@@ -322,6 +349,9 @@ def delete_category(
     # Mark category as inactive (soft delete)
     category.is_active = False
     db.commit()
+
+    # Invalidate category cache
+    cache.delete_pattern("catalog:categories:*")
 
 
 # ========== Services ==========
@@ -397,16 +427,16 @@ def list_services(
 def create_service(
     service_data: ServiceCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_owner)
+    current_user: User = Depends(require_owner_or_receptionist)
 ):
     """Create a new service.
 
-    **Permissions**: Owner only
+    **Permissions**: Owner or Receptionist
 
     Args:
         service_data: Service details.
         db: Database session.
-        current_user: Authenticated owner.
+        current_user: Authenticated user (owner or receptionist).
 
     Returns:
         ServiceResponse: Created service.
@@ -508,17 +538,17 @@ def update_service(
     service_id: str,
     service_data: ServiceUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_owner)
+    current_user: User = Depends(require_owner_or_receptionist)
 ):
     """Update a service.
 
-    **Permissions**: Owner only
+    **Permissions**: Owner or Receptionist
 
     Args:
         service_id: Service ID.
         service_data: Fields to update.
         db: Database session.
-        current_user: Authenticated owner.
+        current_user: Authenticated user (owner or receptionist).
 
     Returns:
         ServiceResponse: Updated service.
@@ -569,11 +599,11 @@ def update_service(
 def delete_service(
     service_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_owner)
+    current_user: User = Depends(require_owner_or_receptionist)
 ):
     """Soft delete a service.
 
-    **Permissions**: Owner only
+    **Permissions**: Owner or Receptionist
 
     The service is not permanently deleted but marked as deleted.
     Historical bills will still reference the service.
@@ -581,7 +611,7 @@ def delete_service(
     Args:
         service_id: Service ID.
         db: Database session.
-        current_user: Authenticated owner.
+        current_user: Authenticated user (owner or receptionist).
 
     Raises:
         404: Service not found.
@@ -614,17 +644,17 @@ def create_addon(
     service_id: str,
     addon_data: ServiceAddonCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_owner)
+    current_user: User = Depends(require_owner_or_receptionist)
 ):
     """Add an addon to a service.
 
-    **Permissions**: Owner only
+    **Permissions**: Owner or Receptionist
 
     Args:
         service_id: Service ID.
         addon_data: Addon details.
         db: Database session.
-        current_user: Authenticated owner.
+        current_user: Authenticated user (owner or receptionist).
 
     Returns:
         ServiceAddonResponse: Created addon.
@@ -666,17 +696,17 @@ def update_addon(
     addon_id: str,
     addon_data: ServiceAddonUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_owner)
+    current_user: User = Depends(require_owner_or_receptionist)
 ):
     """Update a service addon.
 
-    **Permissions**: Owner only
+    **Permissions**: Owner or Receptionist
 
     Args:
         addon_id: Addon ID.
         addon_data: Fields to update.
         db: Database session.
-        current_user: Authenticated owner.
+        current_user: Authenticated user (owner or receptionist).
 
     Returns:
         ServiceAddonResponse: Updated addon.
@@ -713,16 +743,16 @@ def update_addon(
 def delete_addon(
     addon_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_owner)
+    current_user: User = Depends(require_owner_or_receptionist)
 ):
     """Delete a service addon.
 
-    **Permissions**: Owner only
+    **Permissions**: Owner or Receptionist
 
     Args:
         addon_id: Addon ID.
         db: Database session.
-        current_user: Authenticated owner.
+        current_user: Authenticated user (owner or receptionist).
 
     Raises:
         404: Addon not found.
@@ -751,11 +781,11 @@ def delete_addon(
 async def bulk_import_catalog(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_owner)
+    current_user: User = Depends(require_owner_or_receptionist)
 ):
     """Bulk import categories and services from CSV file.
 
-    **Permissions**: Owner only
+    **Permissions**: Owner or Receptionist
 
     CSV Format:
     - Headers: type,category_name,name,description,base_price,duration_minutes,display_order
@@ -893,6 +923,9 @@ async def bulk_import_catalog(
         # Commit all changes
         db.commit()
 
+        # Invalidate category cache so the UI sees new categories immediately
+        cache.delete_pattern("catalog:categories:*")
+
         return {
             "success": True,
             "categories_created": categories_created,
@@ -1025,6 +1058,338 @@ def list_retail_products(
     return result
 
 
+# ========== Service Staff Templates (Multi-Staff Services) ==========
+
+@router.get(
+    "/services/{service_id}/staff-templates",
+    response_model=List[ServiceStaffTemplateResponse],
+    status_code=status.HTTP_200_OK,
+    summary="List staff role templates for a service"
+)
+def list_service_staff_templates(
+    service_id: str,
+    include_inactive: bool = Query(False, description="Include inactive templates"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    List all staff role templates for a multi-person service.
+
+    **Permissions**: Any authenticated user
+
+    Templates define the standard roles and contribution splits for services
+    that require multiple staff members (e.g., Botox, Complex Treatments).
+
+    Args:
+        service_id: Service ID
+        include_inactive: Whether to include inactive templates
+        db: Database session
+        current_user: Authenticated user
+
+    Returns:
+        List[ServiceStaffTemplateResponse]: Staff role templates
+    """
+    # Verify service exists
+    service = db.query(Service).filter(Service.id == service_id).first()
+    if not service:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Service not found: {service_id}"
+        )
+
+    # Query templates
+    query = db.query(ServiceStaffTemplate).filter(
+        ServiceStaffTemplate.service_id == service_id
+    )
+
+    if not include_inactive:
+        query = query.filter(ServiceStaffTemplate.is_active == True)
+
+    templates = query.order_by(ServiceStaffTemplate.sequence_order).all()
+
+    return [ServiceStaffTemplateResponse.model_validate(t) for t in templates]
+
+
+@router.post(
+    "/services/{service_id}/staff-templates",
+    response_model=ServiceStaffTemplateResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a staff role template for a service"
+)
+def create_service_staff_template(
+    service_id: str,
+    template_data: ServiceStaffTemplateCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_owner_or_receptionist)
+):
+    """
+    Create a staff role template for a multi-person service.
+
+    **Permission**: Owner only
+
+    Defines a standard role (e.g., "Botox Application", "Hair Wash") with
+    contribution split and estimated duration for services requiring multiple staff.
+
+    **Example**: Botox Treatment with 3 roles:
+    - Application (50%, 30 min)
+    - Hair Wash (25%, 15 min)
+    - Styling (25%, 20 min)
+
+    Args:
+        service_id: Service ID
+        template_data: Template creation data
+        db: Database session
+        current_user: Owner user
+
+    Returns:
+        ServiceStaffTemplateResponse: Created template
+    """
+    # Verify service exists
+    service = db.query(Service).filter(Service.id == service_id).first()
+    if not service:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Service not found: {service_id}"
+        )
+
+    # Validate contribution data
+    if template_data.contribution_type == "percentage":
+        if template_data.default_contribution_percent is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="default_contribution_percent required for PERCENTAGE type"
+            )
+        if not (0 <= template_data.default_contribution_percent <= 100):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Contribution percent must be between 0 and 100"
+            )
+    elif template_data.contribution_type == "fixed":
+        if template_data.default_contribution_fixed is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="default_contribution_fixed required for FIXED type"
+            )
+
+    # Check for duplicate sequence order
+    existing = db.query(ServiceStaffTemplate).filter(
+        ServiceStaffTemplate.service_id == service_id,
+        ServiceStaffTemplate.sequence_order == template_data.sequence_order,
+        ServiceStaffTemplate.is_active == True
+    ).first()
+
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Sequence order {template_data.sequence_order} already exists for this service"
+        )
+
+    # Create template
+
+    template = ServiceStaffTemplate(
+        id=generate_ulid(),
+        service_id=service_id,
+        **template_data.model_dump()
+    )
+
+    db.add(template)
+    db.commit()
+    db.refresh(template)
+
+    return ServiceStaffTemplateResponse.model_validate(template)
+
+
+@router.get(
+    "/services/{service_id}/staff-templates/{template_id}",
+    response_model=ServiceStaffTemplateResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get a specific staff role template"
+)
+def get_service_staff_template(
+    service_id: str,
+    template_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get details of a specific staff role template.
+
+    **Permissions**: Any authenticated user
+
+    Args:
+        service_id: Service ID
+        template_id: Template ID
+        db: Database session
+        current_user: Authenticated user
+
+    Returns:
+        ServiceStaffTemplateResponse: Template details
+    """
+    template = db.query(ServiceStaffTemplate).filter(
+        ServiceStaffTemplate.id == template_id,
+        ServiceStaffTemplate.service_id == service_id
+    ).first()
+
+    if not template:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Template not found: {template_id}"
+        )
+
+    return ServiceStaffTemplateResponse.model_validate(template)
+
+
+@router.patch(
+    "/services/{service_id}/staff-templates/{template_id}",
+    response_model=ServiceStaffTemplateResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Update a staff role template"
+)
+def update_service_staff_template(
+    service_id: str,
+    template_id: str,
+    template_data: ServiceStaffTemplateUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_owner_or_receptionist)
+):
+    """
+    Update a staff role template.
+
+    **Permission**: Owner only
+
+    Args:
+        service_id: Service ID
+        template_id: Template ID
+        template_data: Update data
+        db: Database session
+        current_user: Owner user
+
+    Returns:
+        ServiceStaffTemplateResponse: Updated template
+    """
+    template = db.query(ServiceStaffTemplate).filter(
+        ServiceStaffTemplate.id == template_id,
+        ServiceStaffTemplate.service_id == service_id
+    ).first()
+
+    if not template:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Template not found: {template_id}"
+        )
+
+    # Update fields
+    update_data = template_data.model_dump(exclude_unset=True)
+
+    # Validate sequence order if being updated
+    if "sequence_order" in update_data:
+        existing = db.query(ServiceStaffTemplate).filter(
+            ServiceStaffTemplate.service_id == service_id,
+            ServiceStaffTemplate.sequence_order == update_data["sequence_order"],
+            ServiceStaffTemplate.id != template_id,
+            ServiceStaffTemplate.is_active == True
+        ).first()
+
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Sequence order {update_data['sequence_order']} already exists"
+            )
+
+    for field, value in update_data.items():
+        setattr(template, field, value)
+
+    db.commit()
+    db.refresh(template)
+
+    return ServiceStaffTemplateResponse.model_validate(template)
+
+
+@router.delete(
+    "/services/{service_id}/staff-templates/{template_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete a staff role template"
+)
+def delete_service_staff_template(
+    service_id: str,
+    template_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_owner_or_receptionist)
+):
+    """
+    Delete (deactivate) a staff role template.
+
+    **Permission**: Owner only
+
+    Note: This is a soft delete - sets is_active to False.
+
+    Args:
+        service_id: Service ID
+        template_id: Template ID
+        db: Database session
+        current_user: Owner user
+
+    Returns:
+        None
+    """
+    template = db.query(ServiceStaffTemplate).filter(
+        ServiceStaffTemplate.id == template_id,
+        ServiceStaffTemplate.service_id == service_id
+    ).first()
+
+    if not template:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Template not found: {template_id}"
+        )
+
+    # Soft delete
+    template.is_active = False
+    db.commit()
+
+    return None
+
+
+@router.get(
+    "/services/{service_id}/with-templates",
+    response_model=ServiceWithTemplates,
+    status_code=status.HTTP_200_OK,
+    summary="Get service with staff role templates"
+)
+def get_service_with_templates(
+    service_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get a service with all its staff role templates.
+
+    **Permissions**: Any authenticated user
+
+    Useful for checkout UI to show which roles are required for a multi-person service.
+
+    Args:
+        service_id: Service ID
+        db: Database session
+        current_user: Authenticated user
+
+    Returns:
+        ServiceWithTemplates: Service with templates and category
+    """
+    service = db.query(Service).options(
+        joinedload(Service.staff_templates),
+        joinedload(Service.category)
+    ).filter(Service.id == service_id).first()
+
+    if not service:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Service not found: {service_id}"
+        )
+
+    return ServiceWithTemplates.model_validate(service)
+
+
 # ========== Service Analytics ==========
 
 @router.post(
@@ -1034,7 +1399,7 @@ def list_retail_products(
 )
 def update_service_average_durations(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_owner)
+    current_user: User = Depends(require_owner_or_receptionist)
 ):
     """Update average_duration_minutes for all services based on historical completion data.
 

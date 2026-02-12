@@ -145,6 +145,11 @@ class InventoryChangeRequest(Base, ULIDMixin, TimestampMixin):
     # For receives: unit cost in paise
     unit_cost = Column(Integer)
 
+    # Supplier tracking (for RECEIVE type)
+    supplier_invoice_number = Column(String(100))
+    supplier_discount_percent = Column(Numeric(5, 2))  # e.g., 15.50 for 15.5%
+    supplier_discount_fixed = Column(Integer)  # discount in paise
+
     reason_code = Column(String, nullable=False)  # 'new_stock', 'correction', 'damage', etc.
     notes = Column(Text)
 

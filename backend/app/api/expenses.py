@@ -8,8 +8,9 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.auth.dependencies import get_current_user, require_permission
-from app.models.user import User
+from app.models.user import User, RoleEnum
 from app.models.expense import Expense, ExpenseCategory, ExpenseStatus
+from app.utils import IST
 from app.schemas.expense import (
     ExpenseCreate,
     ExpenseUpdate,
@@ -34,11 +35,19 @@ def create_expense(
     """
     Create a new expense record.
 
-    **Permissions:** Owner only
+    **Permissions:** Owner or Receptionist (Receptionist cannot create rent/salary expenses)
 
     Creates an expense with automatic approval if requires_approval=False,
     otherwise sets status to PENDING.
     """
+    # Restrict receptionist from creating rent and salary expenses
+    if current_user.role.name == RoleEnum.RECEPTIONIST:
+        if expense_data.category in [ExpenseCategory.RENT, ExpenseCategory.SALARIES]:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Receptionist cannot create rent or salary expenses. Only owner can create these."
+            )
+
     # Determine initial status
     initial_status = ExpenseStatus.PENDING if expense_data.requires_approval else ExpenseStatus.APPROVED
 
@@ -57,9 +66,9 @@ def create_expense(
         status=initial_status,
         requires_approval=expense_data.requires_approval,
         recorded_by=current_user.id,
-        recorded_at=datetime.utcnow(),
+        recorded_at=datetime.now(IST),
         approved_by=None if expense_data.requires_approval else current_user.id,
-        approved_at=None if expense_data.requires_approval else datetime.utcnow()
+        approved_at=None if expense_data.requires_approval else datetime.now(IST)
     )
 
     db.add(expense)
@@ -85,12 +94,18 @@ def list_expenses(
     """
     List expenses with optional filters.
 
-    **Permissions:** Owner only
+    **Permissions:** Owner or Receptionist (Receptionist cannot view rent/salary expenses)
 
     Supports filtering by date range, category, status, staff, and recurring flag.
     Returns paginated results.
     """
     query = db.query(Expense)
+
+    # Restrict receptionist from viewing rent and salary expenses
+    if current_user.role.name == RoleEnum.RECEPTIONIST:
+        query = query.filter(
+            Expense.category.notin_([ExpenseCategory.RENT, ExpenseCategory.SALARIES])
+        )
 
     # Apply filters
     if start_date:
@@ -135,11 +150,17 @@ def get_expense_summary(
     """
     Get expense summary for a period.
 
-    **Permissions:** Owner only
+    **Permissions:** Owner or Receptionist (Receptionist cannot view rent/salary expenses)
 
     Returns total amount, breakdown by category, and counts by status.
     """
     query = db.query(Expense)
+
+    # Restrict receptionist from viewing rent and salary expenses in summary
+    if current_user.role.name == RoleEnum.RECEPTIONIST:
+        query = query.filter(
+            Expense.category.notin_([ExpenseCategory.RENT, ExpenseCategory.SALARIES])
+        )
 
     if start_date:
         query = query.filter(Expense.expense_date >= start_date)
@@ -275,11 +296,11 @@ def approve_or_reject_expense(
     if approval.approved:
         expense.status = ExpenseStatus.APPROVED
         expense.approved_by = current_user.id
-        expense.approved_at = datetime.utcnow()
+        expense.approved_at = datetime.now(IST)
     else:
         expense.status = ExpenseStatus.REJECTED
         expense.rejected_by = current_user.id
-        expense.rejected_at = datetime.utcnow()
+        expense.rejected_at = datetime.now(IST)
         expense.rejection_reason = approval.notes
 
     db.commit()

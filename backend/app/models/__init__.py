@@ -11,15 +11,16 @@ from app.models.user import Role, RoleEnum, User, Staff
 
 # Customer
 from app.models.customer import Customer
+from app.models.pending_payment import PendingPaymentCollection
 
 # Service Catalog
-from app.models.service import ServiceCategory, Service, ServiceAddon, ServiceMaterialUsage
+from app.models.service import ServiceCategory, Service, ServiceAddon, ServiceMaterialUsage, ServiceStaffTemplate
 
 # Appointments
 from app.models.appointment import Appointment, AppointmentStatus, WalkIn
 
 # Billing
-from app.models.billing import Bill, BillItem, BillStatus, Payment, PaymentMethod
+from app.models.billing import Bill, BillItem, BillItemStaffContribution, BillStatus, Payment, PaymentMethod
 
 # Inventory
 from app.models.inventory import (
@@ -67,11 +68,13 @@ __all__ = [
     "Staff",
     # Customer
     "Customer",
+    "PendingPaymentCollection",
     # Service
     "ServiceCategory",
     "Service",
     "ServiceAddon",
     "ServiceMaterialUsage",
+    "ServiceStaffTemplate",
     # Appointment
     "Appointment",
     "AppointmentStatus",
@@ -79,6 +82,7 @@ __all__ = [
     # Billing
     "Bill",
     "BillItem",
+    "BillItemStaffContribution",
     "BillStatus",
     "Payment",
     "PaymentMethod",

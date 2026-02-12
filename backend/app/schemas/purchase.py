@@ -84,6 +84,7 @@ class PurchaseItemBase(BaseModel):
     uom: str = Field(..., max_length=20)
     quantity: Decimal = Field(..., gt=0)
     unit_cost: int = Field(..., gt=0)  # In paise
+    discount_amount: int = Field(0, ge=0)  # Discount in paise
 
 
 class PurchaseItemCreate(PurchaseItemBase):
@@ -116,6 +117,7 @@ class PurchaseInvoiceBase(BaseModel):
 class PurchaseInvoiceCreate(PurchaseInvoiceBase):
     """Schema for creating a purchase invoice."""
     items: List[PurchaseItemCreate] = Field(..., min_items=1)
+    invoice_discount_amount: int = Field(0, ge=0)  # Invoice-level discount in paise
 
 
 class PurchaseInvoiceUpdate(BaseModel):
@@ -128,10 +130,19 @@ class PurchaseInvoiceUpdate(BaseModel):
     items: Optional[List[PurchaseItemCreate]] = None
 
 
+class PurchaseInvoiceEditRequest(BaseModel):
+    """Schema for editing invoice with discounts (any status)."""
+    items: List[PurchaseItemCreate] = Field(..., min_items=1)
+    invoice_discount_amount: int = Field(0, ge=0)  # Invoice-level discount in paise
+    notes: Optional[str] = None
+
+
 class PurchaseInvoiceResponse(PurchaseInvoiceBase):
     """Schema for purchase invoice response."""
     id: str
-    total_amount: int  # In paise
+    subtotal: int  # Sum of items before invoice discount
+    invoice_discount_amount: int  # Invoice-level discount
+    total_amount: int  # In paise (after discounts)
     paid_amount: int
     balance_due: int
     status: PurchaseStatus

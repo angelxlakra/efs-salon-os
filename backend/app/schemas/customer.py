@@ -29,6 +29,8 @@ class CustomerResponse(CustomerBase):
     total_visits: int
     total_spent: int
     total_spent_rupees: float
+    pending_balance: int  # Outstanding amount owed in paise
+    pending_balance_rupees: float
     last_visit_at: Optional[datetime]
     full_name: str
     created_at: datetime

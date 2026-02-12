@@ -224,3 +224,12 @@ class ActiveWalkInsResponse(BaseModel):
     """Response for active walk-ins (live dashboard)."""
     sessions: List[CustomerSessionGroup]
     total_customers: int
+
+
+# ============ Session Customer Update Schema ============
+
+class SessionCustomerUpdate(BaseModel):
+    """Schema for updating the customer on all walk-ins in a session."""
+    customer_id: Optional[str] = Field(None, description="Existing customer ID (optional)")
+    customer_name: str = Field(..., min_length=2, description="Customer name (required)")
+    customer_phone: Optional[str] = Field(None, description="Customer phone (optional)")

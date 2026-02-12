@@ -38,6 +38,7 @@ from app.schemas.appointment import (
     MyServicesResponse,
     ServiceResponseBase,
     StaffResponseBase,
+    SessionCustomerUpdate,
 )
 from app.auth.dependencies import get_current_user, require_owner_or_receptionist
 from app.auth.permissions import PermissionChecker
@@ -1088,6 +1089,59 @@ def get_active_walkins_v2(
         sessions=sessions,
         total_customers=len(sessions)
     )
+
+
+@router.patch("/walkins/session/{session_id}/customer")
+def update_session_customer(
+    session_id: str,
+    data: SessionCustomerUpdate,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_owner_or_receptionist)
+):
+    """Update the customer on all walk-ins in a session.
+
+    Used when a session was started as "Walk-in Customer" and needs to be
+    reassigned to a real customer, or when switching from one customer to another.
+
+    **Permissions**: Receptionist or Owner
+
+    Args:
+        session_id: The session ID grouping the walk-ins
+        data: New customer information
+        db: Database session
+        current_user: Authenticated user
+
+    Returns:
+        dict with updated_count
+
+    Raises:
+        404: No walk-ins found for this session
+    """
+    walkins = db.query(WalkIn).filter(WalkIn.session_id == session_id).all()
+
+    if not walkins:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No walk-ins found for session: {session_id}"
+        )
+
+    # Resolve customer
+    customer_id = _get_or_create_customer(
+        db,
+        data.customer_id,
+        data.customer_name,
+        data.customer_phone
+    )
+
+    # Update all walk-ins in this session
+    for walkin in walkins:
+        walkin.customer_id = customer_id
+        walkin.customer_name = data.customer_name
+        walkin.customer_phone = data.customer_phone
+
+    db.commit()
+
+    return {"updated_count": len(walkins), "session_id": session_id}
 
 
 @router.get("/walkins/my-services", response_model=MyServicesResponse)

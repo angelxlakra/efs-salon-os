@@ -49,7 +49,7 @@ def check_receptionist_permission(
     # We check if role is mapped or check properties if they exist
     # User model has is_owner, is_receptionist properties
     if not (current_user.is_receptionist or current_user.is_owner):
-         raise HTTPException(
+        raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not enough permissions",
         )

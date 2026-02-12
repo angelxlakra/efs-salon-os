@@ -62,6 +62,9 @@ def seed_roles(db: Session):
             "customers": ["create", "read", "update"],
             "inventory": ["read", "request"],
             "reports": ["read"],
+            "services": ["create", "read", "update"],  # Can manage service catalog
+            "service_categories": ["create", "read", "update"],  # Can manage categories
+            "expenses": ["create", "read"],  # Can add and view expenses (except rent/salary)
         }
     )
     db.add(receptionist_role)
@@ -199,7 +202,9 @@ def seed_salon_settings(db: Session):
         receipt_show_logo=False,
         primary_color="#000000",
         invoice_prefix="SAL",
-        invoice_terms="All services are non-refundable. Please arrive 10 minutes before your appointment."
+        invoice_terms="All services are non-refundable. Please arrive 10 minutes before your appointment.",
+        daily_revenue_target_paise=2000000,  # ₹20,000 daily target
+        daily_services_target=25  # 25 services daily target
     )
 
     db.add(settings)
@@ -226,8 +231,8 @@ def main():
         # Seed owner user
         owner_user = seed_owner_user(db, roles)
 
-        # Seed service categories
-        categories = seed_service_categories(db)
+        # Seed service categories - REMOVED: Allow receptionist to manage via UI or CSV import
+        # categories = seed_service_categories(db)
 
         # Seed salon settings
         settings = seed_salon_settings(db)
@@ -238,7 +243,7 @@ def main():
         print("\nSummary:")
         print(f"  - Roles: {len(roles)}")
         print(f"  - Users: 1 (owner)")
-        print(f"  - Service Categories: {len(categories)}")
+        print(f"  - Service Categories: Not seeded (use CSV import or UI)")
         print(f"  - Salon Settings: Initialized")
         print("\nDefault Login:")
         print("  Username: owner")

@@ -21,6 +21,10 @@ from app.models.service import Service
 from app.models.user import Staff
 from app.utils import IST
 from app.config import settings
+from app.services.cache_service import cache
+
+# Cache TTL for dashboard metrics (60 seconds = 1 minute)
+DASHBOARD_CACHE_TTL = 60
 
 
 class AccountingService:
@@ -37,7 +41,10 @@ class AccountingService:
     # ============ Dashboard Methods ============
 
     def get_dashboard_metrics(self, target_date: Optional[date] = None) -> Dict:
-        """Get real-time dashboard metrics for a specific date.
+        """Get real-time dashboard metrics for a specific date with caching.
+
+        Implements short-lived caching (60s) to reduce database load while
+        maintaining acceptable freshness for dashboard displays.
 
         Args:
             target_date: Date to get metrics for (defaults to today in IST)
@@ -48,6 +55,12 @@ class AccountingService:
         """
         if not target_date:
             target_date = datetime.now(IST).date()
+
+        # Check cache first
+        cache_key = f"dashboard:metrics:{target_date}"
+        cached_metrics = cache.get_json(cache_key)
+        if cached_metrics:
+            return cached_metrics
 
         # Get date range for queries
         start_of_day = datetime.combine(target_date, time.min)
@@ -135,7 +148,24 @@ class AccountingService:
         cash_drawer_opening_float = cash_drawer.opening_float if cash_drawer else None
         cash_drawer_expected_cash = cash_drawer.expected_cash if cash_drawer else None
 
-        return {
+        # Calculate average service duration from completed appointments
+        avg_service_duration_minutes = None
+        completed_with_duration = self.db.query(Appointment).filter(
+            Appointment.scheduled_at >= start_of_day,
+            Appointment.scheduled_at <= end_of_day,
+            Appointment.status == AppointmentStatus.COMPLETED,
+            Appointment.started_at.isnot(None),
+            Appointment.completed_at.isnot(None)
+        ).all()
+
+        if completed_with_duration:
+            total_duration = sum([
+                (appt.completed_at - appt.started_at).total_seconds() / 60
+                for appt in completed_with_duration
+            ])
+            avg_service_duration_minutes = round(total_duration / len(completed_with_duration))
+
+        metrics = {
             "today": target_date,
             "total_bills": total_bills,
             "completed_appointments": completed_appointments,
@@ -152,10 +182,196 @@ class AccountingService:
             "cash_drawer_open": cash_drawer_open,
             "cash_drawer_opening_float": cash_drawer_opening_float,
             "cash_drawer_expected_cash": cash_drawer_expected_cash,
+            "avg_service_duration_minutes": avg_service_duration_minutes,
         }
 
+        # Cache for 60 seconds
+        cache.set(cache_key, metrics, ttl=DASHBOARD_CACHE_TTL)
+
+        return metrics
+
+    def get_day_comparison(self, target_date: Optional[date] = None) -> Dict:
+        """Compare metrics between target date and previous day.
+
+        Args:
+            target_date: Date to get comparison for (defaults to today in IST)
+
+        Returns:
+            Dictionary with today's metrics, yesterday's metrics, and comparison data
+        """
+        if not target_date:
+            target_date = datetime.now(IST).date()
+
+        # Check cache first
+        cache_key = f"dashboard:comparison:{target_date}"
+        cached_comparison = cache.get_json(cache_key)
+        if cached_comparison:
+            return cached_comparison
+
+        # Get today's and yesterday's metrics
+        today_metrics = self.get_dashboard_metrics(target_date)
+        yesterday_date = target_date - timedelta(days=1)
+        yesterday_metrics = self.get_dashboard_metrics(yesterday_date)
+
+        # Calculate changes
+        revenue_change = today_metrics["net_revenue"] - yesterday_metrics["net_revenue"]
+        revenue_percent = (revenue_change / yesterday_metrics["net_revenue"] * 100) if yesterday_metrics["net_revenue"] > 0 else 0
+
+        services_change = today_metrics["completed_appointments"] - yesterday_metrics["completed_appointments"]
+        services_percent = (services_change / yesterday_metrics["completed_appointments"] * 100) if yesterday_metrics["completed_appointments"] > 0 else 0
+
+        customers_change = today_metrics["total_bills"] - yesterday_metrics["total_bills"]
+        customers_percent = (customers_change / yesterday_metrics["total_bills"] * 100) if yesterday_metrics["total_bills"] > 0 else 0
+
+        comparison_data = {
+            "today": today_metrics,
+            "yesterday": yesterday_metrics,
+            "comparison": {
+                "revenue_change_paise": revenue_change,
+                "revenue_percent_change": round(revenue_percent, 1),
+                "services_change": services_change,
+                "services_percent_change": round(services_percent, 1),
+                "customers_change": customers_change,
+                "customers_percent_change": round(customers_percent, 1),
+            },
+            "yesterday_available": True
+        }
+
+        # Cache for 60 seconds
+        cache.set(cache_key, comparison_data, ttl=DASHBOARD_CACHE_TTL)
+
+        return comparison_data
+
+    def get_hourly_metrics(self, target_date: Optional[date] = None) -> Dict:
+        """Get hourly breakdown of business metrics for a day.
+
+        Args:
+            target_date: Date to get hourly breakdown for (defaults to today in IST)
+
+        Returns:
+            Dictionary with hourly breakdown and peak hour information
+        """
+        if not target_date:
+            target_date = datetime.now(IST).date()
+
+        # Check cache first
+        cache_key = f"dashboard:hourly:{target_date}"
+        cached_hourly = cache.get_json(cache_key)
+        if cached_hourly:
+            return cached_hourly
+
+        start_of_day = datetime.combine(target_date, time.min)
+        end_of_day = datetime.combine(target_date, time.max)
+
+        # Query bills grouped by hour
+        from sqlalchemy import extract
+        hourly_bills = self.db.query(
+            extract('hour', Bill.created_at).label('hour'),
+            func.count(Bill.id).label('bills_count'),
+            func.sum(Bill.rounded_total).label('revenue_paise')
+        ).filter(
+            Bill.created_at >= start_of_day,
+            Bill.created_at <= end_of_day,
+            Bill.status == BillStatus.POSTED
+        ).group_by(extract('hour', Bill.created_at)).all()
+
+        # Query appointments grouped by hour (based on completed_at)
+        hourly_services = self.db.query(
+            extract('hour', Appointment.completed_at).label('hour'),
+            func.count(Appointment.id).label('services_count')
+        ).filter(
+            Appointment.completed_at >= start_of_day,
+            Appointment.completed_at <= end_of_day,
+            Appointment.status == AppointmentStatus.COMPLETED
+        ).group_by(extract('hour', Appointment.completed_at)).all()
+
+        # Create lookup dictionaries
+        bills_by_hour = {int(row.hour): (row.bills_count, row.revenue_paise or 0) for row in hourly_bills}
+        services_by_hour = {int(row.hour): row.services_count for row in hourly_services}
+
+        # Build full 24-hour breakdown
+        hourly_data = []
+        peak_hour = 0
+        peak_revenue = 0
+
+        for hour in range(24):
+            bills_count, revenue_paise = bills_by_hour.get(hour, (0, 0))
+            services_count = services_by_hour.get(hour, 0)
+
+            # Format hour label
+            next_hour = (hour + 1) % 24
+            hour_label = f"{hour:02d}:00 - {next_hour:02d}:00"
+
+            hourly_data.append({
+                "hour": hour,
+                "hour_label": hour_label,
+                "bills_count": bills_count,
+                "revenue_paise": revenue_paise,
+                "services_count": services_count
+            })
+
+            # Track peak hour
+            if revenue_paise > peak_revenue:
+                peak_hour = hour
+                peak_revenue = revenue_paise
+
+        result = {
+            "date": target_date,
+            "hourly_data": hourly_data,
+            "peak_hour": peak_hour,
+            "peak_hour_revenue": peak_revenue
+        }
+
+        # Cache for 60 seconds
+        cache.set(cache_key, result, ttl=DASHBOARD_CACHE_TTL)
+
+        return result
+
+    def get_daily_trends(self, days: int = 7, target_date: Optional[date] = None) -> Dict:
+        """Get daily metrics for the last N days for trend analysis.
+
+        Args:
+            days: Number of days to include (default 7)
+            target_date: End date (defaults to today in IST)
+
+        Returns:
+            Dictionary with daily metrics for trend charts/sparklines
+        """
+        if not target_date:
+            target_date = datetime.now(IST).date()
+
+        # Check cache first
+        cache_key = f"dashboard:trends:{days}:{target_date}"
+        cached_trends = cache.get_json(cache_key)
+        if cached_trends:
+            return cached_trends
+
+        daily_metrics = []
+
+        # Get metrics for each day
+        for i in range(days - 1, -1, -1):
+            day = target_date - timedelta(days=i)
+            metrics = self.get_dashboard_metrics(day)
+
+            daily_metrics.append({
+                "date": day,
+                "revenue_paise": metrics["net_revenue"],
+                "services_count": metrics["completed_appointments"],
+                "customers_count": metrics["total_bills"]
+            })
+
+        result = {
+            "days": days,
+            "daily_metrics": daily_metrics
+        }
+
+        # Cache for 5 minutes (longer than dashboard metrics)
+        cache.set(cache_key, result, ttl=300)
+
+        return result
+
     def get_top_services(self, target_date: Optional[date] = None, limit: int = 5) -> List[Dict]:
-        """Get top performing services for a date.
+        """Get top performing services for a date with caching.
 
         Args:
             target_date: Date to get metrics for (defaults to today)
@@ -166,6 +382,12 @@ class AccountingService:
         """
         if not target_date:
             target_date = datetime.now(IST).date()
+
+        # Check cache first
+        cache_key = f"dashboard:top_services:{target_date}:{limit}"
+        cached_services = cache.get_json(cache_key)
+        if cached_services:
+            return cached_services
 
         start_of_day = datetime.combine(target_date, time.min)
         end_of_day = datetime.combine(target_date, time.max)
@@ -192,7 +414,7 @@ class AccountingService:
             func.sum(BillItem.line_total).desc()
         ).limit(limit).all()
 
-        return [
+        top_services = [
             {
                 "service_id": r.id,
                 "service_name": r.name,
@@ -202,8 +424,13 @@ class AccountingService:
             for r in results
         ]
 
+        # Cache for 60 seconds
+        cache.set(cache_key, top_services, ttl=DASHBOARD_CACHE_TTL)
+
+        return top_services
+
     def get_staff_performance(self, target_date: Optional[date] = None) -> List[Dict]:
-        """Get staff performance metrics for a date.
+        """Get staff performance metrics for a date with caching.
 
         Args:
             target_date: Date to get metrics for (defaults to today)
@@ -213,6 +440,12 @@ class AccountingService:
         """
         if not target_date:
             target_date = datetime.now(IST).date()
+
+        # Check cache first
+        cache_key = f"dashboard:staff_performance:{target_date}"
+        cached_performance = cache.get_json(cache_key)
+        if cached_performance:
+            return cached_performance
 
         start_of_day = datetime.combine(target_date, time.min)
         end_of_day = datetime.combine(target_date, time.max)
@@ -245,6 +478,9 @@ class AccountingService:
                 "services_completed": r.services_completed,
                 "total_revenue": 0  # Placeholder - needs bill linking
             })
+
+        # Cache for 60 seconds
+        cache.set(cache_key, staff_data, ttl=DASHBOARD_CACHE_TTL)
 
         return staff_data
 

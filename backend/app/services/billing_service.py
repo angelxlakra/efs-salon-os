@@ -26,14 +26,17 @@ from typing import List, Optional
 from sqlalchemy.orm import Session
 from ulid import ULID
 
-from app.models.billing import Bill, BillItem, BillStatus, Payment, PaymentMethod
+from app.models.billing import Bill, BillItem, BillStatus, Payment, PaymentMethod, BillItemStaffContribution
 from app.models.customer import Customer
+from app.models.pending_payment import PendingPaymentCollection
+from app.utils import IST
 from app.models.service import Service, ServiceMaterialUsage
 from app.models.inventory import SKU
 from app.models.appointment import WalkIn
 from app.services.invoice_generator import InvoiceNumberGenerator
 from app.services.tax_calculator import TaxCalculator
 from app.services.inventory_service import InventoryService
+from app.services.contribution_calculator import ContributionCalculator, ContributionCalculationError
 
 
 class BillingService:
@@ -152,7 +155,7 @@ class BillingService:
                 # Calculate COGS for service (material usage)
                 cogs_amount = self._calculate_service_cogs(service.id, quantity)
 
-                bill_items_data.append({
+                bill_item_data = {
                     "service_id": service.id,
                     "sku_id": None,
                     "item_name": service.name,
@@ -163,8 +166,10 @@ class BillingService:
                     "staff_id": item.get("staff_id"),
                     "appointment_id": item.get("appointment_id"),
                     "walkin_id": item.get("walkin_id"),
-                    "notes": item.get("notes")
-                })
+                    "notes": item.get("notes"),
+                    "staff_contributions": item.get("staff_contributions")  # Multi-staff data
+                }
+                bill_items_data.append(bill_item_data)
 
             elif "sku_id" in item and item["sku_id"]:
                 # Retail product item
@@ -233,12 +238,25 @@ class BillingService:
         self.db.flush() # Get bill.id without committing
 
         for item_data in bill_items_data:
+            # Extract staff_contributions before creating bill_item
+            staff_contributions_data = item_data.pop("staff_contributions", None)
+
+            # Create bill item
             bill_item = BillItem(
                 id=str(ULID()),
                 bill_id=bill.id,
                 **item_data
             )
             self.db.add(bill_item)
+            self.db.flush()  # Get bill_item.id
+
+            # Handle multi-staff contributions if present
+            if staff_contributions_data:
+                self._create_staff_contributions(
+                    bill_item_id=bill_item.id,
+                    line_total_paise=bill_item.line_total,
+                    contributions_data=staff_contributions_data
+                )
 
         # Link walk-ins to bill if session_id provided
         if session_id:
@@ -253,6 +271,62 @@ class BillingService:
         self.db.commit()
         self.db.refresh(bill)
         return bill
+
+    def _create_staff_contributions(
+        self,
+        bill_item_id: str,
+        line_total_paise: int,
+        contributions_data: List[dict]
+    ) -> None:
+        """
+        Create staff contribution records for a multi-staff service.
+
+        Calculates contributions using ContributionCalculator and creates
+        BillItemStaffContribution records.
+
+        Args:
+            bill_item_id: Bill item ID to link contributions to
+            line_total_paise: Total amount to split among staff
+            contributions_data: List of contribution dicts with staff info
+
+        Raises:
+            ValueError: If contribution calculation or validation fails
+        """
+        try:
+            # Calculate contributions
+            calculated_contributions = ContributionCalculator.calculate_contributions(
+                line_total_paise=line_total_paise,
+                contributions=contributions_data
+            )
+
+            # Validate results
+            ContributionCalculator.validate_contributions(
+                calculated_contributions,
+                line_total_paise
+            )
+
+            # Create contribution records
+            for contrib in calculated_contributions:
+                contribution = BillItemStaffContribution(
+                    id=str(ULID()),
+                    bill_item_id=bill_item_id,
+                    staff_id=contrib["staff_id"],
+                    role_in_service=contrib["role_in_service"],
+                    sequence_order=contrib["sequence_order"],
+                    contribution_split_type=contrib.get("contribution_split_type"),
+                    contribution_percent=contrib.get("contribution_percent"),
+                    contribution_fixed=contrib.get("contribution_fixed"),
+                    contribution_amount=contrib["contribution_amount"],
+                    time_spent_minutes=contrib.get("time_spent_minutes"),
+                    base_percent_component=contrib.get("base_percent_component"),
+                    time_component=contrib.get("time_component"),
+                    skill_component=contrib.get("skill_component"),
+                    notes=contrib.get("notes")
+                )
+                self.db.add(contribution)
+
+        except ContributionCalculationError as e:
+            raise ValueError(f"Contribution calculation failed: {str(e)}")
 
     def add_payment(
         self,
@@ -313,12 +387,33 @@ class BillingService:
 
         TOLERANCE = 1000 # Rs 10 tolerance
 
+        # Check for overpayment
+        overpayment_amount = 0
         if new_total > bill.rounded_total + TOLERANCE:
-            raise ValueError(
-                f"Payment would exceed bill total. "
-                f"Bill: Rs {bill.rounded_total/100:.2f}, "
-                f"Paid: Rs {new_total/100:.2f}"
-            )
+            # If customer has pending balance, allow overpayment to reduce it
+            if bill.customer_id:
+                customer = self.db.query(Customer).filter(Customer.id == bill.customer_id).first()
+                if customer and customer.pending_balance > 0:
+                    overpayment_amount = new_total - bill.rounded_total
+                    if overpayment_amount > customer.pending_balance:
+                        raise ValueError(
+                            f"Overpayment exceeds pending balance. "
+                            f"Bill: Rs {bill.rounded_total/100:.2f}, "
+                            f"Payment: Rs {new_total/100:.2f}, "
+                            f"Pending Balance: Rs {customer.pending_balance/100:.2f}"
+                        )
+                else:
+                    raise ValueError(
+                        f"Payment would exceed bill total. "
+                        f"Bill: Rs {bill.rounded_total/100:.2f}, "
+                        f"Paid: Rs {new_total/100:.2f}"
+                    )
+            else:
+                raise ValueError(
+                    f"Payment would exceed bill total. "
+                    f"Bill: Rs {bill.rounded_total/100:.2f}, "
+                    f"Paid: Rs {new_total/100:.2f}"
+                )
         
         payment = Payment(
             id=str(ULID()),
@@ -327,11 +422,40 @@ class BillingService:
             amount=amount_paise,
             reference_number=reference_number,
             notes=notes,
-            confirmed_at=datetime.utcnow(),
+            confirmed_at=datetime.now(IST),
             confirmed_by=confirmed_by_id
         )
 
         self.db.add(payment)
+
+        # Apply overpayment to pending balance if any
+        if overpayment_amount > 0 and bill.customer_id:
+            customer = self.db.query(Customer).filter(Customer.id == bill.customer_id).first()
+            if customer:
+                previous_balance = customer.pending_balance
+                customer.pending_balance -= overpayment_amount
+
+                # Create pending payment collection record
+                collection = PendingPaymentCollection(
+                    id=str(ULID()),
+                    customer_id=bill.customer_id,
+                    amount=overpayment_amount,
+                    payment_method=payment_method,
+                    reference_number=reference_number,
+                    notes=f"Overpayment on bill {bill.invoice_number or bill.id}",
+                    bill_id=bill.id,
+                    collected_by=confirmed_by_id,
+                    collected_at=datetime.now(IST),
+                    previous_balance=previous_balance,
+                    new_balance=customer.pending_balance
+                )
+                self.db.add(collection)
+
+                # Add note to payment
+                if payment.notes:
+                    payment.notes += f" | Applied Rs {overpayment_amount/100:.2f} to pending balance"
+                else:
+                    payment.notes = f"Applied Rs {overpayment_amount/100:.2f} to pending balance"
 
         if new_total >= bill.rounded_total:
             # Generate invoice number
@@ -339,7 +463,7 @@ class BillingService:
 
             bill.invoice_number = invoice_number
             bill.status = BillStatus.POSTED
-            bill.posted_at = datetime.utcnow()
+            bill.posted_at = datetime.now(IST)
 
             # Reduce stock for retail products
             inventory_service = InventoryService(self.db)
@@ -421,18 +545,18 @@ class BillingService:
             rounded_total=-original_bill.rounded_total,
             rounding_adjustment=-original_bill.rounding_adjustment,
             status=BillStatus.POSTED,
-            posted_at=datetime.utcnow(),
+            posted_at=datetime.now(IST),
             original_bill_id=original_bill.id,
             refund_reason=reason,
             refund_approved_by=refunded_by_id,
-            refunded_at=datetime.utcnow(),
+            refunded_at=datetime.now(IST),
             created_by=refunded_by_id
         )
 
         self.db.add(refund_bill)
 
         original_bill.status = BillStatus.REFUNDED
-        original_bill.refunded_at = datetime.utcnow()
+        original_bill.refunded_at = datetime.now(IST)
         original_bill.refund_reason = reason
         original_bill.refund_approved_by = refunded_by_id
 
@@ -447,6 +571,86 @@ class BillingService:
         self.db.refresh(refund_bill)
         
         return refund_bill
+
+    def complete_bill(
+        self,
+        bill_id: str,
+        completed_by_id: str,
+        notes: Optional[str] = None
+    ) -> Bill:
+        """Complete a bill even with pending balance.
+
+        Allows posting a bill that hasn't been fully paid yet. Useful for:
+        - Free services (family members, complimentary services)
+        - Credit customers (pay later)
+        - Partial payments with pending balance
+
+        Args:
+            bill_id: Bill ID to complete.
+            completed_by_id: User ID completing the bill.
+            notes: Optional notes about the pending payment.
+
+        Returns:
+            Bill: Completed bill with invoice number.
+
+        Raises:
+            ValueError: If bill not found or not in draft status.
+        """
+        bill = self.get_bill(bill_id)
+
+        if not bill:
+            raise ValueError(f"Bill not found: {bill_id}")
+
+        if bill.status != BillStatus.DRAFT:
+            raise ValueError(
+                f"Can only complete draft bills. Current status: {bill.status}"
+            )
+
+        # Generate invoice number
+        invoice_number = InvoiceNumberGenerator.generate(self.db)
+        bill.invoice_number = invoice_number
+        bill.status = BillStatus.POSTED
+        bill.posted_at = datetime.now(IST)
+
+        # Add notes about pending balance if provided
+        if notes:
+            complete_note = f"[Bill completed with pending balance] {notes}"
+            if bill.notes:
+                bill.notes = f"{bill.notes}\n{complete_note}"
+            else:
+                bill.notes = complete_note
+
+        # Reduce stock for retail products
+        inventory_service = InventoryService(self.db)
+        for item in bill.items:
+            if item.sku_id:  # Retail product
+                inventory_service.reduce_stock_for_sale(
+                    sku_id=item.sku_id,
+                    quantity=item.quantity,
+                    bill_id=bill.id,
+                    user_id=completed_by_id
+                )
+
+        # Update customer stats (use actual paid amount, not bill total)
+        if bill.customer_id:
+            # Get total paid
+            total_paid = sum(payment.amount for payment in bill.payments)
+            pending_amount = bill.rounded_total - total_paid
+
+            # Only update customer stats with what they actually paid
+            if total_paid > 0:
+                self._update_customer_stats(bill.customer_id, total_paid, increment=True)
+
+            # Update pending balance if there's an outstanding amount
+            if pending_amount > 0:
+                customer = self.db.query(Customer).filter(Customer.id == bill.customer_id).first()
+                if customer:
+                    customer.pending_balance += pending_amount
+
+        self.db.commit()
+        self.db.refresh(bill)
+
+        return bill
 
     def void_bill(
         self,
@@ -482,7 +686,7 @@ class BillingService:
 
         # Update bill status
         bill.status = BillStatus.VOID
-        bill.updated_at = datetime.utcnow()
+        bill.updated_at = datetime.now(IST)
 
         # Store void reason in notes if provided
         if reason:
@@ -515,6 +719,174 @@ class BillingService:
 
         return self.db.query(Bill).filter(Bill.id == bill_id).first()
 
+    def update_payment(
+        self,
+        payment_id: str,
+        payment_method: Optional[PaymentMethod] = None,
+        amount: Optional[int] = None,  # in paise
+        reference_number: Optional[str] = None,
+        notes: Optional[str] = None,
+        updated_by_id: str = None
+    ) -> Payment:
+        """Update an existing payment.
+
+        Updates payment details and recalculates bill status if amount changes.
+        Cannot update payments on refunded bills.
+
+        Args:
+            payment_id: ID of the payment to update.
+            payment_method: Optional new payment method.
+            amount: Optional new amount in paise.
+            reference_number: Optional new transaction reference.
+            notes: Optional new notes.
+            updated_by_id: User making the update.
+
+        Returns:
+            Payment: Updated payment record.
+
+        Raises:
+            ValueError: If payment not found or bill is refunded.
+        """
+        payment = self.db.query(Payment).filter(Payment.id == payment_id).first()
+
+        if not payment:
+            raise ValueError("Payment not found")
+
+        bill = self.db.query(Bill).filter(Bill.id == payment.bill_id).first()
+
+        if not bill:
+            raise ValueError("Associated bill not found")
+
+        if bill.status == BillStatus.REFUNDED:
+            raise ValueError("Cannot edit payments on refunded bills")
+
+        # Store old amount for recalculation
+        old_amount = payment.amount
+
+        # Update fields if provided
+        if payment_method is not None:
+            payment.payment_method = payment_method
+        if amount is not None:
+            payment.amount = amount
+        if reference_number is not None:
+            payment.reference_number = reference_number
+        if notes is not None:
+            payment.notes = notes
+
+        # If amount changed, recalculate bill status
+        if amount is not None and amount != old_amount:
+            # Calculate total payments
+            all_payments = self.db.query(Payment).filter(
+                Payment.bill_id == bill.id
+            ).all()
+            total_payments = sum(p.amount for p in all_payments)
+
+            TOLERANCE = 1000  # Rs 10 tolerance
+
+            # Check if new total would exceed bill amount
+            if total_payments > bill.rounded_total + TOLERANCE:
+                raise ValueError(
+                    f"Updated payment would exceed bill total. "
+                    f"Bill: Rs {bill.rounded_total/100:.2f}, "
+                    f"Total Payments: Rs {total_payments/100:.2f}"
+                )
+
+            # Update bill status based on payment total
+            if total_payments >= bill.rounded_total:
+                # If was draft and now fully paid, post it
+                if bill.status == BillStatus.DRAFT:
+                    # Generate invoice number
+                    invoice_number = InvoiceNumberGenerator.generate(self.db)
+                    bill.invoice_number = invoice_number
+                    bill.status = BillStatus.POSTED
+                    bill.posted_at = datetime.now(IST)
+
+                    # Reduce stock for retail products
+                    inventory_service = InventoryService(self.db)
+                    for item in bill.items:
+                        if item.sku_id:  # Retail product
+                            inventory_service.reduce_stock_for_sale(
+                                sku_id=item.sku_id,
+                                quantity=item.quantity,
+                                bill_id=bill.id,
+                                user_id=updated_by_id
+                            )
+
+                    # Update customer stats
+                    if bill.customer_id:
+                        self._update_customer_stats(bill.customer_id, bill.rounded_total, increment=True)
+
+            elif total_payments < bill.rounded_total:
+                # If was posted and now underpaid, revert to draft
+                if bill.status == BillStatus.POSTED:
+                    # Note: We're not reversing stock or customer stats here
+                    # This is a business decision - once posted, stock reduction is permanent
+                    # Only the bill status changes back to draft
+                    bill.status = BillStatus.DRAFT
+                    bill.posted_at = None
+                    # Keep invoice_number as audit trail
+
+        self.db.commit()
+        self.db.refresh(payment)
+        return payment
+
+    def delete_payment(
+        self,
+        payment_id: str,
+        deleted_by_id: str = None
+    ) -> Bill:
+        """Delete a payment and recalculate bill status.
+
+        Removes payment and updates bill status if necessary.
+        Cannot delete payments from refunded bills.
+
+        Args:
+            payment_id: ID of the payment to delete.
+            deleted_by_id: User deleting the payment.
+
+        Returns:
+            Bill: Updated bill after payment deletion.
+
+        Raises:
+            ValueError: If payment not found or bill is refunded.
+        """
+        payment = self.db.query(Payment).filter(Payment.id == payment_id).first()
+
+        if not payment:
+            raise ValueError("Payment not found")
+
+        bill = self.db.query(Bill).filter(Bill.id == payment.bill_id).first()
+
+        if not bill:
+            raise ValueError("Associated bill not found")
+
+        if bill.status == BillStatus.REFUNDED:
+            raise ValueError("Cannot delete payments from refunded bills")
+
+        # Store payment amount before deletion
+        payment_amount = payment.amount
+
+        # Delete the payment
+        self.db.delete(payment)
+
+        # Recalculate total payments
+        remaining_payments = self.db.query(Payment).filter(
+            Payment.bill_id == bill.id
+        ).all()
+        total_payments = sum(p.amount for p in remaining_payments)
+
+        # Update bill status if now underpaid
+        if total_payments < bill.rounded_total:
+            if bill.status == BillStatus.POSTED:
+                # Revert to draft (stock and customer stats remain as-is)
+                bill.status = BillStatus.DRAFT
+                bill.posted_at = None
+                # Keep invoice_number as audit trail
+
+        self.db.commit()
+        self.db.refresh(bill)
+        return bill
+
     def _calculate_service_cogs(self, service_id: str, quantity: int) -> int:
         """Calculate COGS for a service based on material usage.
 
@@ -544,6 +916,71 @@ class BillingService:
 
         return total_cogs
 
+    def collect_pending_payment(
+        self,
+        customer_id: str,
+        amount: int,  # in paise
+        payment_method: PaymentMethod,
+        collected_by_id: str,
+        reference_number: Optional[str] = None,
+        notes: Optional[str] = None
+    ) -> PendingPaymentCollection:
+        """Collect pending payment from customer without creating a bill.
+
+        Args:
+            customer_id: Customer ID who is paying.
+            amount: Payment amount in paise.
+            payment_method: Payment method used.
+            collected_by_id: User ID collecting the payment.
+            reference_number: Optional transaction reference.
+            notes: Optional payment notes.
+
+        Returns:
+            PendingPaymentCollection: Created payment collection record.
+
+        Raises:
+            ValueError: If customer not found or amount exceeds pending balance.
+        """
+        customer = self.db.query(Customer).filter(Customer.id == customer_id).first()
+
+        if not customer:
+            raise ValueError("Customer not found")
+
+        if customer.pending_balance <= 0:
+            raise ValueError("Customer has no pending balance")
+
+        if amount > customer.pending_balance:
+            raise ValueError(
+                f"Payment amount exceeds pending balance. "
+                f"Pending: Rs {customer.pending_balance/100:.2f}, "
+                f"Payment: Rs {amount/100:.2f}"
+            )
+
+        # Reduce pending balance
+        previous_balance = customer.pending_balance
+        customer.pending_balance -= amount
+
+        # Create pending payment collection record
+        collection = PendingPaymentCollection(
+            id=str(ULID()),
+            customer_id=customer_id,
+            amount=amount,
+            payment_method=payment_method,
+            reference_number=reference_number,
+            notes=notes,
+            bill_id=None,  # Direct collection, not linked to specific bill
+            collected_by=collected_by_id,
+            collected_at=datetime.now(IST),
+            previous_balance=previous_balance,
+            new_balance=customer.pending_balance
+        )
+
+        self.db.add(collection)
+        self.db.commit()
+        self.db.refresh(collection)
+
+        return collection
+
     def _update_customer_stats(
         self,
         customer_id: str,
@@ -566,7 +1003,7 @@ class BillingService:
         if increment:
             customer.total_visits += 1
             customer.total_spent += amount
-            customer.last_visit_at = datetime.utcnow()
+            customer.last_visit_at = datetime.now(IST)
 
         else:
             customer.total_spent = max(0, customer.total_spent - amount) # To not go negative

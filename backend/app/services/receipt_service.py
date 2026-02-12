@@ -7,6 +7,7 @@ like TVS RP3230, reading configuration from salon settings.
 from io import BytesIO
 from typing import Optional
 from datetime import datetime
+import pytz
 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
@@ -20,6 +21,7 @@ from sqlalchemy.orm import Session
 
 from app.models.billing import Bill
 from app.models.settings import SalonSettings
+from app.utils import IST
 
 # Register DejaVu fonts for Unicode support (including ₹ symbol)
 try:
@@ -126,7 +128,7 @@ class ReceiptService:
             fontName=UNICODE_FONT,
             spaceAfter=1,
             leading=9,
-            textColor=colors.HexColor('#333333')
+            textColor=colors.black
         )
 
         # Custom header/footer messages
@@ -138,7 +140,7 @@ class ReceiptService:
             fontName=UNICODE_FONT,
             spaceAfter=1,
             leading=10,
-            textColor=colors.HexColor('#555555')
+            textColor=colors.black
         )
 
         # Invoice label
@@ -195,9 +197,18 @@ class ReceiptService:
 
         # ==================== INVOICE INFO ====================
 
-        invoice_label = "TAX INVOICE" if bill.status.value == "posted" else "DRAFT BILL"
+        invoice_label = "INVOICE" if bill.status.value == "posted" else "DRAFT BILL"
         invoice_number = bill.invoice_number or "DRAFT"
-        invoice_date = bill.created_at.strftime("%d/%m/%Y %I:%M %p")
+
+        # Convert to IST for display (handle both timezone-aware and naive datetimes)
+        if bill.created_at.tzinfo is None:
+            # If naive, assume UTC and convert to IST
+            bill_time_ist = pytz.utc.localize(bill.created_at).astimezone(IST)
+        else:
+            # If aware, convert to IST
+            bill_time_ist = bill.created_at.astimezone(IST)
+
+        invoice_date = bill_time_ist.strftime("%d/%m/%Y %I:%M %p")
 
         # Create clean invoice info table
         invoice_data = []
@@ -295,8 +306,8 @@ class ReceiptService:
             discount_label = f"Discount ({discount_pct:.1f}%):" if discount_pct > 0 else "Discount:"
 
             totals_data.append([
-                Paragraph(discount_label, ParagraphStyle('TL', parent=styles['Normal'], fontSize=8, alignment=TA_RIGHT, textColor=colors.HexColor('#E53935'))),
-                Paragraph(f"- {ReceiptService.format_currency(bill.discount_amount)}", ParagraphStyle('TV', parent=styles['Normal'], fontSize=8, alignment=TA_RIGHT, textColor=colors.HexColor('#E53935')))
+                Paragraph(discount_label, ParagraphStyle('TL', parent=styles['Normal'], fontSize=8, alignment=TA_RIGHT, textColor=colors.black)),
+                Paragraph(f"- {ReceiptService.format_currency(bill.discount_amount)}", ParagraphStyle('TV', parent=styles['Normal'], fontSize=8, alignment=TA_RIGHT, textColor=colors.black))
             ])
 
         # Tax breakdown (only show if receipt_show_gstin is enabled)
@@ -317,8 +328,8 @@ class ReceiptService:
         if abs(round_off) >= 1:
             sign = "+" if round_off > 0 else ""
             totals_data.append([
-                Paragraph("Round Off:", ParagraphStyle('TL', parent=styles['Normal'], fontSize=7, alignment=TA_RIGHT, textColor=colors.HexColor('#666666'))),
-                Paragraph(f"{sign} {ReceiptService.format_currency(abs(round_off))}", ParagraphStyle('TV', parent=styles['Normal'], fontSize=7, alignment=TA_RIGHT, textColor=colors.HexColor('#666666')))
+                Paragraph("Round Off:", ParagraphStyle('TL', parent=styles['Normal'], fontSize=7, alignment=TA_RIGHT, textColor=colors.black)),
+                Paragraph(f"{sign} {ReceiptService.format_currency(abs(round_off))}", ParagraphStyle('TV', parent=styles['Normal'], fontSize=7, alignment=TA_RIGHT, textColor=colors.black))
             ])
 
         totals_table = Table(totals_data, colWidths=[46 * mm, 28 * mm])
@@ -345,29 +356,72 @@ class ReceiptService:
 
         # ==================== PAYMENT INFO ====================
 
-        if bill.status.value == "posted" and bill.payments:
+        if bill.status.value == "posted":
             elements.append(Spacer(1, 2 * mm))
             elements.append(Paragraph("-" * 48, sep_style))
             elements.append(Spacer(1, 2 * mm))
 
-            payment_data = [[
-                Paragraph("<b>Payment Method</b>", ParagraphStyle('PH', parent=styles['Normal'], fontSize=8)),
-                Paragraph("<b>Amount</b>", ParagraphStyle('PH', parent=styles['Normal'], fontSize=8, alignment=TA_RIGHT))
-            ]]
+            # Show payments if any
+            if bill.payments:
+                payment_data = [[
+                    Paragraph("<b>Payment Method</b>", ParagraphStyle('PH', parent=styles['Normal'], fontSize=8)),
+                    Paragraph("<b>Amount</b>", ParagraphStyle('PH', parent=styles['Normal'], fontSize=8, alignment=TA_RIGHT))
+                ]]
 
-            for payment in bill.payments:
-                payment_data.append([
-                    Paragraph(payment.payment_method.value.upper(), ParagraphStyle('PM', parent=styles['Normal'], fontSize=8)),
-                    Paragraph(ReceiptService.format_currency(payment.amount, show_symbol=False), ParagraphStyle('PA', parent=styles['Normal'], fontSize=8, alignment=TA_RIGHT))
-                ])
+                for payment in bill.payments:
+                    payment_data.append([
+                        Paragraph(payment.payment_method.value.upper(), ParagraphStyle('PM', parent=styles['Normal'], fontSize=8)),
+                        Paragraph(ReceiptService.format_currency(payment.amount, show_symbol=False), ParagraphStyle('PA', parent=styles['Normal'], fontSize=8, alignment=TA_RIGHT))
+                    ])
 
-            payment_table = Table(payment_data, colWidths=[44 * mm, 30 * mm])
-            payment_table.setStyle(TableStyle([
-                ('LINEBELOW', (0, 0), (-1, 0), 0.5, colors.HexColor('#CCCCCC')),
-                ('TOPPADDING', (0, 0), (-1, -1), 2),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
-            ]))
-            elements.append(payment_table)
+                payment_table = Table(payment_data, colWidths=[44 * mm, 30 * mm])
+                payment_table.setStyle(TableStyle([
+                    ('LINEBELOW', (0, 0), (-1, 0), 0.5, colors.HexColor('#CCCCCC')),
+                    ('TOPPADDING', (0, 0), (-1, -1), 2),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+                ]))
+                elements.append(payment_table)
+
+                # Calculate and show pending balance
+                total_paid = sum(payment.amount for payment in bill.payments)
+                pending_balance = bill.rounded_total - total_paid
+
+                if pending_balance > 0:
+                    elements.append(Spacer(1, 2 * mm))
+                    pending_data = [[
+                        Paragraph("<b>PENDING BALANCE:</b>", ParagraphStyle('PendL', parent=styles['Normal'], fontSize=9, fontName=UNICODE_FONT_BOLD, alignment=TA_RIGHT, textColor=colors.black)),
+                        Paragraph(f"<b>{ReceiptService.format_currency(pending_balance)}</b>", ParagraphStyle('PendV', parent=styles['Normal'], fontSize=9, fontName=UNICODE_FONT_BOLD, alignment=TA_RIGHT, textColor=colors.black))
+                    ]]
+                    pending_table = Table(pending_data, colWidths=[46 * mm, 28 * mm])
+                    pending_table.setStyle(TableStyle([
+                        ('TOPPADDING', (0, 0), (-1, 0), 2),
+                        ('BOTTOMPADDING', (0, 0), (-1, 0), 2),
+                    ]))
+                    elements.append(pending_table)
+            else:
+                # No payments - completely free or pending
+                if bill.rounded_total > 0:
+                    # Bill has amount but no payments - show pending
+                    pending_style = ParagraphStyle(
+                        'PendingFull',
+                        parent=styles['Normal'],
+                        fontSize=9,
+                        fontName=UNICODE_FONT_BOLD,
+                        alignment=TA_CENTER,
+                        textColor=colors.black
+                    )
+                    elements.append(Paragraph(f"<b>FULL AMOUNT PENDING: {ReceiptService.format_currency(bill.rounded_total)}</b>", pending_style))
+                else:
+                    # Bill is zero or free
+                    free_style = ParagraphStyle(
+                        'Free',
+                        parent=styles['Normal'],
+                        fontSize=9,
+                        fontName=UNICODE_FONT_BOLD,
+                        alignment=TA_CENTER,
+                        textColor=colors.black
+                    )
+                    elements.append(Paragraph("<b>COMPLIMENTARY SERVICE</b>", free_style))
 
         # ==================== FOOTER ====================
 
@@ -399,7 +453,7 @@ class ReceiptService:
                 fontName=UNICODE_FONT,
                 alignment=TA_CENTER,
                 leading=7,
-                textColor=colors.HexColor('#666666')
+                textColor=colors.black
             )
             elements.append(Paragraph(settings.invoice_terms, terms_style))
 

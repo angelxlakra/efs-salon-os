@@ -26,6 +26,12 @@ class CashDrawer(Base, ULIDMixin):
     expected_cash = Column(Integer, nullable=False, default=0)  # paise (calculated)
     variance = Column(Integer)  # paise (counted - expected)
 
+    # Denomination tracking
+    opening_denominations = Column(JSONB, nullable=True)  # {"50": 10, "100": 20, "200": 5, "500": 8}
+    closing_denominations = Column(JSONB, nullable=True)
+    cash_taken_out = Column(Integer, nullable=True, default=0)  # paise
+    cash_taken_out_reason = Column(Text, nullable=True)
+
     # Reopen tracking
     reopened_at = Column(DateTime(timezone=True))
     reopened_by = Column(String(26), ForeignKey("users.id"))

@@ -1,6 +1,7 @@
 """Customer model for tracking salon customers."""
 
 from sqlalchemy import Column, Date, DateTime, Integer, String, Text
+from sqlalchemy.orm import relationship
 from app.database import Base
 from app.models.base import TimestampMixin, SoftDeleteMixin, ULIDMixin
 
@@ -24,7 +25,11 @@ class Customer(Base, ULIDMixin, TimestampMixin, SoftDeleteMixin):
     # Analytics fields
     total_visits = Column(Integer, nullable=False, default=0)
     total_spent = Column(Integer, nullable=False, default=0)  # in paise
+    pending_balance = Column(Integer, nullable=False, default=0)  # in paise - outstanding amount owed
     last_visit_at = Column(DateTime(timezone=True), index=True)
+
+    # Relationships
+    pending_payment_collections = relationship("PendingPaymentCollection", back_populates="customer", lazy="dynamic")
 
     def __repr__(self):
         return f"<Customer {self.first_name} {self.last_name or ''}>"
@@ -40,3 +45,8 @@ class Customer(Base, ULIDMixin, TimestampMixin, SoftDeleteMixin):
     def total_spent_rupees(self) -> float:
         """Get total spent in rupees."""
         return self.total_spent / 100.0
+
+    @property
+    def pending_balance_rupees(self) -> float:
+        """Get pending balance in rupees."""
+        return self.pending_balance / 100.0

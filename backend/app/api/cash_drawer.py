@@ -6,7 +6,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.api.deps import check_receptionist_permission, get_current_active_user
+from app.auth.dependencies import require_owner_or_receptionist
 from app.models.accounting import CashDrawer
 from app.models.billing import Payment, PaymentMethod, Bill
 from app.models.user import User
@@ -60,17 +60,20 @@ def calculate_drawer_totals(db: Session, drawer: CashDrawer):
 def open_drawer(
     req: DrawerOpenRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(check_receptionist_permission),
+    current_user: User = Depends(require_owner_or_receptionist),
 ):
     if get_todays_drawer(db):
         raise HTTPException(status_code=400, detail="Cash drawer already opened for today")
+
+    opening_float_paise = req.get_opening_float_paise()
 
     drawer = CashDrawer(
         id=generate_ulid(),
         opened_by=current_user.id,
         opened_at=datetime.now(IST),
-        opening_float=req.opening_float,
-        expected_cash=req.opening_float, # Initial exp
+        opening_float=opening_float_paise,
+        opening_denominations=req.opening_denominations.to_dict() if req.opening_denominations else None,
+        expected_cash=opening_float_paise,  # Initial expected
     )
     db.add(drawer)
     db.commit()
@@ -81,24 +84,29 @@ def open_drawer(
 def close_drawer(
     req: DrawerCloseRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(check_receptionist_permission),
+    current_user: User = Depends(require_owner_or_receptionist),
 ):
     drawer = get_todays_drawer(db)
     if not drawer:
         raise HTTPException(status_code=404, detail="No drawer found for today")
-    
+
     if drawer.closed_at:
         raise HTTPException(status_code=400, detail="Drawer already closed")
+
+    closing_counted_paise = req.get_closing_counted_paise()
 
     # Use server time for close
     drawer.closed_at = datetime.now(IST)
     drawer.closed_by = current_user.id
-    drawer.closing_counted = req.closing_counted
+    drawer.closing_counted = closing_counted_paise
+    drawer.closing_denominations = req.closing_denominations.to_dict() if req.closing_denominations else None
+    drawer.cash_taken_out = req.cash_taken_out
+    drawer.cash_taken_out_reason = req.cash_taken_out_reason
     drawer.notes = req.notes
 
-    # Refine expected
+    # Calculate expected cash accounting for cash taken out
     cash_in, cash_out = calculate_drawer_totals(db, drawer)
-    drawer.expected_cash = drawer.opening_float + cash_in - cash_out
+    drawer.expected_cash = drawer.opening_float + cash_in - cash_out - req.cash_taken_out
     drawer.variance = drawer.closing_counted - drawer.expected_cash
 
     db.commit()
@@ -109,7 +117,7 @@ def close_drawer(
 def reopen_drawer(
     req: DrawerReopenRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(check_receptionist_permission),
+    current_user: User = Depends(require_owner_or_receptionist),
 ):
     drawer = get_todays_drawer(db)
     if not drawer:
@@ -136,7 +144,7 @@ def reopen_drawer(
 @router.get("/current", response_model=CashDrawerSummary)
 def get_current_drawer_summary(
     db: Session = Depends(get_db),
-    current_user: User = Depends(check_receptionist_permission),
+    current_user: User = Depends(require_owner_or_receptionist),
 ):
     drawer = get_todays_drawer(db)
     
@@ -154,7 +162,8 @@ def get_current_drawer_summary(
 
     # Calculate live totals
     cash_in, cash_out = calculate_drawer_totals(db, drawer)
-    expected = drawer.opening_float + cash_in - cash_out
+    cash_taken_out = drawer.cash_taken_out or 0
+    expected = drawer.opening_float + cash_in - cash_out - cash_taken_out
 
     return CashDrawerSummary(
         session_id=drawer.id,
@@ -172,7 +181,7 @@ def get_current_drawer_summary(
 def get_drawer_history(
     limit: int = 30,
     db: Session = Depends(get_db),
-    current_user: User = Depends(check_receptionist_permission),
+    current_user: User = Depends(require_owner_or_receptionist),
 ):
     drawers = db.query(CashDrawer).order_by(CashDrawer.opened_at.desc()).limit(limit).all()
     return drawers

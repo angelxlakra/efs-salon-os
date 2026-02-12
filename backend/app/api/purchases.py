@@ -15,12 +15,12 @@ from app.models.purchase import PurchaseInvoice, PurchaseItem, SupplierPayment, 
 from app.models.inventory import Supplier, SKU, StockLedger, InventoryCategory
 from app.schemas.purchase import (
     SupplierCreate, SupplierUpdate, SupplierResponse, SupplierListResponse, SupplierListItem,
-    PurchaseInvoiceCreate, PurchaseInvoiceUpdate, PurchaseInvoiceResponse,
+    PurchaseInvoiceCreate, PurchaseInvoiceUpdate, PurchaseInvoiceEditRequest, PurchaseInvoiceResponse,
     PurchaseInvoiceListResponse, PurchaseInvoiceListItem,
     SupplierPaymentCreate, SupplierPaymentResponse, SupplierPaymentListResponse,
     GoodsReceiptRequest, BarcodeSearchRequest, BarcodeSearchResponse,
 )
-from app.utils import generate_ulid
+from app.utils import generate_ulid, IST
 
 
 router = APIRouter()
@@ -198,10 +198,14 @@ def create_purchase_invoice(
             barcode=item_data.barcode,
             uom=item_data.uom,
             quantity=item_data.quantity,
-            unit_cost=item_data.unit_cost
+            unit_cost=item_data.unit_cost,
+            discount_amount=item_data.discount_amount or 0
         )
         item.calculate_total()
         invoice.items.append(item)
+
+    # Set invoice-level discount
+    invoice.invoice_discount_amount = invoice_data.invoice_discount_amount or 0
 
     # Calculate totals
     invoice.calculate_totals()
@@ -387,6 +391,87 @@ def update_purchase_invoice(
     return response
 
 
+@router.post("/invoices/{invoice_id}/edit", response_model=PurchaseInvoiceResponse)
+def edit_purchase_invoice_with_discounts(
+    invoice_id: str,
+    edit_data: PurchaseInvoiceEditRequest,
+    current_user: User = Depends(require_permission("purchases", "update")),
+    db: Session = Depends(get_db)
+):
+    """
+    Edit purchase invoice with discounts (receptionist and owner can edit).
+
+    Allows editing:
+    - Line items (quantities, discounts)
+    - Invoice-level discount
+    - Notes
+
+    Can be used on invoices in any status (draft, received, partially_paid).
+    """
+    invoice = db.query(PurchaseInvoice).filter(PurchaseInvoice.id == invoice_id).first()
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Purchase invoice not found")
+
+    # Cannot edit fully paid invoices
+    if invoice.status == PurchaseStatus.PAID and invoice.balance_due == 0:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot edit fully paid invoices"
+        )
+
+    # Delete existing items
+    for item in invoice.items:
+        db.delete(item)
+
+    # Clear existing items collection
+    invoice.items = []
+
+    # Create new items with discounts
+    for item_data in edit_data.items:
+        sku_id = item_data.sku_id
+        barcode = item_data.barcode
+
+        # If no sku_id but has barcode, try to find SKU
+        if not sku_id and barcode:
+            sku = db.query(SKU).filter(SKU.barcode == barcode).first()
+            if sku:
+                sku_id = sku.id
+
+        item = PurchaseItem(
+            id=generate_ulid(),
+            purchase_invoice_id=invoice.id,
+            sku_id=sku_id,
+            product_name=item_data.product_name,
+            barcode=item_data.barcode,
+            uom=item_data.uom,
+            quantity=item_data.quantity,
+            unit_cost=item_data.unit_cost,
+            discount_amount=item_data.discount_amount or 0
+        )
+        item.calculate_total()
+        invoice.items.append(item)
+
+    # Update invoice-level discount
+    invoice.invoice_discount_amount = edit_data.invoice_discount_amount or 0
+
+    # Update notes if provided
+    if edit_data.notes is not None:
+        invoice.notes = edit_data.notes
+
+    # Recalculate totals
+    invoice.calculate_totals()
+
+    # Update status based on new totals
+    invoice.update_status()
+
+    db.commit()
+    db.refresh(invoice)
+
+    response = PurchaseInvoiceResponse.model_validate(invoice)
+    response.supplier_name = invoice.supplier.name if invoice.supplier else "Unknown"
+    return response
+
+
 @router.post("/invoices/{invoice_id}/receive", response_model=PurchaseInvoiceResponse)
 def mark_goods_received(
     invoice_id: str,
@@ -410,7 +495,7 @@ def mark_goods_received(
     if invoice.status != PurchaseStatus.DRAFT:
         raise HTTPException(status_code=400, detail="Invoice already received")
 
-    received_at = receipt_data.received_at or datetime.utcnow()
+    received_at = receipt_data.received_at or datetime.now(IST)
 
     # Process each item
     for item in invoice.items:
@@ -547,7 +632,7 @@ def record_supplier_payment(
         id=generate_ulid(),
         **payment_data.model_dump(),
         recorded_by=current_user.id,
-        recorded_at=datetime.utcnow()
+        recorded_at=datetime.now(IST)
     )
     db.add(payment)
 

@@ -17,6 +17,12 @@ from app.services.accounting_service import AccountingService
 from app.schemas.reports import (
     DashboardResponse,
     DashboardMetrics,
+    DashboardWithComparison,
+    MetricComparison,
+    HourlyBreakdown,
+    HourlyMetrics,
+    TrendsResponse,
+    DailyTrendMetrics,
     ServicePerformance,
     StaffPerformance,
     DaySummaryResponse,
@@ -95,6 +101,147 @@ def get_dashboard(
         metrics=metrics,
         top_services=top_services,
         staff_performance=staff_performance
+    )
+
+
+@router.get("/dashboard/comparison", response_model=DashboardWithComparison)
+def get_dashboard_comparison(
+    target_date: Optional[str] = Query(None, description="Date in YYYY-MM-DD format (defaults to today)"),
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    """Get dashboard metrics with comparison to previous day.
+
+    Provides today's metrics alongside yesterday's metrics with percentage changes for:
+    - Revenue (net revenue change in paise and percentage)
+    - Services (completed appointments change and percentage)
+    - Customers (total bills change and percentage)
+
+    **Permissions**: All authenticated users
+
+    Args:
+        target_date: Optional date to get comparison for (YYYY-MM-DD), defaults to today
+        db: Database session
+        current_user: Authenticated user
+
+    Returns:
+        DashboardWithComparison: Dashboard metrics with day-over-day comparison
+    """
+    service = AccountingService(db)
+
+    # Parse target date if provided
+    date_obj = None
+    if target_date:
+        try:
+            date_obj = datetime.strptime(target_date, "%Y-%m-%d").date()
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid date format. Use YYYY-MM-DD"
+            )
+
+    # Get comparison data
+    comparison_data = service.get_day_comparison(date_obj)
+
+    return DashboardWithComparison(
+        today=DashboardMetrics(**comparison_data["today"]),
+        yesterday=DashboardMetrics(**comparison_data["yesterday"]) if comparison_data.get("yesterday") else None,
+        comparison=MetricComparison(**comparison_data["comparison"]) if comparison_data.get("comparison") else None,
+        yesterday_available=comparison_data.get("yesterday_available", True)
+    )
+
+
+@router.get("/dashboard/hourly", response_model=HourlyBreakdown)
+def get_hourly_breakdown(
+    target_date: Optional[str] = Query(None, description="Date in YYYY-MM-DD format (defaults to today)"),
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    """Get hourly breakdown of business metrics.
+
+    Provides hour-by-hour breakdown (0-23) of:
+    - Bills created
+    - Revenue generated
+    - Services completed
+
+    Also identifies the peak revenue hour for the day.
+
+    **Permissions**: All authenticated users
+
+    Args:
+        target_date: Optional date to get breakdown for (YYYY-MM-DD), defaults to today
+        db: Database session
+        current_user: Authenticated user
+
+    Returns:
+        HourlyBreakdown: Complete 24-hour breakdown with peak hour info
+    """
+    service = AccountingService(db)
+
+    # Parse target date if provided
+    date_obj = None
+    if target_date:
+        try:
+            date_obj = datetime.strptime(target_date, "%Y-%m-%d").date()
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid date format. Use YYYY-MM-DD"
+            )
+
+    # Get hourly breakdown
+    hourly_data = service.get_hourly_metrics(date_obj)
+
+    return HourlyBreakdown(
+        date=hourly_data["date"],
+        hourly_data=[HourlyMetrics(**h) for h in hourly_data["hourly_data"]],
+        peak_hour=hourly_data["peak_hour"],
+        peak_hour_revenue=hourly_data["peak_hour_revenue"]
+    )
+
+
+@router.get("/dashboard/trends", response_model=TrendsResponse)
+def get_daily_trends(
+    days: int = Query(7, ge=1, le=30, description="Number of days to include (1-30)"),
+    target_date: Optional[str] = Query(None, description="End date in YYYY-MM-DD format (defaults to today)"),
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    """Get daily metrics for trend analysis (sparklines, charts).
+
+    Returns simple daily metrics (revenue, services, customers) for the last N days.
+    Used for rendering sparklines in stat cards and trend charts.
+
+    **Permissions**: All authenticated users
+
+    Args:
+        days: Number of days to include (default 7, max 30)
+        target_date: Optional end date (YYYY-MM-DD), defaults to today
+        db: Database session
+        current_user: Authenticated user
+
+    Returns:
+        TrendsResponse: Daily metrics for each day in the range
+    """
+    service = AccountingService(db)
+
+    # Parse target date if provided
+    date_obj = None
+    if target_date:
+        try:
+            date_obj = datetime.strptime(target_date, "%Y-%m-%d").date()
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid date format. Use YYYY-MM-DD"
+            )
+
+    # Get trends data
+    trends_data = service.get_daily_trends(days, date_obj)
+
+    return TrendsResponse(
+        days=trends_data["days"],
+        daily_metrics=[DailyTrendMetrics(**d) for d in trends_data["daily_metrics"]]
     )
 
 

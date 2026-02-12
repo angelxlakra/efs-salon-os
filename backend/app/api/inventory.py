@@ -143,7 +143,7 @@ def list_skus(
 def create_sku(
     sku_in: SKUCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_owner)
+    current_user: User = Depends(require_owner_or_receptionist)
 ):
     # Check duplicate SKU code
     if db.query(SKU).filter(SKU.sku_code == sku_in.sku_code).first():
@@ -178,7 +178,7 @@ def update_sku(
     sku_id: str,
     sku_in: SKUUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_owner)
+    current_user: User = Depends(require_owner_or_receptionist)
 ):
     sku = db.query(SKU).filter(SKU.id == sku_id).first()
     if not sku:
@@ -260,7 +260,7 @@ def list_change_requests(
 def approve_change_request(
     request_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_owner)
+    current_user: User = Depends(require_owner_or_receptionist)
 ):
     change_req = db.query(InventoryChangeRequest).filter(InventoryChangeRequest.id == request_id).first()
     if not change_req:
@@ -279,18 +279,36 @@ def approve_change_request(
     qty_change = Decimal(0)
     total_val_change = 0
     new_avg_cost = sku.avg_cost_per_unit
-    
+    final_unit_cost = None  # For RECEIVE type, will be calculated after discounts
+
     if change_req.change_type == ChangeType.RECEIVE:
         qty_change = change_req.quantity
+
+        # Calculate final unit cost after supplier discounts
+        base_unit_cost = change_req.unit_cost or 0
+        final_unit_cost = base_unit_cost
+
+        # Apply percentage discount if provided
+        if change_req.supplier_discount_percent and change_req.supplier_discount_percent > 0:
+            discount_amount = int(base_unit_cost * float(change_req.supplier_discount_percent) / 100)
+            final_unit_cost = base_unit_cost - discount_amount
+
+        # Apply fixed discount if provided (additive)
+        if change_req.supplier_discount_fixed and change_req.supplier_discount_fixed > 0:
+            final_unit_cost = final_unit_cost - change_req.supplier_discount_fixed
+
+        # Ensure final cost doesn't go negative
+        final_unit_cost = max(0, final_unit_cost)
+
         # unit_cost is int (paise), quantity is Decimal. result is Decimal.
-        total_val_change = int(qty_change * (change_req.unit_cost or 0))
-        
-        # Recalculate Avg Cost
+        total_val_change = int(qty_change * final_unit_cost)
+
+        # Recalculate Avg Cost using final discounted cost
         # Current Value + Incoming Value / New Quantity
         current_value = sku.current_stock * sku.avg_cost_per_unit
-        in_value = qty_change * (change_req.unit_cost or 0)
+        in_value = qty_change * final_unit_cost
         new_total_qty = sku.current_stock + qty_change
-        
+
         if new_total_qty > 0:
             new_avg_cost = int((current_value + in_value) / new_total_qty)
             
@@ -307,6 +325,10 @@ def approve_change_request(
     sku.avg_cost_per_unit = new_avg_cost
     
     # Create Ledger Entry
+    # Use final_unit_cost (with discounts) for RECEIVE, otherwise use avg cost
+    ledger_unit_cost = final_unit_cost if change_req.change_type == ChangeType.RECEIVE and final_unit_cost is not None else sku.avg_cost_per_unit
+    ledger_total_value = int(qty_change * ledger_unit_cost) if ledger_unit_cost else 0
+
     ledger = StockLedger(
         id=generate_ulid(),
         sku_id=sku.id,
@@ -314,8 +336,8 @@ def approve_change_request(
         transaction_type=change_req.change_type.value,
         quantity_change=qty_change,
         quantity_after=sku.current_stock,
-        unit_cost=change_req.unit_cost if change_req.change_type == ChangeType.RECEIVE else sku.avg_cost_per_unit,
-        total_value=int(qty_change * (change_req.unit_cost or sku.avg_cost_per_unit)), # Approx value change
+        unit_cost=ledger_unit_cost,
+        total_value=ledger_total_value,
         avg_cost_after=sku.avg_cost_per_unit,
         created_by=current_user.id,
         notes=change_req.notes
@@ -336,7 +358,7 @@ def reject_change_request(
     request_id: str,
     notes: Optional[str] = Query(None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_owner)
+    current_user: User = Depends(require_owner_or_receptionist)
 ):
     change_req = db.query(InventoryChangeRequest).filter(InventoryChangeRequest.id == request_id).first()
     if not change_req:

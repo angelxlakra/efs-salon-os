@@ -2,6 +2,19 @@
 
 Quick reference for backend development with FastAPI, uv, and pyproject.toml.
 
+## Documentation Guidelines
+
+**When to create summary documents**:
+- ✅ **DO**: Major feature additions, architectural changes, new subsystems
+- ✅ **DO**: Breaking changes, migration guides, API version updates
+- ❌ **DON'T**: Routine bug fixes, small patches, minor improvements
+- ❌ **DON'T**: Code refactoring without functional changes
+
+**Format**:
+- Use inline code comments for bug fixes
+- Update existing docs for minor changes
+- Create new docs only for significant features or breaking changes
+
 ## Tech Stack
 
 - **Python**: 3.11+

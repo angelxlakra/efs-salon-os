@@ -7,6 +7,15 @@ from app.database import Base
 from app.models.base import TimestampMixin, ULIDMixin
 
 
+class ContributionSplitType(str, enum.Enum):
+    """How contribution is calculated for multi-staff services."""
+    PERCENTAGE = "percentage"  # Percentage of line total
+    FIXED = "fixed"           # Fixed amount in paise
+    EQUAL = "equal"           # Equal split among all staff
+    TIME_BASED = "time_based" # Based on time spent
+    HYBRID = "hybrid"         # Combination of factors
+
+
 class PaymentMethod(str, enum.Enum):
     """Payment methods accepted."""
     CASH = "cash"
@@ -136,6 +145,7 @@ class BillItem(Base, ULIDMixin, TimestampMixin):
     appointment = relationship("Appointment")
     walkin = relationship("WalkIn")
     staff = relationship("Staff")
+    staff_contributions = relationship("BillItemStaffContribution", back_populates="bill_item", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<BillItem {self.item_name} x{self.quantity}>"
@@ -144,6 +154,60 @@ class BillItem(Base, ULIDMixin, TimestampMixin):
     def line_total_rupees(self) -> float:
         """Get line total in rupees."""
         return self.line_total / 100.0
+
+
+class BillItemStaffContribution(Base, ULIDMixin, TimestampMixin):
+    """
+    Track multiple staff members working on a single service.
+
+    Enables accurate contribution tracking and commission calculation
+    for services performed by multiple staff (e.g., Botox treatment
+    with application specialist, wash technician, and stylist).
+
+    Key Features:
+    - Links to bill item (service line item)
+    - Records staff member and their role
+    - Tracks contribution amount (calculated from line_total)
+    - Supports percentage, fixed, or equal split
+    - Maintains workflow sequence for audit trail
+    """
+    __tablename__ = "bill_item_staff_contributions"
+
+    bill_item_id = Column(String(26), ForeignKey("bill_items.id", ondelete="CASCADE"), nullable=False, index=True)
+    staff_id = Column(String(26), ForeignKey("staff.id"), nullable=False, index=True)
+
+    # Role information
+    role_in_service = Column(String(100), nullable=False)  # e.g., "Botox Application", "Hair Wash"
+    sequence_order = Column(Integer, nullable=False)  # Order in workflow (1, 2, 3...)
+
+    # Contribution calculation
+    contribution_split_type = Column(Enum(ContributionSplitType), nullable=False, default=ContributionSplitType.PERCENTAGE)
+    contribution_percent = Column(Integer, nullable=True)  # 0-100 (for PERCENTAGE/HYBRID types)
+    contribution_fixed = Column(Integer, nullable=True)  # paise (for FIXED type)
+    contribution_amount = Column(Integer, nullable=False)  # Calculated actual paise earned
+
+    # Time tracking (optional, for TIME_BASED/HYBRID)
+    time_spent_minutes = Column(Integer, nullable=True)
+
+    # Hybrid calculation components (optional)
+    base_percent_component = Column(Integer, nullable=True)  # paise from base percentage
+    time_component = Column(Integer, nullable=True)  # paise from time-based calculation
+    skill_component = Column(Integer, nullable=True)  # paise from skill/complexity weight
+
+    # Notes
+    notes = Column(Text)
+
+    # Relationships
+    bill_item = relationship("BillItem", back_populates="staff_contributions")
+    staff = relationship("Staff")
+
+    def __repr__(self):
+        return f"<BillItemStaffContribution {self.role_in_service} - ₹{self.contribution_amount / 100:.2f}>"
+
+    @property
+    def contribution_rupees(self) -> float:
+        """Get contribution amount in rupees."""
+        return self.contribution_amount / 100.0
 
 
 class Payment(Base, ULIDMixin, TimestampMixin):

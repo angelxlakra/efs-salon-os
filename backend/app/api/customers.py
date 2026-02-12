@@ -80,17 +80,61 @@ def search_customer_by_phone(
     db: Session = Depends(get_db),
     current_user = Depends(get_current_user)
 ):
+    """Search for exact phone match (deprecated - use /autocomplete instead)."""
     customer = db.query(Customer).filter(
         Customer.phone == phone,
         Customer.deleted_at.is_(None)
     ).first()
-    
+
     if not customer:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Customer not found"
         )
     return customer
+
+@router.get("/autocomplete", response_model=CustomerListResponse)
+def autocomplete_customers(
+    q: str = Query(..., min_length=2, description="Search query (name or phone)"),
+    limit: int = Query(10, ge=1, le=50, description="Maximum results to return"),
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    """Fast autocomplete search across ALL customers by name or phone.
+
+    Designed for POS customer selection - searches entire database,
+    not limited to current page. Returns top matches sorted by relevance.
+
+    Args:
+        q: Search query (partial name or phone)
+        limit: Maximum results (default 10)
+
+    Returns:
+        CustomerListResponse with matching customers
+    """
+    query = db.query(Customer).filter(Customer.deleted_at.is_(None))
+
+    # Search by name OR phone
+    search_filter = or_(
+        Customer.first_name.ilike(f"%{q}%"),
+        Customer.last_name.ilike(f"%{q}%"),
+        Customer.phone.ilike(f"%{q}%")
+    )
+    query = query.filter(search_filter)
+
+    # Order by most recent first (likely to be searched again)
+    query = query.order_by(Customer.last_visit_at.desc().nullslast())
+
+    # Limit results for autocomplete
+    items = query.limit(limit).all()
+
+    return {
+        "items": items,
+        "total": len(items),
+        "page": 1,
+        "size": limit,
+        "pages": 1
+    }
 
 @router.get("/{id}", response_model=CustomerResponse)
 def get_customer(

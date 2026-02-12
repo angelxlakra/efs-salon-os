@@ -33,7 +33,9 @@ class PurchaseInvoice(Base, ULIDMixin, TimestampMixin):
     due_date = Column(Date)
 
     # Amounts (in paise)
-    total_amount = Column(Integer, nullable=False, default=0)
+    subtotal = Column(Integer, nullable=False, default=0)  # Sum of all items before invoice discount
+    invoice_discount_amount = Column(Integer, nullable=False, default=0)  # Invoice-level discount in paise
+    total_amount = Column(Integer, nullable=False, default=0)  # subtotal - invoice_discount_amount
     paid_amount = Column(Integer, nullable=False, default=0)
     balance_due = Column(Integer, nullable=False, default=0)  # Auto-calculated
 
@@ -59,8 +61,9 @@ class PurchaseInvoice(Base, ULIDMixin, TimestampMixin):
     creator = relationship("User", foreign_keys=[created_by])
 
     def calculate_totals(self):
-        """Calculate total_amount from items."""
-        self.total_amount = sum(item.total_cost for item in self.items)
+        """Calculate total_amount from items with discounts."""
+        self.subtotal = sum(item.total_cost for item in self.items)
+        self.total_amount = self.subtotal - (self.invoice_discount_amount or 0)
         self.balance_due = self.total_amount - (self.paid_amount or 0)
 
     def update_status(self):
@@ -99,15 +102,17 @@ class PurchaseItem(Base, ULIDMixin, TimestampMixin):
     # Quantity and pricing (in paise)
     quantity = Column(Numeric(10, 2), nullable=False)
     unit_cost = Column(Integer, nullable=False)  # Buying price per unit
-    total_cost = Column(Integer, nullable=False)  # quantity × unit_cost
+    discount_amount = Column(Integer, nullable=False, default=0)  # Discount in paise
+    total_cost = Column(Integer, nullable=False)  # (quantity × unit_cost) - discount_amount
 
     # Relationships
     invoice = relationship("PurchaseInvoice", back_populates="items")
     sku = relationship("SKU")
 
     def calculate_total(self):
-        """Calculate total_cost."""
-        self.total_cost = int(Decimal(str(self.quantity)) * self.unit_cost)
+        """Calculate total_cost with discount."""
+        base_cost = int(Decimal(str(self.quantity)) * self.unit_cost)
+        self.total_cost = base_cost - (self.discount_amount or 0)
 
     def __repr__(self):
         return f"<PurchaseItem {self.product_name} x{self.quantity}>"
