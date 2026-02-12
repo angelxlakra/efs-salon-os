@@ -317,6 +317,7 @@ export default function UsersPage() {
                                     <th className="px-6 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Linked Account</th>
                                     <th className="px-6 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Specialization</th>
                                     <th className="px-6 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Expected Cash</th>
+                                    <th className="px-6 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Type</th>
                                     <th className="px-6 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
                                     {(isOwner || user?.role === 'receptionist') && <th className="px-6 py-4 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider">Actions</th>}
                                 </tr>
@@ -366,8 +367,16 @@ export default function UsersPage() {
                                             ₹{((s.current_drawer_balance || 0) / 100).toFixed(2)}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
-                                            <Badge 
-                                                variant={s.is_active ? 'default' : 'destructive'} 
+                                            <Badge
+                                                variant="outline"
+                                                className={`font-normal ${s.is_service_provider ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-gray-50 text-gray-500 border-gray-200'}`}
+                                            >
+                                                {s.is_service_provider ? 'Service Provider' : 'Non-Provider'}
+                                            </Badge>
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <Badge
+                                                variant={s.is_active ? 'default' : 'destructive'}
                                                 className={`font-normal ${s.is_active ? 'bg-green-50 text-green-700 hover:bg-green-100 hover:text-green-800 border-green-200' : ''}`}
                                             >
                                                 {s.is_active ? 'Active' : 'Inactive'}

@@ -34,6 +34,7 @@ const staffSchema = z.object({
   display_name: z.string().min(1, 'Display name is required'),
   specialization: z.string().optional(), // Comma separated string for input
   is_active: z.boolean(),
+  is_service_provider: z.boolean(),
 });
 
 interface StaffDialogProps {
@@ -55,6 +56,7 @@ export function StaffDialog({ open, staff, onClose, onSuccess }: StaffDialogProp
       display_name: '',
       specialization: '',
       is_active: true,
+      is_service_provider: true,
     },
   });
 
@@ -68,6 +70,7 @@ export function StaffDialog({ open, staff, onClose, onSuccess }: StaffDialogProp
           display_name: staff.display_name,
           specialization: staff.specialization?.join(', ') || '',
           is_active: staff.is_active,
+          is_service_provider: staff.is_service_provider ?? true,
         });
       } else {
         // Create mode - fetch eligible users
@@ -76,6 +79,7 @@ export function StaffDialog({ open, staff, onClose, onSuccess }: StaffDialogProp
           display_name: '',
           specialization: '',
           is_active: true,
+          is_service_provider: true,
         });
         fetchEligibleUsers();
       }
@@ -85,18 +89,19 @@ export function StaffDialog({ open, staff, onClose, onSuccess }: StaffDialogProp
   const fetchEligibleUsers = async () => {
     try {
       setIsUsersLoading(true);
-      // Fetch all users and filter client-side for now, or use a specific endpoint if exists.
-      // Based on API review, we don't have a dedicated "eligible for staff" endpoint.
-      // We will fetch users and filter for Role=STAFF manually. In a real large app, backend should support this.
-      const { data } = await apiClient.get('/users?size=100'); 
-      console.log({data});
-      
-      const staffUsers = data.items.filter((u: any) => u.role?.name === 'staff' && !u.staff);
-      
-      // We also need to filter out users who ALREADY have a staff profile.
-      // This might be tricky without a backend helper. 
-      // For now, let's just list all STAFF users. The backend will error if we try to create a duplicate.
-      setUsers(staffUsers);
+      // Fetch users and staff profiles, then cross-reference to find users without staff profiles
+      const [usersRes, staffRes] = await Promise.all([
+        apiClient.get('/users?size=100'),
+        apiClient.get('/staff?size=100'),
+      ]);
+
+      const usersWithStaff = new Set(
+        (staffRes.data.items || []).map((s: any) => s.user_id)
+      );
+      const eligibleUsers = (usersRes.data.items || []).filter(
+        (u: any) => u.is_active && !usersWithStaff.has(u.id)
+      );
+      setUsers(eligibleUsers);
 
     } catch (error) {
       console.error('Failed to fetch users', error);
@@ -122,7 +127,8 @@ export function StaffDialog({ open, staff, onClose, onSuccess }: StaffDialogProp
         await apiClient.patch(`/staff/${staff.id}`, {
             display_name: payload.display_name,
             specialization: payload.specialization,
-            is_active: payload.is_active
+            is_active: payload.is_active,
+            is_service_provider: payload.is_service_provider,
         });
         toast.success('Staff profile updated');
       } else {
@@ -218,7 +224,7 @@ export function StaffDialog({ open, staff, onClose, onSuccess }: StaffDialogProp
                          </SelectContent>
                      </Select>
                      <FormDescription>
-                        Only users with STAFF role are shown. User must already exist.
+                        Users without a staff profile are shown.
                      </FormDescription>
                      <FormMessage />
                      </FormItem>
@@ -273,6 +279,29 @@ export function StaffDialog({ open, staff, onClose, onSuccess }: StaffDialogProp
                     </FormLabel>
                     <FormDescription>
                       Inactive staff cannot be assigned new appointments.
+                    </FormDescription>
+                  </div>
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="is_service_provider"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                  <div className="space-y-1 leading-none">
+                    <FormLabel>
+                      Service Provider
+                    </FormLabel>
+                    <FormDescription>
+                      When enabled, this staff member appears in the service assignment dropdown in POS.
                     </FormDescription>
                   </div>
                 </FormItem>
