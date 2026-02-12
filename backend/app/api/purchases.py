@@ -149,45 +149,55 @@ def create_purchase_invoice(
     for item_data in invoice_data.items:
         sku_id = item_data.sku_id
         barcode = item_data.barcode
-        
-        # If no sku_id but has barcode, try to find or create SKU
-        if not sku_id and barcode:
-            sku = db.query(SKU).filter(SKU.barcode == barcode).first()
+
+        # If no sku_id, try to find or create SKU
+        if not sku_id:
+            sku = None
+
+            # Try to find existing SKU by barcode first
+            if barcode:
+                sku = db.query(SKU).filter(SKU.barcode == barcode).first()
+
             if not sku:
                 # Create default category if not exists
                 category = db.query(InventoryCategory).filter(InventoryCategory.name == "General").first()
                 if not category:
                     category = InventoryCategory(
-                        id=generate_ulid(), 
+                        id=generate_ulid(),
                         name="General",
                         description="Default category for automatically created SKUs"
                     )
                     db.add(category)
                     db.flush()
-                
-                # Check if we should use barcode as SKU code or generate one
-                # SKU code is unique, so we use barcode if it's not already used as a code
-                sku_code = barcode
+
+                # Generate SKU code from barcode or product name
+                if barcode:
+                    sku_code = barcode
+                else:
+                    base_code = item_data.product_name.upper().replace(' ', '-')[:30]
+                    sku_code = f"PUR-{base_code}"
+
                 existing_sku_by_code = db.query(SKU).filter(SKU.sku_code == sku_code).first()
                 if existing_sku_by_code:
-                    sku_code = f"AUTO-{barcode}"
-                
-                # Create SKU
-                sku = SKU(
-                    id=generate_ulid(),
-                    category_id=category.id,
-                    supplier_id=invoice_data.supplier_id,
-                    sku_code=sku_code,
-                    name=item_data.product_name,
-                    barcode=barcode,
-                    uom=item_data.uom,
-                    avg_cost_per_unit=item_data.unit_cost,
-                    current_stock=0,
-                    is_active=True
-                )
-                db.add(sku)
-                db.flush()
-            
+                    # Reuse existing SKU with same code
+                    sku = existing_sku_by_code
+                else:
+                    # Create new SKU
+                    sku = SKU(
+                        id=generate_ulid(),
+                        category_id=category.id,
+                        supplier_id=invoice_data.supplier_id,
+                        sku_code=sku_code,
+                        name=item_data.product_name,
+                        barcode=barcode if barcode else None,
+                        uom=item_data.uom,
+                        avg_cost_per_unit=item_data.unit_cost,
+                        current_stock=0,
+                        is_active=True
+                    )
+                    db.add(sku)
+                    db.flush()
+
             sku_id = sku.id
 
         item = PurchaseItem(
@@ -500,43 +510,55 @@ def mark_goods_received(
     # Process each item
     for item in invoice.items:
         sku_id = item.sku_id
-        
-        # Safety check: if no sku_id but has barcode, try to link it now
-        if not sku_id and item.barcode:
-            sku = db.query(SKU).filter(SKU.barcode == item.barcode).first()
+
+        # Safety net: if no sku_id, find or create SKU
+        if not sku_id:
+            sku = None
+
+            # Try to find existing SKU by barcode first
+            if item.barcode:
+                sku = db.query(SKU).filter(SKU.barcode == item.barcode).first()
+
             if not sku:
                 # Create default category if not exists
                 category = db.query(InventoryCategory).filter(InventoryCategory.name == "General").first()
                 if not category:
                     category = InventoryCategory(
-                        id=generate_ulid(), 
+                        id=generate_ulid(),
                         name="General",
                         description="Default category for automatically created SKUs"
                     )
                     db.add(category)
                     db.flush()
-                
-                # Create SKU
-                sku_code = item.barcode
+
+                # Generate SKU code from barcode or product name
+                if item.barcode:
+                    sku_code = item.barcode
+                else:
+                    base_code = item.product_name.upper().replace(' ', '-')[:30]
+                    sku_code = f"PUR-{base_code}"
+
                 existing_sku_by_code = db.query(SKU).filter(SKU.sku_code == sku_code).first()
                 if existing_sku_by_code:
-                    sku_code = f"AUTO-{item.barcode}"
-                
-                sku = SKU(
-                    id=generate_ulid(),
-                    category_id=category.id,
-                    supplier_id=invoice.supplier_id,
-                    sku_code=sku_code,
-                    name=item.product_name,
-                    barcode=item.barcode,
-                    uom=item.uom,
-                    avg_cost_per_unit=item.unit_cost,
-                    current_stock=0,
-                    is_active=True
-                )
-                db.add(sku)
-                db.flush()
-            
+                    # Reuse existing SKU with same code
+                    sku = existing_sku_by_code
+                else:
+                    # Create new SKU
+                    sku = SKU(
+                        id=generate_ulid(),
+                        category_id=category.id,
+                        supplier_id=invoice.supplier_id,
+                        sku_code=sku_code,
+                        name=item.product_name,
+                        barcode=item.barcode if item.barcode else None,
+                        uom=item.uom,
+                        avg_cost_per_unit=item.unit_cost,
+                        current_stock=0,
+                        is_active=True
+                    )
+                    db.add(sku)
+                    db.flush()
+
             # Update item with the SKU link
             item.sku_id = sku.id
             sku_id = sku.id
@@ -748,3 +770,127 @@ def search_by_barcode(
         )
 
     return BarcodeSearchResponse(found=False)
+
+
+# ============ One-Time Fix: Backfill Missing SKUs ============
+
+@router.post("/fix-missing-skus")
+def fix_missing_skus(
+    current_user: User = Depends(require_permission("purchases", "update")),
+    db: Session = Depends(get_db)
+):
+    """
+    One-time fix: scan all received invoices and create SKUs for items
+    that were skipped during goods receipt (items without sku_id).
+
+    Also backfills stock levels and creates ledger entries.
+    """
+    # Find all purchase items with no sku_id on received invoices
+    orphan_items = (
+        db.query(PurchaseItem)
+        .join(PurchaseInvoice, PurchaseItem.purchase_invoice_id == PurchaseInvoice.id)
+        .filter(
+            PurchaseInvoice.status == PurchaseStatus.RECEIVED,
+            PurchaseItem.sku_id.is_(None)
+        )
+        .all()
+    )
+
+    if not orphan_items:
+        return {"message": "No orphan items found. All purchase items already have SKUs.", "fixed": 0}
+
+    # Get or create default category
+    category = db.query(InventoryCategory).filter(InventoryCategory.name == "General").first()
+    if not category:
+        category = InventoryCategory(
+            id=generate_ulid(),
+            name="General",
+            description="Default category for automatically created SKUs"
+        )
+        db.add(category)
+        db.flush()
+
+    fixed_items = []
+
+    for item in orphan_items:
+        invoice = db.query(PurchaseInvoice).filter(PurchaseInvoice.id == item.purchase_invoice_id).first()
+        sku = None
+
+        # Try to find existing SKU by barcode
+        if item.barcode:
+            sku = db.query(SKU).filter(SKU.barcode == item.barcode).first()
+
+        if not sku:
+            # Generate SKU code
+            if item.barcode:
+                sku_code = item.barcode
+            else:
+                base_code = item.product_name.upper().replace(' ', '-')[:30]
+                sku_code = f"PUR-{base_code}"
+
+            existing_sku = db.query(SKU).filter(SKU.sku_code == sku_code).first()
+            if existing_sku:
+                sku = existing_sku
+            else:
+                sku = SKU(
+                    id=generate_ulid(),
+                    category_id=category.id,
+                    supplier_id=invoice.supplier_id if invoice else None,
+                    sku_code=sku_code,
+                    name=item.product_name,
+                    barcode=item.barcode if item.barcode else None,
+                    uom=item.uom,
+                    avg_cost_per_unit=item.unit_cost,
+                    current_stock=0,
+                    is_active=True
+                )
+                db.add(sku)
+                db.flush()
+
+        # Link item to SKU
+        item.sku_id = sku.id
+
+        # Update stock (weighted average cost)
+        old_value = int(Decimal(str(sku.current_stock)) * sku.avg_cost_per_unit)
+        new_value = item.total_cost
+        new_quantity = sku.current_stock + item.quantity
+
+        if new_quantity > 0:
+            sku.avg_cost_per_unit = int((old_value + new_value) / Decimal(str(new_quantity)))
+
+        sku.current_stock += item.quantity
+
+        # Create stock ledger entry
+        supplier_name = invoice.supplier.name if invoice and invoice.supplier else "Unknown"
+        invoice_number = invoice.invoice_number if invoice else "Unknown"
+
+        ledger = StockLedger(
+            id=generate_ulid(),
+            sku_id=sku.id,
+            transaction_type="receive",
+            quantity_change=item.quantity,
+            quantity_after=sku.current_stock,
+            unit_cost=item.unit_cost,
+            total_value=item.total_cost,
+            avg_cost_after=sku.avg_cost_per_unit,
+            reference_type="purchase",
+            reference_id=invoice.id if invoice else None,
+            created_by=current_user.id,
+            notes=f"Backfill: Purchase from {supplier_name}, Invoice: {invoice_number}"
+        )
+        db.add(ledger)
+
+        fixed_items.append({
+            "product_name": item.product_name,
+            "sku_code": sku.sku_code,
+            "quantity": float(item.quantity),
+            "invoice_number": invoice_number,
+        })
+
+    db.commit()
+
+    return {
+        "message": f"Fixed {len(fixed_items)} orphan items. SKUs created and stock updated.",
+        "fixed": len(fixed_items),
+        "items": fixed_items
+    }

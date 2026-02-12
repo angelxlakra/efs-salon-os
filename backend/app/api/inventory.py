@@ -188,6 +188,10 @@ def update_sku(
         if db.query(SKU).filter(SKU.sku_code == sku_in.sku_code).first():
             raise HTTPException(status_code=400, detail="SKU code already exists")
 
+    if sku_in.barcode is not None and sku_in.barcode != sku.barcode:
+        if sku_in.barcode and db.query(SKU).filter(SKU.barcode == sku_in.barcode, SKU.id != sku_id).first():
+            raise HTTPException(status_code=400, detail="Barcode already assigned to another SKU")
+
     update_data = sku_in.dict(exclude_unset=True)
     for field, value in update_data.items():
         setattr(sku, field, value)

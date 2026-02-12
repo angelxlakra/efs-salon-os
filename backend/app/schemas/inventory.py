@@ -79,6 +79,7 @@ class SKUUpdate(BaseModel):
     description: Optional[str] = None
     brand_name: Optional[str] = None
     volume: Optional[str] = None
+    barcode: Optional[str] = None
     uom: Optional[UOMEnum] = None
     reorder_point: Optional[float] = Field(None, ge=0)
     category_id: Optional[str] = None
