@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Package, Search, Edit, Plus, Minus, TrendingUp, CheckCircle, XCircle } from 'lucide-react';
+import { Package, Search, Edit, Plus, Minus, TrendingUp, CheckCircle, XCircle, RefreshCw, Camera } from 'lucide-react';
+import { BarcodeScanner } from '@/components/barcode-scanner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -20,6 +21,7 @@ interface SKU {
   id: string;
   sku_code: string;
   name: string;
+  barcode?: string;
   category_name?: string;
   current_stock: number;
   uom: string;
@@ -61,7 +63,8 @@ export default function InventoryPage() {
   const [editingSku, setEditingSku] = useState<SKU | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
-  // Form state for retail settings
+  // Form state for edit dialog
+  const [editBarcode, setEditBarcode] = useState('');
   const [isSellable, setIsSellable] = useState(false);
   const [retailPrice, setRetailPrice] = useState('');
   const [retailMarkup, setRetailMarkup] = useState('');
@@ -83,6 +86,12 @@ export default function InventoryPage() {
   // Change requests state
   const [changeRequests, setChangeRequests] = useState<ChangeRequest[]>([]);
   const [loadingRequests, setLoadingRequests] = useState(false);
+
+  // Sync from purchases state
+  const [syncing, setSyncing] = useState(false);
+
+  // Barcode scanner state
+  const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
 
   useEffect(() => {
     loadSkus();
@@ -127,6 +136,7 @@ export default function InventoryPage() {
 
   const handleEdit = (sku: SKU) => {
     setEditingSku(sku);
+    setEditBarcode(sku.barcode || '');
     setIsSellable(sku.is_sellable);
     setRetailPrice(sku.retail_price ? (sku.retail_price / 100).toFixed(2) : '');
     setRetailMarkup(sku.retail_markup_percent?.toString() || '');
@@ -139,6 +149,7 @@ export default function InventoryPage() {
     try {
       const updateData: any = {
         is_sellable: isSellable,
+        barcode: editBarcode.trim() || null,
       };
 
       if (isSellable) {
@@ -292,6 +303,25 @@ export default function InventoryPage() {
     }
   };
 
+  const handleSyncFromPurchases = async () => {
+    setSyncing(true);
+    try {
+      const response = await apiClient.post('/purchases/fix-missing-skus');
+      const data = response.data;
+      if (data.fixed > 0) {
+        toast.success(`Synced ${data.fixed} items from purchases to inventory`);
+        loadSkus();
+      } else {
+        toast.info('All purchase items are already synced to inventory');
+      }
+    } catch (error: any) {
+      console.error('Failed to sync from purchases:', error);
+      toast.error(error.response?.data?.detail || 'Failed to sync from purchases');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -303,12 +333,22 @@ export default function InventoryPage() {
   const isOwner = user?.role === 'owner';
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold">Inventory Management</h1>
-          <p className="text-muted-foreground">Manage SKUs, retail settings, and stock adjustments</p>
+    <div className="p-4 md:p-6 space-y-4 md:space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+        <div className="min-w-0">
+          <h1 className="text-xl md:text-2xl font-bold">Inventory Management</h1>
+          <p className="text-sm text-muted-foreground">Manage SKUs, retail settings, and stock adjustments</p>
         </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleSyncFromPurchases}
+          disabled={syncing}
+          className="shrink-0"
+        >
+          <RefreshCw className={`mr-2 h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
+          {syncing ? 'Syncing...' : 'Sync from Purchases'}
+        </Button>
       </div>
 
       <Tabs defaultValue="skus" className="space-y-4">
@@ -336,8 +376,58 @@ export default function InventoryPage() {
             </div>
           </div>
 
-      {/* SKU List */}
-      <Card>
+      {/* SKU List - Mobile Cards */}
+      <div className="md:hidden space-y-3">
+        {filteredSkus.map((sku) => (
+          <Card key={sku.id}>
+            <CardContent className="p-4">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <div className="font-medium truncate">{sku.name}</div>
+                  <div className="text-xs font-mono text-muted-foreground">{sku.sku_code}</div>
+                  {sku.category_name && (
+                    <div className="text-xs text-muted-foreground mt-1">{sku.category_name}</div>
+                  )}
+                </div>
+                <div className="flex gap-1 shrink-0">
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(sku)}>
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleAdjustStock(sku)}>
+                    <TrendingUp className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t">
+                <div>
+                  <div className="text-xs text-muted-foreground">Stock</div>
+                  <div className="text-sm font-medium">{sku.current_stock} {sku.uom}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground">Cost</div>
+                  <div className="text-sm font-medium">{formatCurrency(sku.avg_cost_per_unit)}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground">Retail</div>
+                  <div className="text-sm font-medium">{sku.retail_price ? formatCurrency(sku.retail_price) : '-'}</div>
+                </div>
+              </div>
+              {sku.is_sellable && (
+                <Badge variant="outline" className="mt-2 text-xs">Sellable in POS</Badge>
+              )}
+            </CardContent>
+          </Card>
+        ))}
+        {filteredSkus.length === 0 && (
+          <div className="text-center py-12 text-muted-foreground">
+            <Package className="h-12 w-12 mx-auto mb-4 opacity-20" />
+            <p>No SKUs found</p>
+          </div>
+        )}
+      </div>
+
+      {/* SKU List - Desktop Table */}
+      <Card className="hidden md:block">
         <CardHeader>
           <CardTitle>SKU List</CardTitle>
         </CardHeader>
@@ -390,7 +480,7 @@ export default function InventoryPage() {
                           variant="ghost"
                           size="sm"
                           onClick={() => handleEdit(sku)}
-                          title="Edit retail settings"
+                          title="Edit SKU"
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
@@ -436,16 +526,16 @@ export default function InventoryPage() {
               ) : (
                 <div className="space-y-3">
                   {changeRequests.map((request) => (
-                    <div key={request.id} className="border rounded-lg p-4">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <span className="font-semibold">{request.sku_name}</span>
-                            <Badge variant="outline">{request.sku_code}</Badge>
+                    <div key={request.id} className="border rounded-lg p-3 md:p-4">
+                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-1.5 mb-2">
+                            <span className="font-semibold truncate">{request.sku_name}</span>
+                            <Badge variant="outline" className="text-xs">{request.sku_code}</Badge>
                             <Badge variant={
                               request.change_type === 'receive' ? 'default' :
                               request.change_type === 'consume' ? 'destructive' : 'secondary'
-                            }>
+                            } className="text-xs">
                               {request.change_type.toUpperCase()}
                             </Badge>
                           </div>
@@ -478,7 +568,7 @@ export default function InventoryPage() {
                           </div>
                         </div>
                         {isOwner && (
-                          <div className="flex gap-2 ml-4">
+                          <div className="flex gap-2 shrink-0">
                             <Button
                               size="sm"
                               variant="outline"
@@ -509,7 +599,7 @@ export default function InventoryPage() {
 
       {/* Stock Adjustment Dialog */}
       <Dialog open={stockDialogOpen} onOpenChange={setStockDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Adjust Stock</DialogTitle>
           </DialogHeader>
@@ -580,7 +670,7 @@ export default function InventoryPage() {
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="discount-percent">Supplier Discount (%)</Label>
                       <Input
@@ -693,9 +783,9 @@ export default function InventoryPage() {
 
       {/* Edit Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-[95vw] sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Edit Retail Settings</DialogTitle>
+            <DialogTitle>Edit SKU</DialogTitle>
           </DialogHeader>
 
           {editingSku && (
@@ -706,6 +796,31 @@ export default function InventoryPage() {
                 <div className="text-sm text-muted-foreground mt-1">
                   Cost: {formatCurrency(editingSku.avg_cost_per_unit)}
                 </div>
+              </div>
+
+              <div>
+                <Label htmlFor="barcode">Barcode</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="barcode"
+                    value={editBarcode}
+                    onChange={(e) => setEditBarcode(e.target.value)}
+                    placeholder="Enter barcode"
+                    className="flex-1"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setShowBarcodeScanner(true)}
+                    title="Scan barcode with camera"
+                  >
+                    <Camera className="h-4 w-4" />
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Type manually or scan with camera. Can be added or updated at any time.
+                </p>
               </div>
 
               <div className="flex items-center space-x-2">
@@ -763,6 +878,18 @@ export default function InventoryPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Barcode Scanner Modal */}
+      {showBarcodeScanner && (
+        <BarcodeScanner
+          onScan={(barcode) => {
+            setEditBarcode(barcode);
+            setShowBarcodeScanner(false);
+          }}
+          onClose={() => setShowBarcodeScanner(false)}
+          autoClose={true}
+        />
+      )}
     </div>
   );
 }
