@@ -75,6 +75,7 @@ export interface PurchaseItem {
   uom: string;
   quantity: number;
   unit_cost: number;
+  discount_amount: number;
   total_cost: number;
   created_at: string;
 }
@@ -86,6 +87,7 @@ export interface PurchaseItemCreate {
   uom: string;
   quantity: number;
   unit_cost: number;
+  discount_amount?: number;
 }
 
 export interface PurchaseInvoice {
@@ -95,6 +97,8 @@ export interface PurchaseInvoice {
   invoice_number: string;
   invoice_date: string;
   due_date?: string;
+  subtotal: number;
+  invoice_discount_amount: number;
   total_amount: number;
   paid_amount: number;
   balance_due: number;
@@ -139,6 +143,7 @@ export interface PurchaseInvoiceCreate {
   notes?: string;
   invoice_file_url?: string;
   items: PurchaseItemCreate[];
+  invoice_discount_amount?: number;
 }
 
 export interface PurchaseInvoiceUpdate {
@@ -148,6 +153,12 @@ export interface PurchaseInvoiceUpdate {
   notes?: string;
   invoice_file_url?: string;
   items?: PurchaseItemCreate[];
+}
+
+export interface PurchaseInvoiceEditRequest {
+  items: PurchaseItemCreate[];
+  invoice_discount_amount?: number;
+  notes?: string;
 }
 
 export interface SupplierPayment {
@@ -256,6 +267,11 @@ export const purchaseApi = {
 
   updatePurchaseInvoice: async (id: string, data: PurchaseInvoiceUpdate): Promise<PurchaseInvoice> => {
     const response = await apiClient.patch(`/purchases/invoices/${id}`, data);
+    return response.data;
+  },
+
+  editPurchaseInvoiceWithDiscounts: async (id: string, data: PurchaseInvoiceEditRequest): Promise<PurchaseInvoice> => {
+    const response = await apiClient.post(`/purchases/invoices/${id}/edit`, data);
     return response.data;
   },
 

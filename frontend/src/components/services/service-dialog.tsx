@@ -133,7 +133,7 @@ export function ServiceDialog({ open, service, categories, onClose, onSuccess }:
       };
 
       if (isEdit) {
-        await apiClient.put(`/catalog/services/${service.id}`, payload);
+        await apiClient.patch(`/catalog/services/${service.id}`, payload);
         toast.success('Service updated successfully');
       } else {
         await apiClient.post('/catalog/services', payload);

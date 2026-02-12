@@ -1,6 +1,6 @@
 'use client';
 
-import { Trash2, Plus, Minus, ShoppingCart, User, Edit2, ListOrdered } from 'lucide-react';
+import { Trash2, Plus, Minus, ShoppingCart, User, Users, Edit2, ListOrdered, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -15,14 +15,17 @@ import {
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { useCartStore } from '@/stores/cart-store';
-import { useState, useImperativeHandle, RefObject, useEffect, useRef } from 'react';
+import { useState, useImperativeHandle, RefObject, useEffect } from 'react';
 import { useAuthStore } from '@/stores/auth-store';
 import { useSettingsStore } from '@/stores/settings-store';
 import { CustomerSearch } from './customer-search';
 import { StaffSelector } from './staff-selector';
 import { ActiveServicesModal } from './active-services-modal';
+import { AdHocStaffTeamEditor } from './AdHocStaffTeamEditor';
 import { apiClient } from '@/lib/api-client';
 import { toast } from 'sonner';
+import { useRouter } from 'next/navigation';
+import { StaffContributionCreate } from '@/types/multi-staff';
 
 interface CartSidebarProps {
   onCheckout: () => void;
@@ -43,7 +46,9 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
     setCustomer,
     setGlobalDiscount,
     setItemStaff,
+    setItemStaffContributions,
     generateSessionId,
+    setSessionId,
     markItemsAsBooked,
     populateFromSession,
     clearCart,
@@ -54,6 +59,7 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
     getUnbookedItems,
   } = useCartStore();
 
+  const router = useRouter();
   const { user } = useAuthStore();
   const { hasGST, fetchSettings, settings } = useSettingsStore();
   const [discountInput, setDiscountInput] = useState('');
@@ -61,9 +67,6 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
   const [isCreatingOrders, setIsCreatingOrders] = useState(false);
   const [isLoadingSession, setIsLoadingSession] = useState(false);
   const [showActiveServicesModal, setShowActiveServicesModal] = useState(false);
-
-  // Track which customer we've loaded session for (to avoid re-fetching)
-  const loadedCustomerRef = useRef<string | null>(null);
 
   // Staff change dialog state
   const [showStaffDialog, setShowStaffDialog] = useState(false);
@@ -77,12 +80,29 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
   const [quantityStaffId, setQuantityStaffId] = useState<string | null>(null);
   const [quantityStaffName, setQuantityStaffName] = useState<string | null>(null);
 
-  // Fetch settings on mount
+  // Ad-hoc multi-staff team editor
+  const [showTeamEditor, setShowTeamEditor] = useState(false);
+  const [teamEditorItemId, setTeamEditorItemId] = useState<string | null>(null);
+  const [availableStaff, setAvailableStaff] = useState<any[]>([]);
+
+  // Fetch settings and staff on mount
   useEffect(() => {
     if (!settings) {
       fetchSettings();
     }
+    fetchAvailableStaff();
   }, []);
+
+  const fetchAvailableStaff = async () => {
+    try {
+      const { data } = await apiClient.get('/staff', {
+        params: { is_active: true, service_providers_only: true },
+      });
+      setAvailableStaff(data.items || data || []);
+    } catch (error) {
+      console.error('Error fetching staff:', error);
+    }
+  };
 
   // Expose openSearch method to parent via ref
   useImperativeHandle(customerSearchRef, () => ({
@@ -95,17 +115,14 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
   useEffect(() => {
     const fetchActiveSession = async () => {
       // Only fetch if customer is selected
-      if (!customerId && !customerPhone) {
-        loadedCustomerRef.current = null;
-        return;
-      }
+      if (!customerId && !customerPhone) return;
 
-      // Don't re-fetch if we've already loaded for this customer
-      const customerKey = customerId || customerPhone || '';
-      if (loadedCustomerRef.current === customerKey) return;
-
-      // Don't override existing cart items (unless they're for a different customer)
-      if (items.length > 0 && loadedCustomerRef.current !== null) return;
+      // Don't re-populate if the cart already has booked items
+      // (persists across mobile Sheet remounts, unlike a local ref)
+      // Note: sessionId alone isn't sufficient because the dashboard sets sessionId
+      // before items are marked as booked
+      const hasBookedItems = items.some(item => item.isBooked);
+      if (sessionId && hasBookedItems) return;
 
       try {
         setIsLoadingSession(true);
@@ -137,29 +154,16 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
 
           // Populate cart with booked items
           populateFromSession(customerSession.session_id, cartItems);
-
-          // Mark as loaded for this customer
-          loadedCustomerRef.current = customerKey;
-
-          toast.success(
-            `Loaded ${cartItems.length} active service${cartItems.length > 1 ? 's' : ''} for ${customerName}`
-          );
-        } else {
-          // No active session found, mark as loaded anyway
-          loadedCustomerRef.current = customerKey;
         }
       } catch (error: any) {
         console.error('Error fetching active session:', error);
-        // Mark as loaded even on error to prevent retry loops
-        loadedCustomerRef.current = customerKey;
-        // Don't show error toast, just log it (customer might not have active session)
       } finally {
         setIsLoadingSession(false);
       }
     };
 
     fetchActiveSession();
-  }, [customerId, customerPhone, items.length, customerName, populateFromSession]); // Run when customer changes
+  }, [customerId, customerPhone, sessionId]); // Run when customer changes or session is cleared
 
   // Format paise to rupees
   const formatPrice = (paise: number) => {
@@ -203,13 +207,37 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
 
   const handleClearCart = () => {
     clearCart();
-    loadedCustomerRef.current = null; // Reset loaded customer tracking
   };
 
-  const handleCustomerChange = (customerId: string | null, customerName: string | null, customerPhone?: string | null) => {
-    console.log('handleCustomerChange called with:', customerId, customerName, customerPhone);
-    setCustomer(customerId, customerName || 'Walk-in Customer', customerPhone || null);
-    console.log('Customer set in cart store');
+  // Update customer dialog state (for reassigning active session)
+  const [showUpdateCustomerDialog, setShowUpdateCustomerDialog] = useState(false);
+  const [isUpdatingSessionCustomer, setIsUpdatingSessionCustomer] = useState(false);
+
+  const handleCustomerChange = (newCustomerId: string | null, newCustomerName: string | null, newCustomerPhone?: string | null) => {
+    console.log('handleCustomerChange called with:', newCustomerId, newCustomerName, newCustomerPhone);
+    setCustomer(newCustomerId, newCustomerName || 'Walk-in Customer', newCustomerPhone || null);
+  };
+
+  const handleUpdateSessionCustomer = async (newCustomerId: string | null, newCustomerName: string | null, newCustomerPhone?: string | null) => {
+    if (!sessionId) return;
+
+    try {
+      setIsUpdatingSessionCustomer(true);
+      await apiClient.patch(`/appointments/walkins/session/${sessionId}/customer`, {
+        customer_id: newCustomerId || undefined,
+        customer_name: newCustomerName || 'Walk-in Customer',
+        customer_phone: newCustomerPhone || undefined,
+      });
+      // Update cart store with new customer info
+      setCustomer(newCustomerId, newCustomerName || 'Walk-in Customer', newCustomerPhone || null);
+      toast.success('Session customer updated');
+      setShowUpdateCustomerDialog(false);
+    } catch (error: any) {
+      console.error('Failed to update session customer:', error);
+      toast.error('Failed to update session customer on server');
+    } finally {
+      setIsUpdatingSessionCustomer(false);
+    }
   };
 
   const handleOpenStaffChange = (itemId: string, currentStaffId: string | null) => {
@@ -288,6 +316,20 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
     setQuantityStaffName(null);
   };
 
+  const handleOpenTeamEditor = (itemId: string) => {
+    setTeamEditorItemId(itemId);
+    setShowTeamEditor(true);
+  };
+
+  const handleSaveTeam = (contributions: StaffContributionCreate[]) => {
+    if (!teamEditorItemId) return;
+
+    setItemStaffContributions(teamEditorItemId, contributions);
+    toast.success('Staff team updated');
+    setShowTeamEditor(false);
+    setTeamEditorItemId(null);
+  };
+
   const handleCreateServiceOrders = async () => {
     // Get only unbooked items
     const unbookedItems = getUnbookedItems();
@@ -339,10 +381,9 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
         `Booked ${response.data.total_items} service${response.data.total_items > 1 ? 's' : ''}! Staff notified.`
       );
 
-      // Show success message with option to checkout
-      toast.info('Services are now in progress. You can checkout when ready.', {
-        duration: 5000,
-      });
+      // Redirect to dashboard
+      clearCart();
+      router.push('/dashboard');
     } catch (error: any) {
       console.error('Error creating service orders:', error);
       toast.error(
@@ -360,13 +401,27 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
 
   // Check if all service items have staff assigned (products don't need staff)
   const serviceItems = items.filter((item) => !item.isProduct);
-  const allItemsHaveStaff = serviceItems.every((item) => item.staffId);
+  const allItemsHaveStaff = serviceItems.every((item) => {
+    // Multi-staff services need staffContributions array with at least one contribution
+    if (item.isMultiStaff) {
+      return item.staffContributions && item.staffContributions.length > 0;
+    }
+    // Single-staff services need staffId
+    return item.staffId;
+  });
 
   // Get unbooked items
   const unbookedItems = getUnbookedItems();
   const unbookedServices = unbookedItems.filter((item) => !item.isProduct);
   const hasUnbookedItems = unbookedServices.length > 0;
-  const allUnbookedHaveStaff = unbookedServices.every((item) => item.staffId);
+  const allUnbookedHaveStaff = unbookedServices.every((item) => {
+    // Multi-staff services need staffContributions array with at least one contribution
+    if (item.isMultiStaff) {
+      return item.staffContributions && item.staffContributions.length > 0;
+    }
+    // Single-staff services need staffId
+    return item.staffId;
+  });
 
   return (
     <div className="w-full bg-white md:rounded-xl md:border border-gray-200 flex flex-col md:sticky md:top-0 h-full md:h-[calc(100vh-7rem)] md:shadow-sm">
@@ -397,6 +452,19 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
           isOpen={isCustomerSearchOpen}
           onOpenChange={setIsCustomerSearchOpen}
         />
+
+        {/* Update Session Customer - only when session is active */}
+        {sessionId && customerName && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowUpdateCustomerDialog(true)}
+            className="w-full mt-2"
+          >
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Update Customer for Session
+          </Button>
+        )}
 
         {/* Manage Active Services */}
         {customerName && (
@@ -429,7 +497,7 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
           </div>
         ) : (
           <div className="space-y-3">
-            {items.map((item) => (
+            {[...items].sort((a, b) => Number(a.isBooked) - Number(b.isBooked)).map((item) => (
               <div
                 key={item.id}
                 className={`rounded-lg p-3 space-y-2 ${
@@ -473,23 +541,62 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
 
                 {/* Staff Assignment (Services only) */}
                 {!item.isProduct && (
-                  item.staffId && item.staffName ? (
-                    <div className="flex items-center justify-between">
-                      <Badge variant="secondary" className="text-xs">
-                        <User className="h-3 w-3 mr-1" />
-                        {item.staffName}
-                      </Badge>
+                  item.isMultiStaff && item.staffContributions && item.staffContributions.length > 0 ? (
+                    // Multi-staff service - show list of staff with roles
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs text-gray-600 font-medium">Staff Team:</p>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleOpenTeamEditor(item.id)}
+                          className="h-6 px-2 text-xs"
+                        >
+                          <Edit2 className="h-3 w-3 mr-1" />
+                          Edit Team
+                        </Button>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {item.staffContributions.map((contrib, idx) => (
+                          <Badge key={idx} variant="secondary" className="text-xs">
+                            <User className="h-3 w-3 mr-1" />
+                            {contrib.role_in_service}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  ) : item.staffId && item.staffName ? (
+                    // Single-staff service - can convert to multi-staff
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <Badge variant="secondary" className="text-xs">
+                          <User className="h-3 w-3 mr-1" />
+                          {item.staffName}
+                        </Badge>
+                        <div className="flex gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleOpenStaffChange(item.id, item.staffId!)}
+                            className="h-6 px-2 text-xs"
+                          >
+                            <Edit2 className="h-3 w-3 mr-1" />
+                            Change
+                          </Button>
+                        </div>
+                      </div>
                       <Button
-                        variant="ghost"
+                        variant="outline"
                         size="sm"
-                        onClick={() => handleOpenStaffChange(item.id, item.staffId!)}
-                        className="h-6 px-2 text-xs"
+                        onClick={() => handleOpenTeamEditor(item.id)}
+                        className="w-full h-7 text-xs"
                       >
-                        <Edit2 className="h-3 w-3 mr-1" />
-                        Change
+                        <Users className="h-3 w-3 mr-1" />
+                        Add More Staff
                       </Button>
                     </div>
                   ) : (
+                    // No staff assigned yet
                     <Button
                       variant="outline"
                       size="sm"
@@ -729,6 +836,29 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
         </DialogContent>
       </Dialog>
 
+      {/* Update Session Customer Dialog */}
+      <Dialog open={showUpdateCustomerDialog} onOpenChange={setShowUpdateCustomerDialog}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Update Session Customer</DialogTitle>
+            <DialogDescription>
+              Reassign all booked services in this session to a different customer.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <CustomerSearch
+              value={{ id: null, name: null }}
+              onChange={(id, name, phone) => {
+                handleUpdateSessionCustomer(id, name, phone);
+              }}
+            />
+          </div>
+          {isUpdatingSessionCustomer && (
+            <p className="text-sm text-center text-gray-500">Updating...</p>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* Active Services Modal */}
       <ActiveServicesModal
         open={showActiveServicesModal}
@@ -737,16 +867,29 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
         customerPhone={customerPhone}
         customerName={customerName}
         onServicesCancelled={() => {
-          // Refresh cart when services are cancelled
-          loadedCustomerRef.current = null; // Reset loaded state
-          // Trigger re-fetch by clearing and setting customer again
-          const currentCustomer = { customerId, customerName, customerPhone };
-          setCustomer(null, '', '');
-          setTimeout(() => {
-            setCustomer(currentCustomer.customerId, currentCustomer.customerName || '', currentCustomer.customerPhone || '');
-          }, 100);
+          // Clear session so the useEffect re-fetches active services
+          setSessionId(null);
         }}
       />
+
+      {/* Ad-hoc Multi-Staff Team Editor */}
+      {teamEditorItemId && (() => {
+        const item = items.find((i) => i.id === teamEditorItemId);
+        return item && !item.isProduct ? (
+          <AdHocStaffTeamEditor
+            serviceId={item.serviceId || ''}
+            serviceName={item.serviceName || ''}
+            servicePrice={item.unitPrice}
+            currentStaffId={item.staffId}
+            currentStaffName={item.staffName}
+            currentContributions={item.staffContributions}
+            availableStaff={availableStaff}
+            open={showTeamEditor}
+            onOpenChange={setShowTeamEditor}
+            onSave={handleSaveTeam}
+          />
+        ) : null;
+      })()}
     </div>
   );
 }

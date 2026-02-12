@@ -6,6 +6,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { expenseApi } from '@/lib/api/expenses';
 import { ExpenseCategory, RecurrenceType, type Expense, type ExpenseCreate } from '@/types/expense';
 import { toast } from 'sonner';
+import { useAuthStore } from '@/stores/auth-store';
 
 interface ExpenseFormProps {
   expense?: Expense | null;
@@ -14,6 +15,7 @@ interface ExpenseFormProps {
 }
 
 export function ExpenseForm({ expense, onCancel, onSuccess }: ExpenseFormProps) {
+  const { user } = useAuthStore();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState<Partial<ExpenseCreate>>({
     category: ExpenseCategory.OTHER,
@@ -22,6 +24,15 @@ export function ExpenseForm({ expense, onCancel, onSuccess }: ExpenseFormProps) 
     description: '',
     is_recurring: false,
     requires_approval: false,
+  });
+
+  // Filter categories based on user role
+  const availableCategories = Object.values(ExpenseCategory).filter((cat) => {
+    // Receptionist cannot create rent or salary expenses
+    if (user?.role === 'receptionist') {
+      return cat !== ExpenseCategory.RENT && cat !== ExpenseCategory.SALARIES;
+    }
+    return true;
   });
 
   useEffect(() => {
@@ -75,7 +86,7 @@ export function ExpenseForm({ expense, onCancel, onSuccess }: ExpenseFormProps) 
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {Object.values(ExpenseCategory).map((cat) => (
+              {availableCategories.map((cat) => (
                 <SelectItem key={cat} value={cat}>
                   {cat.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
                 </SelectItem>

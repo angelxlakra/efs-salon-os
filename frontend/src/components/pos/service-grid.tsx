@@ -9,6 +9,8 @@ import { useCartStore } from '@/stores/cart-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { apiClient } from '@/lib/api-client';
 import { toast } from 'sonner';
+import { ServiceStaffTemplate, StaffContributionCreate } from '@/types/multi-staff';
+import { StaffAssignmentSelector } from '@/components/checkout/StaffAssignmentSelector';
 
 interface ServiceCategory {
   id: string;
@@ -30,6 +32,7 @@ interface Staff {
   display_name: string;
   is_active: boolean;
   user_id: string;
+  specialization?: string[]; // Optional for now, as existing API may not return it
 }
 
 interface StaffBusyness {
@@ -66,6 +69,10 @@ export function ServiceGrid({ searchInputRef, hideStaffSelection = false, onServ
   const [isLoadingStaff, setIsLoadingStaff] = useState(false);
   const [currentUserStaff, setCurrentUserStaff] = useState<StaffWithBusyness | null>(null);
   const expandedCardRef = useRef<HTMLDivElement | null>(null);
+
+  // Multi-staff service state
+  const [serviceTemplates, setServiceTemplates] = useState<Record<string, ServiceStaffTemplate[]>>({});
+  const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
 
   // Fetch services and staff on mount
   useEffect(() => {
@@ -197,6 +204,29 @@ export function ServiceGrid({ searchInputRef, hideStaffSelection = false, onServ
     }
   };
 
+  const fetchServiceTemplates = async (serviceId: string) => {
+    // Don't fetch if already cached
+    if (serviceTemplates[serviceId]) {
+      return;
+    }
+
+    try {
+      setIsLoadingTemplates(true);
+      const { data } = await apiClient.get(`/catalog/services/${serviceId}/staff-templates`);
+
+      if (data.templates && data.templates.length > 0) {
+        setServiceTemplates(prev => ({ ...prev, [serviceId]: data.templates }));
+      }
+    } catch (error: any) {
+      // If 404, service doesn't have templates - that's okay
+      if (error.response?.status !== 404) {
+        console.error('Error fetching service templates:', error);
+      }
+    } finally {
+      setIsLoadingTemplates(false);
+    }
+  };
+
   const handleServiceClick = (service: Service) => {
     // If user is staff, auto-assign service to themselves using staff_id from user object
     if (user?.role === 'staff') {
@@ -239,7 +269,13 @@ export function ServiceGrid({ searchInputRef, hideStaffSelection = false, onServ
     }
 
     // Toggle expansion: if already expanded, collapse it; otherwise expand it
-    setExpandedServiceId(expandedServiceId === service.id ? null : service.id);
+    const willExpand = expandedServiceId !== service.id;
+    setExpandedServiceId(willExpand ? service.id : null);
+
+    // Fetch templates when expanding
+    if (willExpand) {
+      fetchServiceTemplates(service.id);
+    }
   };
 
   const handleStaffClick = (service: Service, staffId: string, staffName: string) => {
@@ -271,6 +307,34 @@ export function ServiceGrid({ searchInputRef, hideStaffSelection = false, onServ
     });
 
     toast.success(`${service.name} added to cart (${staffName})`);
+
+    // Collapse the service card
+    setExpandedServiceId(null);
+  };
+
+  const handleMultiStaffAssignment = (service: Service, contributions: StaffContributionCreate[]) => {
+    // Add to cart with multi-staff contributions
+    const newItem = {
+      isProduct: false,
+      serviceId: service.id,
+      serviceName: service.name,
+      quantity: 1,
+      unitPrice: service.base_price,
+      discount: 0,
+      taxRate: service.tax_rate,
+      duration: service.duration_minutes,
+      isMultiStaff: true,
+      staffContributions: contributions,
+    };
+
+    addItem(newItem);
+
+    const staffNames = contributions.map(c => {
+      const staffMember = staff.find(s => s.id === c.staff_id);
+      return staffMember?.display_name || 'Unknown';
+    }).join(', ');
+
+    toast.success(`${service.name} added to cart (${staffNames})`);
 
     // Collapse the service card
     setExpandedServiceId(null);
@@ -432,7 +496,7 @@ export function ServiceGrid({ searchInputRef, hideStaffSelection = false, onServ
                     {/* Category Badge */}
                     <Badge
                       variant="secondary"
-                      className="absolute top-2 right-2 text-xs"
+                      className="absolute top-2 right-2 text-xs max-w-[50%] truncate"
                     >
                       {service.category.name}
                     </Badge>
@@ -463,62 +527,93 @@ export function ServiceGrid({ searchInputRef, hideStaffSelection = false, onServ
                   {/* Staff Selection - Inline */}
                   {isExpanded && !hideStaffSelection && (
                     <div className="px-4 pb-4 border-t border-gray-100 pt-3">
-                      <p className="text-sm font-medium text-gray-700 mb-3">
-                        <User className="h-4 w-4 inline mr-1" />
-                        Select Staff Member
-                      </p>
-
-                      {isLoadingStaff ? (
-                        <div className="flex items-center justify-center py-4">
-                          <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
-                        </div>
-                      ) : staff.length === 0 ? (
-                        <div className="text-sm text-gray-500 py-2">
-                          No active staff available
+                      {/* Check if this service has multi-staff templates */}
+                      {serviceTemplates[service.id] && serviceTemplates[service.id].length > 0 ? (
+                        // Multi-staff service with predefined roles
+                        <div>
+                          <p className="text-sm font-medium text-gray-700 mb-3">
+                            <User className="h-4 w-4 inline mr-1" />
+                            Assign Staff to Roles
+                          </p>
+                          {isLoadingTemplates ? (
+                            <div className="flex items-center justify-center py-4">
+                              <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+                            </div>
+                          ) : (
+                            <StaffAssignmentSelector
+                              serviceId={service.id}
+                              serviceName={service.name}
+                              servicePrice={service.base_price}
+                              templates={serviceTemplates[service.id]}
+                              availableStaff={staff}
+                              splitType="hybrid"
+                              onAssignmentsChange={(contributions) => {
+                                handleMultiStaffAssignment(service, contributions);
+                              }}
+                            />
+                          )}
                         </div>
                       ) : (
-                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                          {staff.map((staffMember) => (
-                            <button
-                              key={staffMember.id}
-                              onClick={() =>
-                                handleStaffClick(
-                                  service,
-                                  staffMember.id,
-                                  staffMember.display_name
-                                )
-                              }
-                              title={getStaffBusynessText(staffMember)}
-                              className="group/staff relative flex flex-col gap-2 px-3 py-3 bg-gray-50 hover:bg-black hover:text-white border border-gray-200 hover:border-black rounded-lg transition-all text-left"
-                            >
-                              {/* Staff Name and Icon */}
-                              <div className="flex items-center gap-2">
-                                <User className="h-4 w-4 flex-shrink-0" />
-                                <span className="truncate font-medium text-sm">
-                                  {staffMember.display_name}
-                                </span>
-                              </div>
+                        // Regular single-staff service
+                        <div>
+                          <p className="text-sm font-medium text-gray-700 mb-3">
+                            <User className="h-4 w-4 inline mr-1" />
+                            Select Staff Member
+                          </p>
 
-                              {/* Busyness Info */}
-                              {staffMember.busyness && (
-                                <div className="flex items-center justify-between gap-2 text-xs">
-                                  {getStatusBadge(staffMember.busyness.status)}
-                                  {staffMember.busyness.total_wait_minutes > 0 && (
-                                    <div className="flex items-center gap-1 text-gray-600 group-hover/staff:text-white">
-                                      <Clock className="h-3 w-3" />
-                                      <span>{formatWaitTime(staffMember.busyness.total_wait_minutes)}</span>
+                          {isLoadingStaff || isLoadingTemplates ? (
+                            <div className="flex items-center justify-center py-4">
+                              <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+                            </div>
+                          ) : staff.length === 0 ? (
+                            <div className="text-sm text-gray-500 py-2">
+                              No active staff available
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                              {staff.map((staffMember) => (
+                                <button
+                                  key={staffMember.id}
+                                  onClick={() =>
+                                    handleStaffClick(
+                                      service,
+                                      staffMember.id,
+                                      staffMember.display_name
+                                    )
+                                  }
+                                  title={getStaffBusynessText(staffMember)}
+                                  className="group/staff relative flex flex-col gap-2 px-3 py-3 bg-gray-50 hover:bg-black hover:text-white border border-gray-200 hover:border-black rounded-lg transition-all text-left"
+                                >
+                                  {/* Staff Name and Icon */}
+                                  <div className="flex items-center gap-2">
+                                    <User className="h-4 w-4 flex-shrink-0" />
+                                    <span className="truncate font-medium text-sm">
+                                      {staffMember.display_name}
+                                    </span>
+                                  </div>
+
+                                  {/* Busyness Info */}
+                                  {staffMember.busyness && (
+                                    <div className="flex items-center justify-between gap-2 text-xs">
+                                      {getStatusBadge(staffMember.busyness.status)}
+                                      {staffMember.busyness.total_wait_minutes > 0 && (
+                                        <div className="flex items-center gap-1 text-gray-600 group-hover/staff:text-white">
+                                          <Clock className="h-3 w-3" />
+                                          <span>{formatWaitTime(staffMember.busyness.total_wait_minutes)}</span>
+                                        </div>
+                                      )}
                                     </div>
                                   )}
-                                </div>
-                              )}
 
-                              {/* Tooltip on hover - using CSS */}
-                              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg shadow-lg opacity-0 group-hover/staff:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-10">
-                                {getStaffBusynessText(staffMember)}
-                                <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900"></div>
-                              </div>
-                            </button>
-                          ))}
+                                  {/* Tooltip on hover - using CSS */}
+                                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg shadow-lg opacity-0 group-hover/staff:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-10">
+                                    {getStaffBusynessText(staffMember)}
+                                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900"></div>
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>

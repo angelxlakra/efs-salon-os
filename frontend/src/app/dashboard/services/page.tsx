@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, Loader2, Edit2, Trash2, FolderPlus, Upload } from 'lucide-react';
+import { Plus, Loader2, Edit2, Trash2, FolderPlus, Upload, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -12,6 +12,7 @@ import { ServiceDialog } from '@/components/services/service-dialog';
 import { CategoryDialog } from '@/components/services/category-dialog';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { ImportDialog } from '@/components/services/import-dialog';
+import { ServiceStaffTemplateManager } from '@/components/services/ServiceStaffTemplateManager';
 
 interface ServiceCategory {
   id: string;
@@ -39,7 +40,7 @@ interface CatalogData {
 
 export default function ServicesPage() {
   const { user } = useAuthStore();
-  const isOwner = user?.role === 'owner';
+  const canManageServices = user?.role === 'owner' || user?.role === 'receptionist';
 
   const [catalog, setCatalog] = useState<CatalogData>({ categories: [], services: [] });
   const [isLoading, setIsLoading] = useState(true);
@@ -60,6 +61,10 @@ export default function ServicesPage() {
     id: null,
   });
   const [importDialog, setImportDialog] = useState(false);
+  const [templateDialog, setTemplateDialog] = useState<{ open: boolean; service: Service | null }>({
+    open: false,
+    service: null,
+  });
 
   useEffect(() => {
     fetchCatalog();
@@ -144,7 +149,7 @@ export default function ServicesPage() {
             Manage your salon's service catalog and categories
           </p>
         </div>
-        {isOwner && (
+        {canManageServices && (
           <div className="flex gap-2">
             <Button
               variant="outline"
@@ -226,7 +231,7 @@ export default function ServicesPage() {
             <p className="text-gray-500 text-center mb-4">
               Create your first service category to get started
             </p>
-            {isOwner && (
+            {canManageServices && (
               <Button onClick={() => setCategoryDialog({ open: true, category: null })}>
                 <FolderPlus className="h-4 w-4 mr-2" />
                 Create Category
@@ -249,7 +254,7 @@ export default function ServicesPage() {
                       )}
                       <Badge variant="outline">{services.length} services</Badge>
                     </div>
-                    {isOwner && (
+                    {canManageServices && (
                       <div className="flex gap-2">
                         <Button
                           variant="ghost"
@@ -303,7 +308,7 @@ export default function ServicesPage() {
                                 </Badge>
                               )}
                             </div>
-                            {isOwner && (
+                            {canManageServices && (
                               <div className="flex gap-1">
                                 <Button
                                   variant="ghost"
@@ -345,6 +350,19 @@ export default function ServicesPage() {
                               {service.duration_minutes} min
                             </span>
                           </div>
+                          {canManageServices && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="w-full mt-3"
+                              onClick={() =>
+                                setTemplateDialog({ open: true, service })
+                              }
+                            >
+                              <Users className="h-3 w-3 mr-2" />
+                              Staff Roles
+                            </Button>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -400,6 +418,17 @@ export default function ServicesPage() {
         onSuccess={() => {
           fetchCatalog();
           setImportDialog(false);
+        }}
+      />
+
+      <ServiceStaffTemplateManager
+        serviceId={templateDialog.service?.id || null}
+        serviceName={templateDialog.service?.name || ''}
+        open={templateDialog.open}
+        onOpenChange={(open) => setTemplateDialog({ open, service: open ? templateDialog.service : null })}
+        onSuccess={() => {
+          // Optional: refresh catalog or show indicator
+          toast.success('Staff roles updated');
         }}
       />
     </div>

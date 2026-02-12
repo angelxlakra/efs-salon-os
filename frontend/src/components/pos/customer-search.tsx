@@ -28,6 +28,8 @@ interface Customer {
   email: string;
   total_visits: number;
   total_spent: number;
+  pending_balance: number;
+  pending_balance_rupees: number;
 }
 
 interface CustomerSearchProps {
@@ -45,15 +47,22 @@ export function CustomerSearch({ value, onChange, isOpen, onOpenChange }: Custom
   const [search, setSearch] = useState('');
   const [showDialog, setShowDialog] = useState(false);
 
+  // Debounced search - fetch from server when user types
   useEffect(() => {
-    if (open) {
-      fetchCustomers();
+    if (search.length >= 2) {
+      const timer = setTimeout(() => {
+        fetchCustomers(search);
+      }, 300); // 300ms debounce
+      return () => clearTimeout(timer);
+    } else if (search.length === 0) {
+      setCustomers([]);
     }
-  }, [open]);
+  }, [search]);
 
-  const fetchCustomers = async () => {
+  const fetchCustomers = async (query: string) => {
     try {
-      const { data } = await apiClient.get('/customers');
+      // Use new autocomplete endpoint - searches ALL customers
+      const { data } = await apiClient.get(`/customers/autocomplete?q=${encodeURIComponent(query)}&limit=10`);
       setCustomers(data.items || []);
     } catch (error) {
       console.error('Failed to fetch customers:', error);
@@ -67,15 +76,6 @@ export function CustomerSearch({ value, onChange, isOpen, onOpenChange }: Custom
     }
     return phone;
   };
-
-  const filteredCustomers = customers.filter((customer) => {
-    const query = search.toLowerCase();
-    return (
-      customer.first_name.toLowerCase().includes(query) ||
-      customer.last_name.toLowerCase().includes(query) ||
-      customer.phone?.includes(query)
-    );
-  });
 
   const handleSelect = (customer: Customer) => {
     console.log('Customer selected:', customer);
@@ -138,9 +138,9 @@ export function CustomerSearch({ value, onChange, isOpen, onOpenChange }: Custom
                 onValueChange={setSearch}
               />
               <CommandList>
-                {search && filteredCustomers.length > 0 && (
+                {search.length >= 2 && customers.length > 0 && (
                   <CommandGroup heading="Customers">
-                    {filteredCustomers.map((customer) => (
+                    {customers.map((customer) => (
                       <CommandItem
                         key={customer.id}
                         value={customer.id}
@@ -168,14 +168,24 @@ export function CustomerSearch({ value, onChange, isOpen, onOpenChange }: Custom
                           <div className="text-xs text-gray-500">
                             {formatPhone(customer.phone)} • {customer.total_visits} visits
                           </div>
+                          {customer.pending_balance > 0 && (
+                            <div className="text-xs text-red-600 font-medium">
+                              Pending: ₹{(customer.pending_balance / 100).toFixed(2)}
+                            </div>
+                          )}
                         </div>
                       </CommandItem>
                     ))}
                   </CommandGroup>
                 )}
-                {search && filteredCustomers.length === 0 && (
+                {search.length >= 2 && customers.length === 0 && (
                   <div className="py-6 text-center text-sm text-gray-500">
                     No customers found
+                  </div>
+                )}
+                {search.length > 0 && search.length < 2 && (
+                  <div className="py-6 text-center text-sm text-gray-500">
+                    Type at least 2 characters to search
                   </div>
                 )}
                 <CommandGroup>
@@ -183,13 +193,13 @@ export function CustomerSearch({ value, onChange, isOpen, onOpenChange }: Custom
                     onSelect={() => {
                       console.log('Add New Customer - onSelect');
                       setOpen(false);
-                      setShowDialog(true);
+                      setTimeout(() => setShowDialog(true), 100);
                     }}
                     onPointerDown={(e: React.PointerEvent) => {
                       console.log('Add New Customer - onPointerDown');
                       e.preventDefault();
                       setOpen(false);
-                      setShowDialog(true);
+                      setTimeout(() => setShowDialog(true), 100);
                     }}
                     className="cursor-pointer text-primary hover:bg-accent"
                   >
@@ -227,10 +237,16 @@ export function CustomerSearch({ value, onChange, isOpen, onOpenChange }: Custom
       <CustomerDialog
         open={showDialog}
         customer={null}
+        initialPhone={search}
         onClose={() => setShowDialog(false)}
-        onSuccess={() => {
-          fetchCustomers();
+        onSuccess={(created) => {
           setShowDialog(false);
+          if (created) {
+            const fullName = `${created.first_name} ${created.last_name}`.trim();
+            onChange(created.id, fullName, created.phone);
+          } else {
+            fetchCustomers(search);
+          }
         }}
       />
     </>

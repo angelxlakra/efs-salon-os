@@ -20,6 +20,7 @@ import {
   ShoppingCart,
   TrendingUp,
   CalendarCheck,
+  Wallet,
 } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
 import Image from 'next/image';
@@ -90,6 +91,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       roles: ['owner', 'receptionist'],
     },
     {
+      title: 'Cash Drawer',
+      url: '/dashboard/cash-drawer',
+      icon: Wallet,
+      roles: ['owner', 'receptionist'],
+    },
+    {
       title: 'EOD Reconciliation',
       url: '/dashboard/reconciliation',
       icon: Calculator,
@@ -129,7 +136,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       title: 'Expenses',
       url: '/dashboard/expenses',
       icon: DollarSign,
-      roles: ['owner'],
+      roles: ['owner', 'receptionist'],
     },
     {
       title: 'Reports',

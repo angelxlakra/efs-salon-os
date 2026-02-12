@@ -1,14 +1,18 @@
 import { create } from 'zustand';
 import { ulid } from 'ulid';
+import { StaffContributionCreate } from '@/types/multi-staff';
 
 export interface CartItem {
   id: string;
   // Service fields (when isProduct=false)
   serviceId?: string;
   serviceName?: string;
-  staffId?: string | null; // assigned staff ID
-  staffName?: string | null; // staff display name
+  staffId?: string | null; // assigned staff ID (for single-staff services)
+  staffName?: string | null; // staff display name (for single-staff services)
   duration?: number; // service duration in minutes
+  // Multi-staff service fields
+  isMultiStaff?: boolean; // true if this service requires multiple staff
+  staffContributions?: StaffContributionCreate[]; // staff contributions for multi-staff services
   // Product fields (when isProduct=true)
   skuId?: string;
   productName?: string;
@@ -35,6 +39,7 @@ export interface CartState {
   updateQuantity: (id: string, quantity: number) => void;
   updateDiscount: (id: string, discount: number) => void;
   setItemStaff: (itemId: string, staffId: string | null, staffName: string | null) => void;
+  setItemStaffContributions: (itemId: string, contributions: StaffContributionCreate[]) => void;
   setCustomer: (customerId: string | null, customerName: string | null, customerPhone?: string | null) => void;
   setGlobalDiscount: (discount: number) => void;
   generateSessionId: () => string;
@@ -70,10 +75,13 @@ export const useCartStore = create<CartState>((set, get) => ({
       existingItem = items.find(
         i => i.isProduct && i.skuId === item.skuId && !i.isBooked
       );
+    } else if (item.isMultiStaff) {
+      // For multi-staff services, NEVER combine - each assignment is unique
+      existingItem = undefined;
     } else {
-      // For services, combine by service and staff
+      // For single-staff services, combine by service and staff
       existingItem = items.find(
-        i => !i.isProduct && i.serviceId === item.serviceId && i.staffId === item.staffId && !i.isBooked
+        i => !i.isProduct && !i.isMultiStaff && i.serviceId === item.serviceId && i.staffId === item.staffId && !i.isBooked
       );
     }
 
@@ -125,6 +133,14 @@ export const useCartStore = create<CartState>((set, get) => ({
     set({
       items: get().items.map(item =>
         item.id === itemId ? { ...item, staffId, staffName } : item
+      ),
+    });
+  },
+
+  setItemStaffContributions: (itemId, contributions) => {
+    set({
+      items: get().items.map(item =>
+        item.id === itemId ? { ...item, staffContributions: contributions, isMultiStaff: true } : item
       ),
     });
   },

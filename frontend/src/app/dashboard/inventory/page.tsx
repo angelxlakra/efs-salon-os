@@ -39,6 +39,9 @@ interface ChangeRequest {
   change_type: 'receive' | 'adjust' | 'consume';
   quantity: number;
   unit_cost?: number;
+  supplier_invoice_number?: string;
+  supplier_discount_percent?: number;
+  supplier_discount_fixed?: number;
   reason_code: string;
   notes?: string;
   status: 'pending' | 'approved' | 'rejected';
@@ -71,6 +74,11 @@ export default function InventoryPage() {
   const [unitCost, setUnitCost] = useState('');
   const [reasonCode, setReasonCode] = useState('');
   const [adjustmentNotes, setAdjustmentNotes] = useState('');
+
+  // Supplier tracking (for receive type)
+  const [supplierInvoiceNumber, setSupplierInvoiceNumber] = useState('');
+  const [supplierDiscountPercent, setSupplierDiscountPercent] = useState('');
+  const [supplierDiscountFixed, setSupplierDiscountFixed] = useState('');
 
   // Change requests state
   const [changeRequests, setChangeRequests] = useState<ChangeRequest[]>([]);
@@ -190,6 +198,10 @@ export default function InventoryPage() {
     setUnitCost('');
     setReasonCode('');
     setAdjustmentNotes('');
+    // Reset supplier fields
+    setSupplierInvoiceNumber('');
+    setSupplierDiscountPercent('');
+    setSupplierDiscountFixed('');
     setStockDialogOpen(true);
   };
 
@@ -223,12 +235,33 @@ export default function InventoryPage() {
 
       if (adjustmentType === 'receive') {
         payload.unit_cost = Math.round(parseFloat(unitCost) * 100); // Convert to paise
+
+        // Add supplier tracking fields if provided
+        if (supplierInvoiceNumber) {
+          payload.supplier_invoice_number = supplierInvoiceNumber;
+        }
+        if (supplierDiscountPercent && parseFloat(supplierDiscountPercent) > 0) {
+          payload.supplier_discount_percent = parseFloat(supplierDiscountPercent);
+        }
+        if (supplierDiscountFixed && parseFloat(supplierDiscountFixed) > 0) {
+          payload.supplier_discount_fixed = Math.round(parseFloat(supplierDiscountFixed) * 100); // Convert to paise
+        }
       }
 
       await apiClient.post('/inventory/change-requests', payload);
 
       toast.success('Stock adjustment request created successfully');
       setStockDialogOpen(false);
+
+      // Reset form fields
+      setAdjustmentQty('');
+      setUnitCost('');
+      setReasonCode('');
+      setAdjustmentNotes('');
+      setSupplierInvoiceNumber('');
+      setSupplierDiscountPercent('');
+      setSupplierDiscountFixed('');
+
       loadChangeRequests();
     } catch (error: any) {
       console.error('Failed to create adjustment:', error);
@@ -519,21 +552,87 @@ export default function InventoryPage() {
               </div>
 
               {adjustmentType === 'receive' && (
-                <div>
-                  <Label htmlFor="unit-cost">Unit Cost (₹) *</Label>
-                  <Input
-                    id="unit-cost"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={unitCost}
-                    onChange={(e) => setUnitCost(e.target.value)}
-                    placeholder="Cost per unit"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Used for calculating weighted average cost
-                  </p>
-                </div>
+                <>
+                  <div>
+                    <Label htmlFor="unit-cost">Unit Cost (₹) *</Label>
+                    <Input
+                      id="unit-cost"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={unitCost}
+                      onChange={(e) => setUnitCost(e.target.value)}
+                      placeholder="Cost per unit"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Base cost before any discounts
+                    </p>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="supplier-invoice">Supplier Invoice Number (Optional)</Label>
+                    <Input
+                      id="supplier-invoice"
+                      type="text"
+                      value={supplierInvoiceNumber}
+                      onChange={(e) => setSupplierInvoiceNumber(e.target.value)}
+                      placeholder="e.g., INV-2024-001"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="discount-percent">Supplier Discount (%)</Label>
+                      <Input
+                        id="discount-percent"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        max="100"
+                        value={supplierDiscountPercent}
+                        onChange={(e) => setSupplierDiscountPercent(e.target.value)}
+                        placeholder="e.g., 15.5"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Percentage discount from supplier
+                      </p>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="discount-fixed">Fixed Discount (₹)</Label>
+                      <Input
+                        id="discount-fixed"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={supplierDiscountFixed}
+                        onChange={(e) => setSupplierDiscountFixed(e.target.value)}
+                        placeholder="e.g., 50"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Fixed amount discount
+                      </p>
+                    </div>
+                  </div>
+
+                  {(supplierDiscountPercent || supplierDiscountFixed) && unitCost && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                      <p className="text-sm font-medium text-blue-900">Final Unit Cost</p>
+                      <p className="text-lg font-bold text-blue-900">
+                        ₹{(() => {
+                          const base = parseFloat(unitCost) || 0;
+                          const percentDiscount = (base * (parseFloat(supplierDiscountPercent) || 0)) / 100;
+                          const fixedDiscount = parseFloat(supplierDiscountFixed) || 0;
+                          const final = Math.max(0, base - percentDiscount - fixedDiscount);
+                          return final.toFixed(2);
+                        })()}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        This will be used for calculating weighted average cost
+                      </p>
+                    </div>
+                  )}
+                </>
               )}
 
               <div>

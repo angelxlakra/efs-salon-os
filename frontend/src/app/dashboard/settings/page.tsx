@@ -24,21 +24,57 @@ import {
   Save,
   Loader2,
   AlertCircle,
-  RotateCcw
+  RotateCcw,
+  Target
 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+
+interface FormDataType {
+  salon_name: string;
+  salon_tagline: string;
+  salon_address: string;
+  salon_city: string;
+  salon_state: string;
+  salon_pincode: string;
+  contact_phone: string;
+  contact_email: string;
+  contact_website: string;
+  gstin: string;
+  pan: string;
+  receipt_header_text: string;
+  receipt_footer_text: string;
+  receipt_show_gstin: boolean;
+  receipt_show_logo: boolean;
+  logo_url: string;
+  primary_color: string;
+  invoice_prefix: string;
+  invoice_terms: string;
+  daily_revenue_target_paise: number;
+  daily_services_target: number;
+}
 
 export default function SettingsPage() {
   const { user } = useAuthStore();
   const isOwner = user?.role === 'owner';
 
   const [settings, setSettings] = useState<any>(null);
+  const [originalData, setOriginalData] = useState<FormDataType | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const [hasMounted, setHasMounted] = useState(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [changesSummary, setChangesSummary] = useState<Array<{field: string, label: string, oldValue: any, newValue: any}>>([]);
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormDataType>({
     salon_name: '',
     salon_tagline: '',
     salon_address: '',
@@ -58,6 +94,8 @@ export default function SettingsPage() {
     primary_color: '#000000',
     invoice_prefix: 'SAL',
     invoice_terms: '',
+    daily_revenue_target_paise: 2000000,
+    daily_services_target: 25,
   });
 
   useEffect(() => {
@@ -70,7 +108,7 @@ export default function SettingsPage() {
       setIsLoading(true);
       const { data } = await apiClient.get('/settings');
       setSettings(data);
-      setFormData({
+      const initialData: FormDataType = {
         salon_name: data.salon_name || '',
         salon_tagline: data.salon_tagline || '',
         salon_address: data.salon_address || '',
@@ -90,7 +128,11 @@ export default function SettingsPage() {
         primary_color: data.primary_color || '#000000',
         invoice_prefix: data.invoice_prefix || 'SAL',
         invoice_terms: data.invoice_terms || '',
-      });
+        daily_revenue_target_paise: data.daily_revenue_target_paise ?? 2000000,
+        daily_services_target: data.daily_services_target ?? 25,
+      };
+      setFormData(initialData);
+      setOriginalData(initialData);
       setHasChanges(false);
     } catch (error: any) {
       toast.error('Failed to load settings');
@@ -105,14 +147,95 @@ export default function SettingsPage() {
     setHasChanges(true);
   };
 
-  const handleSave = async () => {
+  const getFieldLabel = (field: string): string => {
+    const labels: Record<string, string> = {
+      salon_name: 'Salon Name',
+      salon_tagline: 'Tagline',
+      salon_address: 'Address',
+      salon_city: 'City',
+      salon_state: 'State',
+      salon_pincode: 'Pincode',
+      contact_phone: 'Phone Number',
+      contact_email: 'Email Address',
+      contact_website: 'Website',
+      gstin: 'GSTIN',
+      pan: 'PAN',
+      receipt_header_text: 'Receipt Header Text',
+      receipt_footer_text: 'Receipt Footer Text',
+      receipt_show_gstin: 'Show GSTIN on Receipts',
+      receipt_show_logo: 'Show Logo on Receipts',
+      logo_url: 'Logo URL',
+      primary_color: 'Primary Color',
+      invoice_prefix: 'Invoice Prefix',
+      invoice_terms: 'Invoice Terms & Conditions',
+      daily_revenue_target_paise: 'Daily Revenue Target',
+      daily_services_target: 'Daily Services Target',
+    };
+    return labels[field] || field;
+  };
+
+  const formatValue = (field: string, value: any): string => {
+    if (value === null || value === undefined || value === '') {
+      return '(empty)';
+    }
+    if (typeof value === 'boolean') {
+      return value ? 'Yes' : 'No';
+    }
+    if (field === 'daily_revenue_target_paise') {
+      return `₹${(value / 100).toLocaleString('en-IN')}`;
+    }
+    if (field === 'daily_services_target') {
+      return `${value} services`;
+    }
+    return String(value);
+  };
+
+  const detectChanges = () => {
+    if (!originalData) return [];
+
+    const changes: Array<{field: string, label: string, oldValue: any, newValue: any}> = [];
+
+    (Object.keys(formData) as Array<keyof FormDataType>).forEach((field) => {
+      const oldVal = originalData[field];
+      const newVal = formData[field];
+
+      // Compare values (handle empty strings vs null)
+      const oldNormalized = oldVal === null || oldVal === undefined ? '' : oldVal;
+      const newNormalized = newVal === null || newVal === undefined ? '' : newVal;
+
+      if (oldNormalized !== newNormalized) {
+        changes.push({
+          field,
+          label: getFieldLabel(field),
+          oldValue: formatValue(field, oldVal),
+          newValue: formatValue(field, newVal),
+        });
+      }
+    });
+
+    return changes;
+  };
+
+  const handleSaveClick = () => {
     if (!isOwner) {
       toast.error('Only owners can update salon settings');
       return;
     }
 
+    const changes = detectChanges();
+    if (changes.length === 0) {
+      toast.info('No changes to save');
+      return;
+    }
+
+    setChangesSummary(changes);
+    setShowConfirmDialog(true);
+  };
+
+  const handleConfirmSave = async () => {
     try {
       setIsSaving(true);
+      setShowConfirmDialog(false);
       await apiClient.patch('/settings', formData);
       toast.success('Settings updated successfully');
       setHasChanges(false);
@@ -189,7 +312,7 @@ export default function SettingsPage() {
               Cancel
             </Button>
           )}
-          <Button onClick={handleSave} disabled={!hasChanges || isSaving}>
+          <Button onClick={handleSaveClick} disabled={!hasChanges || isSaving}>
             {isSaving ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -500,6 +623,53 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
+      {/* Dashboard Goals */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Target className="h-5 w-5" />
+            Dashboard Goals
+          </CardTitle>
+          <CardDescription>
+            Set daily targets for revenue and service counts shown on the dashboard.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="daily_revenue_target">Daily Revenue Target (₹)</Label>
+              <Input
+                id="daily_revenue_target"
+                type="number"
+                min="0"
+                step="100"
+                value={Math.round(formData.daily_revenue_target_paise / 100)}
+                onChange={(e) => handleChange('daily_revenue_target_paise', parseInt(e.target.value) * 100)}
+                placeholder="20000"
+              />
+              <p className="text-xs text-muted-foreground">
+                Target daily revenue in rupees (default: ₹20,000)
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="daily_services_target">Daily Services Target</Label>
+              <Input
+                id="daily_services_target"
+                type="number"
+                min="0"
+                step="1"
+                value={formData.daily_services_target}
+                onChange={(e) => handleChange('daily_services_target', parseInt(e.target.value) || 0)}
+                placeholder="25"
+              />
+              <p className="text-xs text-muted-foreground">
+                Target number of services per day (default: 25)
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Danger Zone */}
       <Card className="border-destructive">
         <CardHeader>
@@ -530,6 +700,97 @@ export default function SettingsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Bottom Save Button */}
+      {hasChanges && (
+        <div className="sticky bottom-0 bg-background border-t pt-4 pb-2 -mx-6 px-6 shadow-lg">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              You have unsaved changes
+            </p>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => fetchSettings()} disabled={isSaving}>
+                Cancel
+              </Button>
+              <Button onClick={handleSaveClick} disabled={isSaving}>
+                {isSaving ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Changes
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Dialog */}
+      <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Confirm Settings Changes</DialogTitle>
+            <DialogDescription>
+              Review the changes you're about to make to your salon settings.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            {changesSummary.length > 0 ? (
+              <div className="space-y-3">
+                {changesSummary.map((change, index) => (
+                  <div key={index} className="border rounded-lg p-3 bg-muted/50">
+                    <p className="font-medium text-sm mb-2">{change.label}</p>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <p className="text-muted-foreground mb-1">Previous:</p>
+                        <p className="text-red-600 line-through">{change.oldValue}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground mb-1">New:</p>
+                        <p className="text-green-600 font-medium">{change.newValue}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">No changes detected.</p>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowConfirmDialog(false)}
+              disabled={isSaving}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmSave}
+              disabled={isSaving}
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-2" />
+                  Confirm & Save
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

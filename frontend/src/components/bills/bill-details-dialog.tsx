@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Printer, User, FileText } from 'lucide-react';
+import { Printer, User, FileText, Edit, Trash2, CreditCard, MessageCircle } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -15,6 +15,8 @@ import { apiClient } from '@/lib/api-client';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 import { useSettingsStore } from '@/stores/settings-store';
+import { sendReceiptToWhatsApp } from '@/lib/whatsapp-receipt';
+import { StaffContributionResponse } from '@/types/multi-staff';
 
 interface BillItem {
   id: string;
@@ -24,7 +26,19 @@ interface BillItem {
   quantity: number;
   line_total: number; // paise
   staff_id: string | null;
+  staff_contributions?: StaffContributionResponse[]; // Multi-staff contributions
   notes: string | null;
+}
+
+interface Payment {
+  id: string;
+  bill_id: string;
+  payment_method: 'cash' | 'upi' | 'card' | 'other';
+  amount: number; // paise
+  reference_number: string | null;
+  notes: string | null;
+  confirmed_at: string;
+  confirmed_by: string;
 }
 
 interface BillDetails {
@@ -43,6 +57,7 @@ interface BillDetails {
   rounded_total: number; // paise
   rounding_adjustment: number; // paise
   items: BillItem[];
+  payments: Payment[];
   created_at: string;
   posted_at: string | null;
   created_by: string;
@@ -67,6 +82,9 @@ export function BillDetailsDialog({
 }: BillDetailsDialogProps) {
   const [bill, setBill] = useState<BillDetails | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const { hasGST, fetchSettings, settings } = useSettingsStore();
 
   useEffect(() => {
@@ -94,6 +112,56 @@ export function BillDetailsDialog({
       onOpenChange(false);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleEditPayment = (payment: Payment) => {
+    setEditingPayment(payment);
+    setIsEditDialogOpen(true);
+  };
+
+  const handleDeletePayment = async (paymentId: string) => {
+    if (!bill || !billId) return;
+
+    if (!confirm('Are you sure you want to delete this payment?')) {
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      await apiClient.delete(`/pos/bills/${billId}/payments/${paymentId}`);
+      toast.success('Payment deleted successfully');
+      await fetchBillDetails(); // Refresh bill details
+    } catch (error: any) {
+      console.error('Error deleting payment:', error);
+      toast.error(error.response?.data?.detail || 'Failed to delete payment');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSavePayment = async (updatedData: Partial<Payment>) => {
+    if (!editingPayment || !bill || !billId) return;
+
+    try {
+      setIsSaving(true);
+      const payload: any = {};
+
+      if (updatedData.payment_method) payload.method = updatedData.payment_method;
+      if (updatedData.amount !== undefined) payload.amount = updatedData.amount / 100; // Convert to rupees
+      if (updatedData.reference_number !== undefined) payload.reference_number = updatedData.reference_number;
+      if (updatedData.notes !== undefined) payload.notes = updatedData.notes;
+
+      await apiClient.patch(`/pos/bills/${billId}/payments/${editingPayment.id}`, payload);
+      toast.success('Payment updated successfully');
+      setIsEditDialogOpen(false);
+      setEditingPayment(null);
+      await fetchBillDetails(); // Refresh bill details
+    } catch (error: any) {
+      console.error('Error updating payment:', error);
+      toast.error(error.response?.data?.detail || 'Failed to update payment');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -126,6 +194,21 @@ export function BillDetailsDialog({
         return <Badge variant="destructive">Refunded</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
+    }
+  };
+
+  const getPaymentMethodLabel = (method: string) => {
+    switch (method) {
+      case 'cash':
+        return 'Cash';
+      case 'upi':
+        return 'UPI';
+      case 'card':
+        return 'Card';
+      case 'other':
+        return 'Other';
+      default:
+        return method;
     }
   };
 
@@ -199,6 +282,22 @@ export function BillDetailsDialog({
                               {item.notes}
                             </p>
                           )}
+                          {/* Multi-staff contributions */}
+                          {item.staff_contributions && item.staff_contributions.length > 0 && (
+                            <div className="mt-2 space-y-1">
+                              <p className="text-xs text-gray-600 font-medium">Staff Team:</p>
+                              {item.staff_contributions.map((contrib, idx) => (
+                                <div key={idx} className="flex items-center justify-between text-xs">
+                                  <span className="text-gray-600">
+                                    {contrib.role_in_service}
+                                  </span>
+                                  <span className="font-medium">
+                                    {formatPrice(contrib.contribution_amount)}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-center text-sm">
                           {item.quantity}
@@ -215,6 +314,81 @@ export function BillDetailsDialog({
                 </table>
               </div>
             </div>
+
+            {/* Payments */}
+            {bill.payments && bill.payments.length > 0 && (
+              <div>
+                <h4 className="font-semibold mb-3 flex items-center gap-2">
+                  <CreditCard className="h-4 w-4" />
+                  Payments
+                </h4>
+                <div className="border rounded-lg overflow-hidden">
+                  <table className="w-full">
+                    <thead className="bg-gray-50 border-b">
+                      <tr>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                          Method
+                        </th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                          Reference
+                        </th>
+                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">
+                          Amount
+                        </th>
+                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {bill.payments.map((payment) => (
+                        <tr key={payment.id}>
+                          <td className="px-4 py-3">
+                            <p className="font-medium text-sm">
+                              {getPaymentMethodLabel(payment.payment_method)}
+                            </p>
+                            {payment.notes && (
+                              <p className="text-xs text-muted-foreground italic">
+                                {payment.notes}
+                              </p>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-muted-foreground">
+                            {payment.reference_number || '-'}
+                          </td>
+                          <td className="px-4 py-3 text-right text-sm font-medium">
+                            {formatPrice(payment.amount)}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            {bill.status !== 'refunded' && (
+                              <div className="flex gap-1 justify-end">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleEditPayment(payment)}
+                                  disabled={isSaving}
+                                >
+                                  <Edit className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDeletePayment(payment.id)}
+                                  disabled={isSaving}
+                                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
 
             {/* Pricing Summary */}
             <div className="bg-gray-50 rounded-lg p-4 space-y-2">
@@ -279,6 +453,22 @@ export function BillDetailsDialog({
                 Reprint Receipt
               </Button>
 
+              {bill.customer_phone && (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    const sent = sendReceiptToWhatsApp(bill, settings?.salon_name);
+                    if (!sent) {
+                      toast.error('No phone number available for this customer');
+                    }
+                  }}
+                  className="flex-1"
+                >
+                  <MessageCircle className="h-4 w-4 mr-2" />
+                  Send to WhatsApp
+                </Button>
+              )}
+
               {bill.status === 'draft' && onVoid && (
                 <Button
                   variant="destructive"
@@ -307,6 +497,122 @@ export function BillDetailsDialog({
           </div>
         ) : null}
       </DialogContent>
+
+      {/* Edit Payment Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Edit Payment</DialogTitle>
+          </DialogHeader>
+
+          {editingPayment && (
+            <div className="space-y-4">
+              {/* Payment Method */}
+              <div>
+                <label className="text-sm font-medium mb-2 block">Payment Method</label>
+                <select
+                  className="w-full px-3 py-2 border rounded-md"
+                  value={editingPayment.payment_method}
+                  onChange={(e) =>
+                    setEditingPayment({
+                      ...editingPayment,
+                      payment_method: e.target.value as any,
+                    })
+                  }
+                >
+                  <option value="cash">Cash</option>
+                  <option value="upi">UPI</option>
+                  <option value="card">Card</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+
+              {/* Amount */}
+              <div>
+                <label className="text-sm font-medium mb-2 block">Amount (₹)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  className="w-full px-3 py-2 border rounded-md"
+                  value={editingPayment.amount / 100}
+                  onChange={(e) =>
+                    setEditingPayment({
+                      ...editingPayment,
+                      amount: Math.round(parseFloat(e.target.value || '0') * 100),
+                    })
+                  }
+                />
+              </div>
+
+              {/* Reference Number */}
+              <div>
+                <label className="text-sm font-medium mb-2 block">
+                  Reference Number (Optional)
+                </label>
+                <input
+                  type="text"
+                  className="w-full px-3 py-2 border rounded-md"
+                  placeholder="e.g., UPI123456"
+                  value={editingPayment.reference_number || ''}
+                  onChange={(e) =>
+                    setEditingPayment({
+                      ...editingPayment,
+                      reference_number: e.target.value,
+                    })
+                  }
+                />
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="text-sm font-medium mb-2 block">Notes (Optional)</label>
+                <textarea
+                  className="w-full px-3 py-2 border rounded-md"
+                  rows={3}
+                  placeholder="Additional notes..."
+                  value={editingPayment.notes || ''}
+                  onChange={(e) =>
+                    setEditingPayment({
+                      ...editingPayment,
+                      notes: e.target.value,
+                    })
+                  }
+                />
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-2 pt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setIsEditDialogOpen(false);
+                    setEditingPayment(null);
+                  }}
+                  disabled={isSaving}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => handleSavePayment(editingPayment)}
+                  disabled={isSaving}
+                  className="flex-1"
+                >
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    'Save Changes'
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }

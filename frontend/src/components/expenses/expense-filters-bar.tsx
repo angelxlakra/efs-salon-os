@@ -1,6 +1,7 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { ExpenseCategory, ExpenseStatus, type ExpenseFilters } from '@/types/expense';
+import { useAuthStore } from '@/stores/auth-store';
 
 interface ExpenseFiltersBarProps {
   filters: ExpenseFilters;
@@ -8,9 +9,20 @@ interface ExpenseFiltersBarProps {
 }
 
 export function ExpenseFiltersBar({ filters, onFiltersChange }: ExpenseFiltersBarProps) {
+  const { user } = useAuthStore();
+
   const updateFilter = (key: keyof ExpenseFilters, value: any) => {
     onFiltersChange({ ...filters, [key]: value, page: 1 });
   };
+
+  // Filter categories based on user role
+  const availableCategories = Object.values(ExpenseCategory).filter((cat) => {
+    // Receptionist cannot view rent or salary expenses
+    if (user?.role === 'receptionist') {
+      return cat !== ExpenseCategory.RENT && cat !== ExpenseCategory.SALARIES;
+    }
+    return true;
+  });
 
   return (
     <div className="flex gap-4 items-end flex-wrap">
@@ -43,7 +55,7 @@ export function ExpenseFiltersBar({ filters, onFiltersChange }: ExpenseFiltersBa
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All categories</SelectItem>
-            {Object.values(ExpenseCategory).map((cat) => (
+            {availableCategories.map((cat) => (
               <SelectItem key={cat} value={cat}>
                 {cat.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
               </SelectItem>

@@ -2,13 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, DollarSign, CheckCircle, Package, FileText, Calendar, User, Phone, Mail, MapPin, CreditCard } from 'lucide-react';
+import { ArrowLeft, DollarSign, CheckCircle, Package, FileText, Calendar, User, Phone, Mail, MapPin, CreditCard, Edit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { purchaseApi, PurchaseInvoice, SupplierPayment } from '@/lib/api/purchases';
 import { toast } from 'sonner';
+import EditInvoiceDialog from '@/components/purchases/edit-invoice-dialog';
 
 export default function InvoiceDetailPage() {
   const params = useParams();
@@ -18,6 +19,7 @@ export default function InvoiceDetailPage() {
   const [invoice, setInvoice] = useState<PurchaseInvoice | null>(null);
   const [payments, setPayments] = useState<SupplierPayment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showEditDialog, setShowEditDialog] = useState(false);
 
   useEffect(() => {
     if (invoiceId) {
@@ -133,6 +135,13 @@ export default function InvoiceDetailPage() {
         </div>
 
         <div className="flex gap-2">
+          {invoice.status !== 'paid' && (
+            <Button variant="outline" onClick={() => setShowEditDialog(true)}>
+              <Edit className="mr-2 h-4 w-4" />
+              Edit Invoice
+            </Button>
+          )}
+
           {invoice.status === 'draft' && (
             <Button onClick={handleMarkReceived}>
               <CheckCircle className="mr-2 h-4 w-4" />
@@ -224,12 +233,28 @@ export default function InvoiceDetailPage() {
                       <div className="text-xs text-muted-foreground">
                         @ {formatCurrency(item.unit_cost)}
                       </div>
+                      {item.discount_amount > 0 && (
+                        <div className="text-xs text-green-600">
+                          Discount: -{formatCurrency(item.discount_amount)}
+                        </div>
+                      )}
                       <div className="font-semibold">{formatCurrency(item.total_cost)}</div>
                     </div>
                   </div>
                 ))}
 
                 <div className="pt-4 space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Subtotal</span>
+                    <span className="font-semibold">{formatCurrency(invoice.subtotal)}</span>
+                  </div>
+                  {invoice.invoice_discount_amount > 0 && (
+                    <div className="flex justify-between text-sm text-green-600">
+                      <span>Invoice Discount</span>
+                      <span className="font-semibold">-{formatCurrency(invoice.invoice_discount_amount)}</span>
+                    </div>
+                  )}
+                  <Separator />
                   <div className="flex justify-between text-lg font-bold">
                     <span>Total Amount</span>
                     <span>{formatCurrency(invoice.total_amount)}</span>
@@ -327,6 +352,19 @@ export default function InvoiceDetailPage() {
           </Card>
         </div>
       </div>
+
+      {/* Edit Invoice Dialog */}
+      {invoice && showEditDialog && (
+        <EditInvoiceDialog
+          invoice={invoice}
+          open={showEditDialog}
+          onClose={() => setShowEditDialog(false)}
+          onSuccess={() => {
+            setShowEditDialog(false);
+            loadInvoiceDetails();
+          }}
+        />
+      )}
     </div>
   );
 }

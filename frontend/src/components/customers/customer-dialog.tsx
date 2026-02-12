@@ -45,8 +45,9 @@ interface Customer {
 interface CustomerDialogProps {
   open: boolean;
   customer: Customer | null;
+  initialPhone?: string;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (customer?: { id: string; first_name: string; last_name: string; phone: string }) => void;
 }
 
 const customerSchema = z.object({
@@ -65,7 +66,7 @@ const customerSchema = z.object({
 
 type CustomerFormData = z.infer<typeof customerSchema>;
 
-export function CustomerDialog({ open, customer, onClose, onSuccess }: CustomerDialogProps) {
+export function CustomerDialog({ open, customer, initialPhone, onClose, onSuccess }: CustomerDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isEdit = !!customer;
 
@@ -107,18 +108,19 @@ export function CustomerDialog({ open, customer, onClose, onSuccess }: CustomerD
         notes: customer.notes || '',
       });
     } else if (open && !customer) {
-      // Reset form for new customer
+      // Reset form for new customer, pre-fill phone if provided
+      const phoneValue = initialPhone?.replace(/\D/g, '').slice(-10) || '';
       reset({
         first_name: '',
         last_name: '',
-        phone: '',
+        phone: phoneValue,
         email: '',
         date_of_birth: '',
         gender: '',
         notes: '',
       });
     }
-  }, [open, customer, reset]);
+  }, [open, customer, initialPhone, reset]);
 
   const onSubmit = async (data: CustomerFormData) => {
     try {
@@ -137,12 +139,17 @@ export function CustomerDialog({ open, customer, onClose, onSuccess }: CustomerD
       if (isEdit) {
         await apiClient.put(`/customers/${customer.id}`, payload);
         toast.success('Customer updated successfully');
+        onSuccess();
       } else {
-        await apiClient.post('/customers', payload);
+        const { data: created } = await apiClient.post('/customers', payload);
         toast.success('Customer created successfully');
+        onSuccess({
+          id: created.id,
+          first_name: created.first_name,
+          last_name: created.last_name,
+          phone: created.phone,
+        });
       }
-
-      onSuccess();
     } catch (error: any) {
       toast.error(
         error.response?.data?.detail || `Failed to ${isEdit ? 'update' : 'create'} customer`

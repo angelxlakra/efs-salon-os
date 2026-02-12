@@ -11,6 +11,11 @@ import { toast } from 'sonner';
 import { useCartStore } from '@/stores/cart-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { ActiveCustomerCard } from '@/components/dashboard/active-customer-card';
+import { TrendIndicator } from '@/components/dashboard/trend-indicator';
+import { DualRadialGoals } from '@/components/dashboard/radial-goal-progress';
+import { HourlyTrendChart } from '@/components/dashboard/hourly-trend-chart';
+import { ServiceDistributionChart } from '@/components/dashboard/service-distribution-chart';
+import { DailyComparisonSparkline } from '@/components/dashboard/daily-comparison-sparkline';
 
 interface Service {
   id: string;
@@ -58,6 +63,41 @@ interface DashboardStats {
   today_customers: number;
   active_services: number;
   pending_bills: number;
+  avg_service_duration_minutes?: number | null;
+}
+
+interface SalonSettings {
+  daily_revenue_target_paise: number;
+  daily_services_target: number;
+}
+
+interface ComparisonData {
+  revenue_change_paise: number;
+  revenue_percent_change: number;
+  services_change: number;
+  services_percent_change: number;
+  customers_change: number;
+  customers_percent_change: number;
+}
+
+interface HourlyData {
+  hour: number;
+  hour_label: string;
+  revenue_paise: number;
+  bills_count: number;
+  services_count: number;
+}
+
+interface ServicePerformance {
+  service_id: string;
+  service_name: string;
+  count: number;
+  total_revenue: number;
+}
+
+interface TrendDataPoint {
+  date: string;
+  value: number;
 }
 
 export default function DashboardPage() {
@@ -73,6 +113,19 @@ export default function DashboardPage() {
     pending_bills: 0,
   });
   const [activeSessions, setActiveSessions] = useState<CustomerSession[]>([]);
+  const [settings, setSettings] = useState<SalonSettings>({
+    daily_revenue_target_paise: 2000000, // Default ₹20,000
+    daily_services_target: 25, // Default 25 services
+  });
+  const [comparison, setComparison] = useState<ComparisonData | null>(null);
+  const [hourlyData, setHourlyData] = useState<HourlyData[]>([]);
+  const [peakHour, setPeakHour] = useState<number | undefined>(undefined);
+  const [topServices, setTopServices] = useState<ServicePerformance[]>([]);
+  const [trendsData, setTrendsData] = useState<{
+    revenue: TrendDataPoint[];
+    customers: TrendDataPoint[];
+    services: TrendDataPoint[];
+  }>({ revenue: [], customers: [], services: [] });
   const [isLoading, setIsLoading] = useState(true);
 
   // Redirect staff users to their My Services page
@@ -95,21 +148,79 @@ export default function DashboardPage() {
         setIsLoading(true);
       }
 
-      // Fetch active walk-ins
-      const { data } = await apiClient.get('/appointments/walkins/active');
-      setActiveSessions(data.sessions || []);
+      // Fetch data in parallel
+      const [
+        walkinsResponse,
+        reportsResponse,
+        settingsResponse,
+        comparisonResponse,
+        hourlyResponse,
+        trendsResponse,
+      ] = await Promise.all([
+        apiClient.get('/appointments/walkins/active'),
+        apiClient.get('/reports/dashboard'),
+        apiClient.get('/settings'),
+        apiClient.get('/reports/dashboard/comparison'),
+        apiClient.get('/reports/dashboard/hourly'),
+        apiClient.get('/reports/dashboard/trends?days=7'),
+      ]);
 
-      // Fetch dashboard statistics
-      const { data: reportsData } = await apiClient.get('/reports/dashboard');
-      const metrics = reportsData.metrics;
+      // Update active sessions
+      setActiveSessions(walkinsResponse.data.sessions || []);
 
+      // Update dashboard statistics
+      const metrics = reportsResponse.data.metrics;
       setStats({
         today_revenue: metrics.net_revenue,
         today_services: metrics.completed_appointments,
         today_customers: metrics.total_bills,
         active_services: metrics.active_appointments,
         pending_bills: metrics.pending_appointments,
+        avg_service_duration_minutes: metrics.avg_service_duration_minutes,
       });
+
+      // Update settings (goals)
+      if (settingsResponse.data) {
+        setSettings({
+          daily_revenue_target_paise: settingsResponse.data.daily_revenue_target_paise || 2000000,
+          daily_services_target: settingsResponse.data.daily_services_target || 25,
+        });
+      }
+
+      // Update comparison data
+      if (comparisonResponse.data?.comparison) {
+        setComparison(comparisonResponse.data.comparison);
+      }
+
+      // Update hourly data
+      if (hourlyResponse.data?.hourly_data) {
+        setHourlyData(hourlyResponse.data.hourly_data);
+        setPeakHour(hourlyResponse.data.peak_hour);
+      }
+
+      // Update top services
+      if (reportsResponse.data?.top_services) {
+        setTopServices(reportsResponse.data.top_services);
+      }
+
+      // Update trends data
+      if (trendsResponse.data?.daily_metrics) {
+        const dailyMetrics = trendsResponse.data.daily_metrics;
+        setTrendsData({
+          revenue: dailyMetrics.map((d: any) => ({
+            date: d.date,
+            value: d.revenue_paise,
+          })),
+          customers: dailyMetrics.map((d: any) => ({
+            date: d.date,
+            value: d.customers_count,
+          })),
+          services: dailyMetrics.map((d: any) => ({
+            date: d.date,
+            value: d.services_count,
+          })),
+        });
+      }
     } catch (error: any) {
       console.error('Failed to fetch dashboard data:', error);
 
@@ -129,6 +240,14 @@ export default function DashboardPage() {
 
   const formatPrice = (paise: number) => {
     return `₹${(paise / 100).toLocaleString('en-IN')}`;
+  };
+
+  const formatDuration = (minutes: number | null | undefined) => {
+    if (!minutes) return 'N/A';
+    if (minutes < 60) return `${minutes} min`;
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
   };
 
   const getCurrentDate = () => {
@@ -198,32 +317,52 @@ export default function DashboardPage() {
 
       {/* Quick Stats - Ultra Compact Design */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2">
-        <Card className="p-2 shadow-sm flex flex-col justify-between">
+        <Card className="p-2 shadow-sm flex flex-col justify-between relative overflow-hidden">
           <div className="flex items-center justify-between">
             <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Revenue</p>
             <DollarSign className="h-3 w-3 text-green-600" />
           </div>
           <div className="mt-1">
-            <div className="text-lg font-bold text-gray-900 leading-none">
-              {formatPrice(stats.today_revenue)}
+            <div className="flex items-center justify-between">
+              <div className="text-lg font-bold text-gray-900 leading-none">
+                {formatPrice(stats.today_revenue)}
+              </div>
+              {comparison && (
+                <TrendIndicator value={comparison.revenue_percent_change} />
+              )}
             </div>
             <p className="text-[10px] text-gray-500 truncate mt-0.5">
               {stats.today_services} services done
             </p>
           </div>
+          {trendsData.revenue.length > 0 && (
+            <div className="absolute top-1 right-1 opacity-30">
+              <DailyComparisonSparkline data={trendsData.revenue} color="#10b981" />
+            </div>
+          )}
         </Card>
 
-        <Card className="p-2 shadow-sm flex flex-col justify-between">
+        <Card className="p-2 shadow-sm flex flex-col justify-between relative overflow-hidden">
           <div className="flex items-center justify-between">
             <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Customers</p>
             <Users className="h-3 w-3 text-blue-600" />
           </div>
           <div className="mt-1">
-            <div className="text-lg font-bold text-gray-900 leading-none">
-              {stats.today_customers}
+            <div className="flex items-center justify-between">
+              <div className="text-lg font-bold text-gray-900 leading-none">
+                {stats.today_customers}
+              </div>
+              {comparison && (
+                <TrendIndicator value={comparison.customers_percent_change} />
+              )}
             </div>
             <p className="text-[10px] text-gray-500 truncate mt-0.5">Served today</p>
           </div>
+          {trendsData.customers.length > 0 && (
+            <div className="absolute top-1 right-1 opacity-30">
+              <DailyComparisonSparkline data={trendsData.customers} color="#3b82f6" />
+            </div>
+          )}
         </Card>
 
         <Card className="p-2 shadow-sm flex flex-col justify-between">
@@ -258,7 +397,9 @@ export default function DashboardPage() {
             <TrendingUp className="h-3 w-3 text-indigo-600" />
           </div>
           <div className="mt-1">
-            <div className="text-lg font-bold text-gray-900 leading-none">{}</div>
+            <div className="text-lg font-bold text-gray-900 leading-none">
+              {formatDuration(stats.avg_service_duration_minutes)}
+            </div>
             <p className="text-[10px] text-gray-500 truncate mt-0.5">Per service</p>
           </div>
         </Card>
@@ -307,8 +448,31 @@ export default function DashboardPage() {
           </Card>
         </div>
 
-        {/* Sidebar - Quick Actions & Stats */}
+        {/* Sidebar - Goals & Quick Actions */}
         <div className="space-y-6">
+          {/* Daily Goals */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Daily Goals</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <DualRadialGoals
+                revenueTarget={settings.daily_revenue_target_paise}
+                currentRevenue={stats.today_revenue}
+                servicesTarget={settings.daily_services_target}
+                currentServices={stats.today_services}
+              />
+              <div className="pt-4 mt-4 border-t">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-600">Avg. Bill Value</span>
+                  <span className="font-semibold text-gray-900">
+                    {formatPrice(Math.round(stats.today_revenue / (stats.today_services || 1)))}
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Quick Actions */}
           <Card>
             <CardHeader>
@@ -352,53 +516,48 @@ export default function DashboardPage() {
               </a>
             </CardContent>
           </Card>
+        </div>
+      </div>
 
-          {/* Today's Performance */}
+      {/* Analytics & Trends Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
+        {/* Hourly Revenue Trend */}
+        <div className="lg:col-span-2">
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Today's Performance</CardTitle>
+              <CardTitle>Hourly Revenue Trend</CardTitle>
+              <CardDescription>Revenue breakdown by hour of the day</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-gray-600">Revenue Target</span>
-                  <span className="text-sm font-medium">
-                    {formatPrice(stats.today_revenue)} / ₹20,000
-                  </span>
+            <CardContent>
+              {hourlyData.length > 0 ? (
+                <HourlyTrendChart data={hourlyData} peakHour={peakHour} />
+              ) : (
+                <div className="h-64 flex items-center justify-center text-gray-500">
+                  <p className="text-sm">Loading hourly data...</p>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div
-                    className="bg-green-600 h-2 rounded-full"
-                    style={{
-                      width: `${Math.min(100, (stats.today_revenue / 2000000) * 100)}%`,
-                    }}
-                  />
-                </div>
-              </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
 
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-gray-600">Services Goal</span>
-                  <span className="text-sm font-medium">
-                    {stats.today_services} / 25
-                  </span>
+        {/* Service Distribution */}
+        <div>
+          <Card>
+            <CardHeader>
+              <CardTitle>Top Services</CardTitle>
+              <CardDescription>Revenue by service type</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {topServices.length > 0 ? (
+                <ServiceDistributionChart
+                  services={topServices}
+                  totalServices={stats.today_services}
+                />
+              ) : (
+                <div className="h-64 flex items-center justify-center text-gray-500">
+                  <p className="text-sm">No service data available</p>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div
-                    className="bg-blue-600 h-2 rounded-full"
-                    style={{ width: `${Math.min(100, (stats.today_services / 25) * 100)}%` }}
-                  />
-                </div>
-              </div>
-
-              <div className="pt-2 border-t">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600">Avg. Bill Value</span>
-                  <span className="font-semibold text-gray-900">
-                    {formatPrice(Math.round(stats.today_revenue / (stats.today_services || 1)))}
-                  </span>
-                </div>
-              </div>
+              )}
             </CardContent>
           </Card>
         </div>

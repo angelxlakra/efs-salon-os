@@ -180,9 +180,8 @@ export function ActiveCustomerCard({
           className="w-full h-8 text-xs"
           size="sm"
           onClick={() => onCheckout(session.session_id)}
-          disabled={!session.all_completed}
         >
-          {session.all_completed ? 'Checkout' : 'Complete Services First'}
+          {session.all_completed ? 'Checkout' : 'Go to Checkout'}
         </Button>
       </CardFooter>
     </Card>

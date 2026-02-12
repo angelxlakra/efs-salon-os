@@ -95,7 +95,7 @@ export function CategoryDialog({ open, category, onClose, onSuccess }: CategoryD
       };
 
       if (isEdit) {
-        await apiClient.put(`/catalog/categories/${category.id}`, payload);
+        await apiClient.patch(`/catalog/categories/${category.id}`, payload);
         toast.success('Category updated successfully');
       } else {
         await apiClient.post('/catalog/categories', payload);

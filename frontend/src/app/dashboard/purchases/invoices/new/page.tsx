@@ -22,8 +22,9 @@ export default function NewPurchaseInvoicePage() {
   const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split('T')[0]);
   const [dueDate, setDueDate] = useState('');
   const [notes, setNotes] = useState('');
+  const [invoiceDiscount, setInvoiceDiscount] = useState(0);
   const [items, setItems] = useState<PurchaseItemCreate[]>([
-    { product_name: '', uom: 'piece', quantity: 1, unit_cost: 0 },
+    { product_name: '', uom: 'piece', quantity: 1, unit_cost: 0, discount_amount: 0 },
   ]);
 
   const [barcodeSearch, setBarcodeSearch] = useState('');
@@ -106,6 +107,7 @@ export default function NewPurchaseInvoicePage() {
             uom: result.uom || 'piece',
             quantity: 1,
             unit_cost: result.avg_cost_per_unit || 0,
+            discount_amount: 0,
           };
           setItems(prev => [...prev, newItem]);
           toast.success(`Added ${result.product_name}`);
@@ -149,6 +151,7 @@ export default function NewPurchaseInvoicePage() {
       uom: quickAddForm.uom,
       quantity: quickAddForm.quantity,
       unit_cost: quickAddForm.unit_cost,
+      discount_amount: 0,
     };
 
     setItems(prev => [...prev, newItem]);
@@ -168,7 +171,7 @@ export default function NewPurchaseInvoicePage() {
   }, [handleBarcodeSearch]);
 
   const handleAddItem = () => {
-    setItems([...items, { product_name: '', uom: 'piece', quantity: 1, unit_cost: 0 }]);
+    setItems([...items, { product_name: '', uom: 'piece', quantity: 1, unit_cost: 0, discount_amount: 0 }]);
   };
 
   const handleRemoveItem = (index: number) => {
@@ -184,7 +187,7 @@ export default function NewPurchaseInvoicePage() {
 
     // Ensure at least one empty item for manual entry
     if (newItems.length === 0) {
-      setItems([{ product_name: '', uom: 'piece', quantity: 1, unit_cost: 0 }]);
+      setItems([{ product_name: '', uom: 'piece', quantity: 1, unit_cost: 0, discount_amount: 0 }]);
     } else {
       setItems(newItems);
     }
@@ -196,12 +199,19 @@ export default function NewPurchaseInvoicePage() {
     setItems(newItems);
   };
 
-  const calculateTotal = () => {
+  const calculateItemTotal = (item: PurchaseItemCreate) => {
+    const baseCost = item.quantity * item.unit_cost;
+    return baseCost - (item.discount_amount || 0);
+  };
+
+  const calculateSubtotal = () => {
     return items
-      .filter(item => item.product_name.trim()) // Only count items with product names
-      .reduce((sum, item) => {
-        return sum + (item.quantity * item.unit_cost);
-      }, 0);
+      .filter(item => item.product_name.trim())
+      .reduce((sum, item) => sum + calculateItemTotal(item), 0);
+  };
+
+  const calculateTotal = () => {
+    return calculateSubtotal() - invoiceDiscount;
   };
 
   const formatCurrency = (amount: number) => {
@@ -247,6 +257,18 @@ export default function NewPurchaseInvoicePage() {
         toast.error(`Item "${item.product_name}": Unit cost must be greater than 0`);
         return;
       }
+      const itemSubtotal = item.quantity * item.unit_cost;
+      if ((item.discount_amount || 0) > itemSubtotal) {
+        toast.error(`Item "${item.product_name}": Discount cannot exceed item subtotal`);
+        return;
+      }
+    }
+
+    // Validate invoice discount
+    const subtotal = calculateSubtotal();
+    if (invoiceDiscount > subtotal) {
+      toast.error('Invoice discount cannot exceed subtotal');
+      return;
     }
 
     try {
@@ -257,6 +279,7 @@ export default function NewPurchaseInvoicePage() {
         due_date: dueDate || undefined,
         notes: notes.trim() || undefined,
         items: filledItems, // Only submit filled items
+        invoice_discount_amount: invoiceDiscount,
       });
 
       toast.success('Purchase invoice created successfully');
@@ -424,7 +447,7 @@ export default function NewPurchaseInvoicePage() {
                           </div>
                         </div>
 
-                        <div className="grid gap-4 grid-cols-2 sm:grid-cols-4">
+                        <div className="grid gap-4 grid-cols-2 sm:grid-cols-5">
                           <div className="space-y-2">
                             <Label className="text-xs sm:text-sm">Unit</Label>
                             <Select
@@ -447,7 +470,7 @@ export default function NewPurchaseInvoicePage() {
                           </div>
 
                           <div className="space-y-2">
-                            <Label className="text-xs sm:text-sm">Quantity *</Label>
+                            <Label className="text-xs sm:text-sm">Qty *</Label>
                             <Input
                               type="number"
                               step="1"
@@ -468,7 +491,7 @@ export default function NewPurchaseInvoicePage() {
                           </div>
 
                           <div className="space-y-2">
-                            <Label className="text-xs sm:text-sm">Unit Cost (₹) *</Label>
+                            <Label className="text-xs sm:text-sm">Cost (₹) *</Label>
                             <Input
                               type="number"
                               step="1"
@@ -483,9 +506,24 @@ export default function NewPurchaseInvoicePage() {
                           </div>
 
                           <div className="space-y-2">
+                            <Label className="text-xs sm:text-sm">Discount (₹)</Label>
+                            <Input
+                              type="number"
+                              step="1"
+                              min="0"
+                              value={(item.discount_amount || 0) === 0 ? '' : (item.discount_amount || 0) / 100}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                handleItemChange(index, 'discount_amount', val === '' ? 0 : Math.round(parseFloat(val) * 100) || 0);
+                              }}
+                              className="h-9 sm:h-10"
+                            />
+                          </div>
+
+                          <div className="space-y-2">
                             <Label className="text-xs sm:text-sm">Total</Label>
-                            <div className="flex items-center h-9 sm:h-10 px-2 sm:px-3 border rounded-md bg-muted text-sm">
-                              {formatCurrency(item.quantity * item.unit_cost)}
+                            <div className="flex items-center h-9 sm:h-10 px-2 sm:px-3 border rounded-md bg-muted text-sm font-semibold">
+                              {formatCurrency(calculateItemTotal(item))}
                             </div>
                           </div>
                         </div>
@@ -506,6 +544,33 @@ export default function NewPurchaseInvoicePage() {
                     </CardContent>
                   </Card>
                 ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Invoice Discount */}
+          <Card className="border-2 border-primary/20 bg-primary/5">
+            <CardHeader>
+              <CardTitle>Invoice Discount</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <Label htmlFor="invoiceDiscount">Additional Discount (₹)</Label>
+                <Input
+                  id="invoiceDiscount"
+                  type="number"
+                  step="1"
+                  min="0"
+                  value={invoiceDiscount === 0 ? '' : invoiceDiscount / 100}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setInvoiceDiscount(val === '' ? 0 : Math.round(parseFloat(val) * 100) || 0);
+                  }}
+                  placeholder="0.00"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Additional discount applied to the entire invoice (after item discounts)
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -543,6 +608,16 @@ export default function NewPurchaseInvoicePage() {
                   <span className="text-muted-foreground">Total Items:</span>
                   <span className="font-medium">{items.filter(item => item.product_name.trim()).length}</span>
                 </div>
+                <div className="flex justify-between text-sm pt-2 border-t">
+                  <span className="text-muted-foreground">Subtotal:</span>
+                  <span className="font-semibold">{formatCurrency(calculateSubtotal())}</span>
+                </div>
+                {invoiceDiscount > 0 && (
+                  <div className="flex justify-between text-sm text-green-600">
+                    <span>Invoice Discount:</span>
+                    <span className="font-semibold">-{formatCurrency(invoiceDiscount)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-lg font-bold pt-2 border-t">
                   <span>Total:</span>
                   <span>{formatCurrency(calculateTotal())}</span>
