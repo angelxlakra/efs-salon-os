@@ -80,6 +80,9 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
   const [quantityStaffId, setQuantityStaffId] = useState<string | null>(null);
   const [quantityStaffName, setQuantityStaffName] = useState<string | null>(null);
 
+  // Cancel service state
+  const [cancellingItemId, setCancellingItemId] = useState<string | null>(null);
+
   // Ad-hoc multi-staff team editor
   const [showTeamEditor, setShowTeamEditor] = useState(false);
   const [teamEditorItemId, setTeamEditorItemId] = useState<string | null>(null);
@@ -139,7 +142,9 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
 
         if (customerSession) {
           // Convert walk-ins to cart items
-          const cartItems = customerSession.walkins.map((walkin: any) => ({
+          const cartItems = customerSession.walkins
+            .filter((walkin: any) => walkin.status !== 'cancelled')
+            .map((walkin: any) => ({
             isProduct: false,
             serviceId: walkin.service.id,
             serviceName: walkin.service.name,
@@ -150,6 +155,8 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
             staffId: walkin.assigned_staff.id,
             staffName: walkin.assigned_staff.display_name,
             duration: walkin.service.duration_minutes,
+            walkinId: walkin.id,
+            walkinStatus: walkin.status,
           }));
 
           // Populate cart with booked items
@@ -319,6 +326,43 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
   const handleOpenTeamEditor = (itemId: string) => {
     setTeamEditorItemId(itemId);
     setShowTeamEditor(true);
+  };
+
+  const handleRemoveItem = async (item: typeof items[0]) => {
+    // For unbooked items, just remove from cart
+    if (!item.isBooked || !item.walkinId) {
+      removeItem(item.id);
+      return;
+    }
+
+    // For booked items, confirm and call cancel API
+    const isCompleted = item.walkinStatus === 'completed';
+    const message = isCompleted
+      ? `"${item.serviceName}" has already been completed by ${item.staffName || 'staff'}. Are you sure you want to cancel it?`
+      : `Cancel "${item.serviceName}" assigned to ${item.staffName || 'staff'}?`;
+
+    if (!confirm(message)) return;
+
+    // For completed services, ask for a reason
+    let reason: string | null = null;
+    if (isCompleted) {
+      reason = prompt('Please enter the reason for cancelling this completed service:');
+      if (reason === null) return; // user pressed Cancel on prompt
+    }
+
+    try {
+      setCancellingItemId(item.id);
+      await apiClient.post(`/appointments/walkins/${item.walkinId}/cancel`, {
+        reason: reason?.trim() || null,
+      });
+      removeItem(item.id);
+      toast.success(`Service "${item.serviceName}" cancelled`);
+    } catch (error: any) {
+      console.error('Error cancelling service:', error);
+      toast.error(error.response?.data?.detail || 'Failed to cancel service');
+    } finally {
+      setCancellingItemId(null);
+    }
   };
 
   const handleSaveTeam = (contributions: StaffContributionCreate[]) => {
@@ -532,10 +576,15 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => removeItem(item.id)}
+                    onClick={() => handleRemoveItem(item)}
+                    disabled={cancellingItemId === item.id}
                     className="h-7 w-7 p-0 text-gray-400 hover:text-red-600"
                   >
-                    <Trash2 className="h-4 w-4" />
+                    {cancellingItemId === item.id ? (
+                      <div className="h-4 w-4 border-2 border-gray-300 border-t-red-600 rounded-full animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}
                   </Button>
                 </div>
 

@@ -23,6 +23,9 @@ export interface CartItem {
   discount: number; // in paise
   taxRate: number; // percentage (e.g., 18 for 18%)
   isBooked: boolean; // whether this item has been added to a service order
+  // Backend walk-in tracking (set when item is booked or loaded from session)
+  walkinId?: string; // backend walk-in ID for cancellation
+  walkinStatus?: string; // backend walk-in status (checked_in, in_progress, completed)
 }
 
 export interface CartState {
