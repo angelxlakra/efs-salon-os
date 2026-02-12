@@ -1,10 +1,10 @@
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import or_, func
+from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
-from app.models.user import User, Staff, Role, RoleEnum
+from app.models.user import User, Staff
 from app.models.appointment import Appointment, WalkIn, AppointmentStatus
 from app.schemas.user import (
     StaffCreate, StaffUpdate, StaffResponse,
@@ -21,7 +21,7 @@ router = APIRouter(prefix="/staff", tags=["Staff"])
 # ========== Helper Functions ==========
 
 def _validate_user_for_staff_creation(db: Session, user_id: str) -> User:
-    """Validate user exists, is active, has STAFF role, no existing profile."""
+    """Validate user exists, is active, and has no existing staff profile."""
     # Check user exists and not deleted
     user = db.query(User).filter(
         User.id == user_id,
@@ -39,13 +39,6 @@ def _validate_user_for_staff_creation(db: Session, user_id: str) -> User:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Cannot create staff profile for inactive user"
-        )
-
-    # Check user has STAFF role
-    if user.role.name != RoleEnum.STAFF:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"User must have STAFF role (current role: {user.role.name})"
         )
 
     # Check no existing staff profile
@@ -90,7 +83,7 @@ def list_staff(
     size: int = Query(20, ge=1, le=100),
     search: Optional[str] = None,
     is_active: Optional[bool] = None,
-    service_providers_only: bool = Query(False, description="Exclude receptionists (show only service providers)"),
+    service_providers_only: bool = Query(False, description="Only show staff marked as service providers"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_owner_or_receptionist)
 ):
@@ -101,14 +94,14 @@ def list_staff(
     - **size**: Items per page (max 100)
     - **search**: Search by display name (case-insensitive)
     - **is_active**: Filter by active status
-    - **service_providers_only**: If true, exclude receptionists (only show staff who provide services)
+    - **service_providers_only**: If true, only show staff marked as service providers
     """
     # Query Staff and join with User (filter deleted users)
     query = db.query(Staff).join(User).filter(User.deleted_at.is_(None))
 
-    # Exclude receptionists if service_providers_only is true
+    # Filter to service providers only
     if service_providers_only:
-        query = query.join(User.role).filter(Role.name == RoleEnum.STAFF)
+        query = query.filter(Staff.is_service_provider == True)
 
     # Apply search filter on display_name
     if search:
@@ -152,7 +145,6 @@ def create_staff(
     Validates that:
     - User exists and is not deleted
     - User is active
-    - User has STAFF role
     - User doesn't already have a staff profile
     """
     # Validate user
@@ -205,7 +197,7 @@ def update_staff(
     """
     Update a staff profile.
 
-    Only display_name, specialization, and is_active can be updated.
+    Only display_name, specialization, is_active, and is_service_provider can be updated.
     """
     # Find staff (exclude deleted users)
     staff = db.query(Staff).join(User).filter(

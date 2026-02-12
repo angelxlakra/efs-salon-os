@@ -130,6 +130,7 @@ class StaffBase(BaseModel):
     display_name: str = Field(..., min_length=1, max_length=100)
     specialization: Optional[List[str]] = None
     is_active: bool = True
+    is_service_provider: bool = True
 
 
 class StaffCreate(StaffBase):
@@ -142,6 +143,7 @@ class StaffUpdate(BaseModel):
     display_name: Optional[str] = Field(None, min_length=1, max_length=100)
     specialization: Optional[List[str]] = None
     is_active: Optional[bool] = None
+    is_service_provider: Optional[bool] = None
 
 
 class StaffResponse(StaffBase):

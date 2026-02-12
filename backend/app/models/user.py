@@ -92,6 +92,7 @@ class Staff(Base, ULIDMixin, TimestampMixin):
     display_name = Column(String, nullable=False)  # What customers see
     specialization = Column(ARRAY(String))  # ['haircut', 'coloring', 'spa']
     is_active = Column(Boolean, nullable=False, default=True)
+    is_service_provider = Column(Boolean, nullable=False, default=True)
 
     # Relationships
     user = relationship("User", back_populates="staff")

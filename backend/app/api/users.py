@@ -93,19 +93,17 @@ def create_user(
     db.commit()
     db.refresh(user)
 
-    # Automatically create Staff profile for STAFF and RECEPTIONIST roles
-    if role.name in [RoleEnum.STAFF, RoleEnum.RECEPTIONIST]:
-        # Extract first name from full name
-        first_name = user.full_name.split()[0] if user.full_name else user.username
-
-        staff = Staff(
-            user_id=user.id,
-            display_name=first_name,
-            specialization=[],
-            is_active=True
-        )
-        db.add(staff)
-        db.commit()
+    # Automatically create Staff profile for all roles
+    first_name = user.full_name.split()[0] if user.full_name else user.username
+    staff = Staff(
+        user_id=user.id,
+        display_name=first_name,
+        specialization=[],
+        is_active=True,
+        is_service_provider=(role.name == RoleEnum.STAFF),
+    )
+    db.add(staff)
+    db.commit()
 
     return user
 
