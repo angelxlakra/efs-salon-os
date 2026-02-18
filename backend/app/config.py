@@ -9,6 +9,7 @@ import os
 from typing import Optional
 from urllib.parse import urlparse
 from pydantic_settings import BaseSettings, SettingsConfigDict
+import re
 from pydantic import field_validator
 
 
@@ -25,6 +26,10 @@ class Settings(BaseSettings):
         case_sensitive=False,
         extra="ignore"
     )
+
+    # Backup Configs
+    branch_id: str = "default"
+    backup_retention_days: int = 7
 
     # Database
     database_url: str = "postgresql+psycopg://salon_user:change_me_123@postgres:5432/salon_db"
@@ -69,6 +74,25 @@ class Settings(BaseSettings):
     # API
     api_prefix: str = "/api"
     cors_origins: str | list[str] = "http://localhost:3000"
+
+    # Cloud Backup (S3-compatible — works with B2, AWS S3, MinIO)
+    backup_s3_endpoint: Optional[str] = None
+    backup_s3_bucket: Optional[str] = None
+    backup_s3_access_key: Optional[str] = None
+    backup_s3_secret_key: Optional[str] = None
+    backup_s3_region: Optional[str] = "us-west-004"
+    backup_cloud_retention_days: int = 90
+
+    @field_validator('branch_id')
+    @classmethod
+    def validate_branch_id(cls, v: str) -> str:
+        """Ensure branch_id is safe for use in file paths and S3 keys."""
+        if not re.match(r'^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$', v):
+            raise ValueError(
+                f"branch_id must be alphanumeric with hyphens/underscores, "
+                f"1-64 chars, got: {v!r}"
+            )
+        return v
 
     @field_validator('cors_origins', mode='before')
     @classmethod

@@ -2,7 +2,7 @@
 
 This worker runs scheduled background jobs using APScheduler:
 - Daily summary generation (21:45 IST)
-- Nightly database backup (23:30 IST)
+- Nightly database backup (22:00 IST)
 - Catchup for missing summaries (on startup)
 
 To run the worker:
@@ -22,6 +22,7 @@ import pytz
 from app.jobs.scheduled import (
     generate_daily_summary_job,
     catchup_missing_summaries,
+    catchup_missing_metrics,
     nightly_backup_job,
     generate_recurring_expenses_job,
     test_job,
@@ -87,18 +88,37 @@ def start_worker():
     )
     logger.info("✅ Scheduled: Recurring Expenses Generation (00:05 IST)")
 
-    # Nightly Backup (23:30 IST)
+    # Nightly Backup (22:00 IST)
     # Runs late at night for database backup
     scheduler.add_job(
         nightly_backup_job,
-        trigger=CronTrigger(hour=23, minute=30, timezone=IST),
+        trigger=CronTrigger(hour=22, minute=00, timezone=IST),
         id='nightly_backup',
         name='Nightly Database Backup',
         replace_existing=True,
         max_instances=1,
         misfire_grace_time=1800  # 30 minutes grace period
     )
-    logger.info("✅ Scheduled: Nightly Backup (23:30 IST)")
+    logger.info("✅ Scheduled: Nightly Backup (22:00 IST)")
+
+    # Weekly Cloud Cleanup (Sunday 02:00 IST)
+    # Deletes cloud backups older than backup_cloud_retention_days
+    def _weekly_cloud_cleanup():
+        from app.services.backup_service import BackupService
+        from app.config import settings
+        service = BackupService()
+        service.cleanup_cloud(settings.backup_cloud_retention_days)
+
+    scheduler.add_job(
+        _weekly_cloud_cleanup,
+        trigger=CronTrigger(day_of_week='sun', hour=2, minute=0, timezone=IST),
+        id='cloud_cleanup',
+        name='Weekly Cloud Backup Cleanup',
+        replace_existing=True,
+        max_instances=1,
+        misfire_grace_time=3600  # 1 hour grace period
+    )
+    logger.info("✅ Scheduled: Weekly Cloud Cleanup (Sunday 02:00 IST)")
 
     # ============ Development/Testing Jobs ============
 
@@ -114,13 +134,20 @@ def start_worker():
 
     # ============ Startup Jobs ============
 
-    # Run catchup job immediately on startup
+    # Run catchup jobs immediately on startup
     logger.info("🔄 Running catchup job for missing summaries...")
     try:
         catchup_missing_summaries()
-        logger.info("✅ Catchup job completed")
+        logger.info("✅ Summary catchup completed")
     except Exception as e:
-        logger.error(f"❌ Catchup job failed: {str(e)}")
+        logger.error(f"❌ Summary catchup failed: {str(e)}")
+
+    logger.info("🔄 Running catchup job for missing cloud metrics...")
+    try:
+        catchup_missing_metrics()
+        logger.info("✅ Metrics catchup completed")
+    except Exception as e:
+        logger.error(f"❌ Metrics catchup failed: {str(e)}")
 
     # ============ Start Scheduler ============
 

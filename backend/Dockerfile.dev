@@ -1,0 +1,28 @@
+# Development Dockerfile for FastAPI with hot reload
+FROM python:3.11-alpine
+
+WORKDIR /app
+
+# Install build + runtime dependencies
+RUN apk add --no-cache \
+    postgresql-dev \
+    postgresql-client \
+    gcc \
+    musl-dev \
+    curl \
+    libffi \
+    && pip install --no-cache-dir uv
+
+# Copy dependency files first (cached layer)
+COPY pyproject.toml uv.lock* ./
+
+# Install all dependencies (including dev)
+RUN uv pip install --system .
+
+# Copy application code (will be overridden by bind mount)
+COPY . .
+
+EXPOSE 8000
+
+# Start with --reload for hot reloading
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

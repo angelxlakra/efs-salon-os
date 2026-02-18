@@ -6,6 +6,12 @@ This module contains all scheduled background jobs that run automatically:
 - Catchup for missing summaries (on startup)
 """
 
+from pathlib import Path
+from app.jobs.utils import parse_database_url
+import subprocess
+import os
+import time
+from app.config import settings
 import logging
 from datetime import datetime, date, timedelta
 from sqlalchemy.orm import Session
@@ -50,6 +56,11 @@ def generate_daily_summary_job():
             generated_by=None,  # System-generated
             is_final=True
         )
+
+        # Push metrics to cloud
+        from app.services.backup_service import BackupService
+        backup_service = BackupService()
+        backup_service.push_daily_metrics(summary)
 
         logger.info(
             f"✅ Daily summary generated successfully for {yesterday}: "
@@ -145,34 +156,88 @@ def catchup_missing_summaries():
 def nightly_backup_job():
     """Perform nightly database backup.
 
-    Scheduled to run at 23:30 IST every day.
-    Creates PostgreSQL dump for disaster recovery.
-
-    **Note**: This is a placeholder implementation.
-    Full backup functionality requires Docker volume access and
-    will be implemented in deployment configuration.
-
-    The actual backup command would be:
-        pg_dump -U salon_user -Fc salon_db > /backups/backup-YYYYMMDD.sql
-
-    For now, this just logs that a backup would be performed.
-    """
+      Scheduled to run at 22:00 IST every day.
+      Creates a compressed PostgreSQL dump to /backups/ and uploads to cloud if configured.
+      """
     logger.info("🔄 Nightly backup job triggered...")
+    
+    # CONFIGS
+    BACKUP_DIR = Path("/backups")
+    MIN_FILE_SIZE_BYTES = 1024  # 1KB
 
     try:
+        # 1. Ensure backup directory exists
+        BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+
+        # 2. Parse DATABASE_URL into components pg_dump understands
+        db_info = parse_database_url(settings.database_url)
+
+        # 3. Build the output filename
         now = datetime.now(IST)
-        backup_date = now.strftime("%Y%m%d")
+        timestamp = now.strftime("%Y%m%d_%H%M%S")
+        filename = f"{settings.branch_id}_{timestamp}.dump"
+        filepath = BACKUP_DIR / filename
 
-        # In production, this would execute:
-        # - pg_dump command via subprocess
-        # - Upload to cloud storage (optional)
-        # - Cleanup old backups (keep last 7 days local, 30 days cloud)
+        logger.info(f"Starting pg_dump to {filepath}...")
+        start_time = time.time()
 
+        # 4. Set up environment with PGPASSWORD
+        env = os.environ.copy()
+        env["PGPASSWORD"] = db_info["password"] or ""
+
+        # 5. Run pg_dump
+        result = subprocess.run(
+            [
+                "pg_dump",
+                "-h",
+                db_info["host"],
+                "-p",
+                str(db_info["port"]),
+                 "-U",
+                db_info["user"],
+                "-Fc",
+                "-d",
+                db_info["dbname"],
+                "-f",
+                str(filepath)
+            ],
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=600
+            )
+
+        duration = time.time() - start_time
+
+        # 6. Check if pg_dump succeeded
+        if result.returncode != 0:
+            logger.error(f"pg_dump failed (exit {result.returncode})")
+            logger.debug(f"pg_dump stderr (truncated): {(result.stderr or '')[:200]}")
+            if filepath.exists():
+                filepath.unlink()
+            return
+        
+        # 7. Verify the dump file
+        if not filepath.exists() or filepath.stat().st_size < MIN_FILE_SIZE_BYTES:
+            logger.error(f"Backup file missing or too small: {filepath}")
+            return
+
+        file_size_mb = filepath.stat().st_size / (1024 * 1024)
         logger.info(
-            f"✅ Backup placeholder executed for {backup_date}. "
-            f"Full implementation requires deployment configuration."
-        )
+              f"Backup completed: {filename} "
+              f"({file_size_mb:.1f} MB in {duration:.1f}s)"
+          )
+        
+        # 8. Clean up old local backups
+        _cleanup_old_backups(BACKUP_DIR, settings.backup_retention_days)
 
+        # 9. Upload to cloud (if configured)
+        from app.services.backup_service import BackupService
+        backup_service = BackupService()
+        backup_service.upload_to_cloud(filepath)
+
+    except subprocess.TimeoutExpired:
+        logger.error("pg_dump timed out after 600s")
     except Exception as e:
         logger.error(f"❌ Backup job failed: {str(e)}", exc_info=True)
 
@@ -299,6 +364,96 @@ def generate_recurring_expenses_job():
     except Exception as e:
         logger.error(f"❌ Recurring expense job failed: {str(e)}", exc_info=True)
         db.rollback()
+
+    finally:
+        db.close()
+
+def _cleanup_old_backups(backup_dir: Path, retention_days: int):
+    """Delete local backup files older than retention_days."""
+
+    cutoff = datetime.now(IST) - timedelta(days=retention_days)
+    removed = 0
+    for f in backup_dir.glob("*.dump"):
+        # Get file modification time and compare to cutoff
+        file_mtime = datetime.fromtimestamp(f.stat().st_mtime, tz=IST)
+        if file_mtime < cutoff:
+            f.unlink()
+            removed += 1
+            logger.info(f"Deleted old backup: {f.name}")
+    
+    if removed:
+          logger.info(f"Cleaned up {removed} old backup(s)")
+
+
+def catchup_missing_metrics():
+    """Push metrics for any recent DaySummary that is missing from cloud storage.
+
+    Runs once on worker startup (after catchup_missing_summaries).
+    Checks the last 14 days of local DaySummary records against the
+    cloud metrics prefix and uploads any that are absent.
+
+    Capped at 14 days to avoid flooding B2 after prolonged downtime.
+    """
+    from app.services.backup_service import BackupService
+
+    backup_service = BackupService()
+
+    if not backup_service.cloud_enabled:
+        logger.debug("Metrics catchup skipped — cloud not configured")
+        return
+
+    db = SessionLocal()
+    logger.info("Checking for missing cloud metrics...")
+
+    try:
+        today = datetime.now(IST).date()
+        start_date = today - timedelta(days=14)
+
+        # Get local summaries for the last 14 days
+        summaries = (
+            db.query(DaySummary)
+            .filter(
+                DaySummary.summary_date >= start_date,
+                DaySummary.summary_date < today,
+                DaySummary.is_final == True,
+            )
+            .all()
+        )
+
+        if not summaries:
+            logger.info("No recent summaries to catch up")
+            return
+
+        # List existing cloud metrics to find gaps
+        s3 = backup_service._get_s3_client()
+        prefix = f"{settings.branch_id}/metrics/"
+
+        existing_keys: set[str] = set()
+        try:
+            response = s3.list_objects_v2(
+                Bucket=settings.backup_s3_bucket,
+                Prefix=prefix,
+            )
+            if "Contents" in response:
+                existing_keys = {obj["Key"] for obj in response["Contents"]}
+        except Exception as e:
+            logger.warning(f"Could not list cloud metrics: {e}")
+            return
+
+        pushed = 0
+        for summary in summaries:
+            expected_key = f"{prefix}{summary.summary_date}.json"
+            if expected_key not in existing_keys:
+                if backup_service.push_daily_metrics(summary):
+                    pushed += 1
+
+        if pushed:
+            logger.info(f"✅ Metrics catchup: pushed {pushed} missing metric(s)")
+        else:
+            logger.info("✅ All recent metrics already in cloud")
+
+    except Exception as e:
+        logger.error(f"❌ Metrics catchup failed: {str(e)}", exc_info=True)
 
     finally:
         db.close()

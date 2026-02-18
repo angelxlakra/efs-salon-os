@@ -23,7 +23,7 @@ WORKDIR /app
 
 # Install runtime dependencies only
 RUN apk add --no-cache \
-    postgresql-libs \
+    postgresql-client \
     curl \
     libffi \
     ttf-dejavu \
