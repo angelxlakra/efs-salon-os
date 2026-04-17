@@ -1,6 +1,7 @@
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/app-sidebar"
 import { ProtectedRoute } from "@/components/protected-route"
+import { NavBottom } from "@/components/nav-bottom"
 
 export default function DashboardLayout({
   children,
@@ -25,6 +26,7 @@ export default function DashboardLayout({
           <div className="flex-1 overflow-auto p-3 sm:p-4 md:p-6 pb-20 md:pb-6 relative">
              {children}
           </div>
+          <NavBottom />
         </main>
       </SidebarProvider>
     </ProtectedRoute>
