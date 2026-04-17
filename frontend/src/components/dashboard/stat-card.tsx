@@ -1,22 +1,18 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { useAuthStore } from '@/stores/auth-store';
 
 interface StatCardProps {
   title: string;
   value: string;
-  /** Secondary line below the value (e.g. "68% of daily goal") */
   subValue?: string;
-  /** If true, value is hidden by default with an eye toggle */
   sensitive?: boolean;
-  /** localStorage key base (user ID is appended) for persisting visibility */
   visibilityKey?: string;
-  /** Trend indicator node (e.g. <TrendIndicator /> ) */
-  trend?: React.ReactNode;
-  /** Icon displayed top-right alongside the eye toggle */
-  icon?: React.ReactNode;
+  trend?: ReactNode;
+  icon?: ReactNode;
 }
 
 export function StatCard({
@@ -30,16 +26,19 @@ export function StatCard({
 }: StatCardProps) {
   const { user } = useAuthStore();
 
-  // Staff role never sees sensitive cards
-  if (sensitive && user?.role === 'staff') return null;
-
   const storageKey = visibilityKey && user?.id ? `${visibilityKey}-${user.id}` : null;
 
-  const [visible, setVisible] = useState<boolean>(() => {
-    if (!sensitive) return true;
-    if (typeof window === 'undefined' || !storageKey) return false;
-    return localStorage.getItem(storageKey) === 'true';
-  });
+  // All hooks BEFORE any early return
+  const [visible, setVisible] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (!sensitive || !storageKey) return;
+    const stored = localStorage.getItem(storageKey);
+    if (stored === 'true') setVisible(true);
+  }, [sensitive, storageKey]);
+
+  // Early return AFTER all hooks
+  if (sensitive && user?.role === 'staff') return null;
 
   const toggle = () => {
     const next = !visible;
@@ -57,6 +56,7 @@ export function StatCard({
           {icon && <span className="text-text-muted">{icon}</span>}
           {sensitive && (
             <button
+              type="button"
               onClick={toggle}
               className="text-text-muted hover:text-text-secondary transition-colors"
               aria-label={visible ? 'Hide value' : 'Show value'}
