@@ -170,7 +170,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   );
 
   return (
-    <Sidebar collapsible="icon" {...props} className="border-r border-sidebar-border bg-sidebar">
+    <Sidebar collapsible="icon" {...props} className="border-r border-border-subtle bg-surface-sidebar">
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
@@ -186,10 +186,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   />
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-semibold">
+                  <span className="truncate font-semibold text-text-primary">
                     {settings?.salon_name || 'Salon'}
                   </span>
-                  <span className="truncate text-xs">
+                  <span className="truncate text-xs text-text-secondary">
                     {settings?.salon_tagline || 'Management'}
                   </span>
                 </div>
@@ -203,11 +203,17 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <SidebarMenu className="gap-2 p-2">
           {navItems.map((item) => (
             <SidebarMenuItem key={item.title}>
-              <SidebarMenuButton 
-                asChild 
-                isActive={pathname === item.url}
+              <SidebarMenuButton
+                asChild
+                isActive={pathname === item.url || pathname.startsWith(item.url + '/')}
                 tooltip={item.title}
-                className="hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
+                className={[
+                  'transition-colors text-text-secondary hover:text-text-primary hover:bg-surface-hover',
+                  'border-l-[3px]',
+                  (pathname === item.url || pathname.startsWith(item.url + '/'))
+                    ? 'bg-accent-bg text-text-primary border-accent rounded-l-none'
+                    : 'border-transparent',
+                ].join(' ')}
                 size="default"
               >
                 <a href={item.url}>
@@ -227,7 +233,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               <DropdownMenuTrigger asChild>
                 <SidebarMenuButton
                   size="lg"
-                  className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+                  className="data-[state=open]:bg-surface-hover text-text-secondary hover:text-text-primary hover:bg-surface-hover"
                 >
                   <Avatar className="h-8 w-8 rounded-lg">
                     <AvatarImage src={user?.avatar_url} alt={user?.fullName || 'User'} />
