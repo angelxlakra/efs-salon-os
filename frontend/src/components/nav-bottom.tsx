@@ -5,8 +5,10 @@ import { LayoutDashboard, CreditCard, Receipt, MoreHorizontal } from 'lucide-rea
 import { useState } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useAuthStore } from '@/stores/auth-store';
+import type { User } from '@/types/auth';
+type Role = User['role'];
 
-const PRIMARY_NAV = [
+const PRIMARY_NAV: { title: string; url: string; icon: React.ElementType; roles: Role[] }[] = [
   { title: 'Home', url: '/dashboard', icon: LayoutDashboard, roles: ['owner', 'receptionist'] },
   { title: 'POS', url: '/dashboard/pos', icon: CreditCard, roles: ['owner', 'receptionist', 'staff'] },
   { title: 'Bills', url: '/dashboard/bills', icon: Receipt, roles: ['owner', 'receptionist'] },
@@ -27,10 +29,13 @@ export function NavBottom() {
   const { user } = useAuthStore();
   const [moreOpen, setMoreOpen] = useState(false);
 
-  const visibleNav = PRIMARY_NAV.filter(item => item.roles.includes(user?.role || ''));
+  if (!user) return null;
+  const visibleNav = PRIMARY_NAV.filter(item => item.roles.includes(user.role));
 
   const isActive = (url: string) =>
     pathname === url || (url !== '/dashboard' && pathname.startsWith(url + '/'));
+
+  const isMoreActive = MORE_NAV.some(item => isActive(item.url));
 
   return (
     <>
@@ -54,8 +59,13 @@ export function NavBottom() {
         ))}
         <button
           onClick={() => setMoreOpen(true)}
-          className="flex flex-col items-center justify-center flex-1 py-2 gap-1 text-[10px] text-text-muted hover:text-text-secondary transition-colors"
+          className={`relative flex flex-col items-center justify-center flex-1 py-2 gap-1 text-[10px] transition-colors ${
+            isMoreActive ? 'text-accent' : 'text-text-muted hover:text-text-secondary'
+          }`}
         >
+          {isMoreActive && (
+            <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-accent rounded-full" />
+          )}
           <MoreHorizontal className="h-5 w-5" />
           <span>More</span>
         </button>
