@@ -59,28 +59,27 @@
   --text-muted: #525252;
 
   /* Accent: Violet (default) */
-  --accent: #7c3aed;
-  --accent-hover: #6d28d9;
-  --accent-bg: #160d2b;
-  --accent-fg: #ffffff;
+  --salon-accent: #7c3aed;
+  --salon-accent-hover: #6d28d9;
+  --salon-accent-bg: #160d2b;
 }
 
 [data-accent="rose"] {
-  --accent: #e11d48;
-  --accent-hover: #be123c;
-  --accent-bg: #2b0d14;
+  --salon-accent: #e11d48;
+  --salon-accent-hover: #be123c;
+  --salon-accent-bg: #2b0d14;
 }
 
 [data-accent="amber"] {
-  --accent: #d97706;
-  --accent-hover: #b45309;
-  --accent-bg: #2b1a00;
+  --salon-accent: #d97706;
+  --salon-accent-hover: #b45309;
+  --salon-accent-bg: #2b1a00;
 }
 
 [data-accent="teal"] {
-  --accent: #0d9488;
-  --accent-hover: #0f766e;
-  --accent-bg: #00211f;
+  --salon-accent: #0d9488;
+  --salon-accent-hover: #0f766e;
+  --salon-accent-bg: #00211f;
 }
 
 /* Base styles */
@@ -144,7 +143,6 @@ body {
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-border: var(--border);
@@ -174,8 +172,9 @@ body {
   --color-text-primary: var(--text-primary);
   --color-text-secondary: var(--text-secondary);
   --color-text-muted: var(--text-muted);
-  --color-accent-hover: var(--accent-hover);
-  --color-accent-bg: var(--accent-bg);
+  --color-accent: var(--salon-accent);
+  --color-accent-hover: var(--salon-accent-hover);
+  --color-accent-bg: var(--salon-accent-bg);
 }
 
 :root {
