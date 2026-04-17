@@ -22,7 +22,7 @@ export default function DashboardLayout({
               {/* Add header actions here later (Notifications, Search) */}
             </div>
           </header>
-          <div className="flex-1 overflow-auto p-6 relative pb-20 md:pb-6">
+          <div className="flex-1 overflow-auto p-3 sm:p-4 md:p-6 pb-20 md:pb-6 relative">
              {children}
           </div>
         </main>
