@@ -87,3 +87,4 @@ backups/
 # Temporary test scripts
 backend/test_*.py
 backend/check_*.sh
+worktrees/
