@@ -63,18 +63,42 @@
   --salon-accent: #e11d48;
   --salon-accent-hover: #be123c;
   --salon-accent-bg: #2b0d14;
+  --accent: #e11d48;
+  --accent-foreground: #ffffff;
+  --primary: #e11d48;
+  --primary-foreground: #ffffff;
+  --ring: #e11d48;
+  --sidebar-primary: #e11d48;
+  --sidebar-ring: #e11d48;
+  --sidebar-accent: #2b0d14;
 }
 
 [data-accent="amber"] {
   --salon-accent: #d97706;
   --salon-accent-hover: #b45309;
   --salon-accent-bg: #2b1a00;
+  --accent: #d97706;
+  --accent-foreground: #ffffff;
+  --primary: #d97706;
+  --primary-foreground: #ffffff;
+  --ring: #d97706;
+  --sidebar-primary: #d97706;
+  --sidebar-ring: #d97706;
+  --sidebar-accent: #2b1a00;
 }
 
 [data-accent="teal"] {
   --salon-accent: #0d9488;
   --salon-accent-hover: #0f766e;
   --salon-accent-bg: #00211f;
+  --accent: #0d9488;
+  --accent-foreground: #ffffff;
+  --primary: #0d9488;
+  --primary-foreground: #ffffff;
+  --ring: #0d9488;
+  --sidebar-primary: #0d9488;
+  --sidebar-ring: #0d9488;
+  --sidebar-accent: #00211f;
 }
 
 /* Custom utility classes */
