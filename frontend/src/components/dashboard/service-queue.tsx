@@ -2,11 +2,13 @@
 
 import { Clock } from 'lucide-react';
 
+type WalkInStatus = 'checked_in' | 'in_progress' | 'completed' | 'cancelled';
+
 interface WalkIn {
   id: string;
   service: { id: string; name: string };
   assigned_staff: { id: string; display_name: string };
-  status: string;
+  status: WalkInStatus;
   checked_in_at: string | null;
 }
 
@@ -21,7 +23,7 @@ interface LaneItem {
   serviceName: string;
   customerName: string;
   checkedInAt: Date;
-  status: string;
+  status: WalkInStatus;
 }
 
 interface StaffLane {
@@ -30,7 +32,7 @@ interface StaffLane {
   items: LaneItem[];
 }
 
-const STATUS_DOT: Record<string, string> = {
+const STATUS_DOT: Partial<Record<WalkInStatus, string>> = {
   checked_in: 'bg-blue-500',
   in_progress: 'bg-amber-400 animate-pulse',
 };
@@ -41,6 +43,7 @@ function buildLanes(sessions: CustomerSession[]): StaffLane[] {
   for (const session of sessions) {
     for (const walkin of session.walkins) {
       if (walkin.status === 'completed') continue;
+      if (!walkin.checked_in_at) continue;
 
       const staffId = walkin.assigned_staff.id;
       if (!laneMap.has(staffId)) {
@@ -55,7 +58,7 @@ function buildLanes(sessions: CustomerSession[]): StaffLane[] {
         walkinId: walkin.id,
         serviceName: walkin.service.name,
         customerName: session.customer_name,
-        checkedInAt: walkin.checked_in_at ? new Date(walkin.checked_in_at) : new Date(),
+        checkedInAt: new Date(walkin.checked_in_at),
         status: walkin.status,
       });
     }
