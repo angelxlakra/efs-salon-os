@@ -1,9 +1,7 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
-import { Clock, CheckCircle, Circle, Loader, Play, Check } from 'lucide-react';
+import { Clock, Play, Check } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import { toast } from 'sonner';
 import { useAuthStore } from '@/stores/auth-store';
@@ -54,6 +52,16 @@ interface ActiveCustomerCardProps {
   onRefresh?: () => void;
 }
 
+const STATUS_COLORS: Record<string, string> = {
+  checked_in: 'bg-blue-500',
+  in_progress: 'bg-amber-400 animate-pulse',
+  completed: 'bg-green-500',
+};
+
+const getStatusDot = (status: string) => (
+  <span className={`block h-2 w-2 rounded-full shrink-0 ${STATUS_COLORS[status] ?? 'bg-text-muted'}`} />
+);
+
 export function ActiveCustomerCard({
   session,
   onCheckout,
@@ -87,53 +95,40 @@ export function ActiveCustomerCard({
     return `₹${(paise / 100).toFixed(2)}`;
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'checked_in':
-        return <Circle className="h-3 w-3 text-blue-500" />;
-      case 'in_progress':
-        return <Loader className="h-3 w-3 text-amber-500 animate-spin" />;
-      case 'completed':
-        return <CheckCircle className="h-3 w-3 text-green-500" />;
-      default:
-        return <Circle className="h-3 w-3 text-gray-400" />;
-    }
-  };
-
   return (
-    <Card className="hover:shadow-md transition-shadow">
-      <CardHeader className="p-4 pb-2">
+    <div className="rounded-xl bg-surface-card border border-border-subtle hover:border-accent/30 transition-colors">
+      <div className="p-4 pb-2">
         <div className="flex justify-between items-start">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <h3 className="font-semibold text-base truncate leading-none">
+              <h3 className="font-semibold text-base truncate leading-none text-text-primary">
                 {session.customer_name}
               </h3>
-              <Badge variant="secondary" className="h-5 px-1.5 text-[10px] font-normal">
-                <Clock className="h-3 w-3 mr-1" />
+              <span className="inline-flex items-center gap-1 text-[10px] text-text-muted bg-surface-row px-2 py-0.5 rounded-full">
+                <Clock className="h-3 w-3" />
                 {session.time_since_checkin}m
-              </Badge>
+              </span>
             </div>
-            <p className="text-xs text-muted-foreground mt-1 truncate">
+            <p className="text-xs text-text-secondary mt-1 truncate">
               {session.customer_phone}
             </p>
           </div>
         </div>
-      </CardHeader>
+      </div>
 
-      <CardContent className="p-4 py-2">
+      <div className="px-4 py-2">
         <div className="space-y-2">
           {session.walkins.map((walkin) => (
             <div
               key={walkin.id}
-              className="flex items-center justify-between text-sm gap-2"
+              className="flex items-center justify-between text-sm gap-2 rounded-lg bg-surface-row px-3 py-2"
             >
               <div className="flex items-center gap-2 min-w-0 flex-1">
-                {getStatusIcon(walkin.status)}
-                <span className="truncate font-medium text-xs">
+                {getStatusDot(walkin.status)}
+                <span className="truncate font-medium text-xs text-text-primary">
                   {walkin.service.name}
                 </span>
-                <span className="text-[10px] text-muted-foreground truncate">
+                <span className="text-[10px] text-text-muted truncate">
                   • {walkin.assigned_staff.display_name}
                 </span>
               </div>
@@ -143,7 +138,7 @@ export function ActiveCustomerCard({
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-6 w-6 p-0"
+                      className="h-6 w-6 p-0 text-blue-400 hover:text-blue-300 hover:bg-blue-500/10"
                       onClick={() => handleStartService(walkin.id)}
                       title="Start service"
                     >
@@ -154,7 +149,7 @@ export function ActiveCustomerCard({
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-6 w-6 p-0"
+                      className="h-6 w-6 p-0 text-green-400 hover:text-green-300 hover:bg-green-500/10"
                       onClick={() => handleCompleteService(walkin.id)}
                       title="Complete service"
                     >
@@ -167,23 +162,24 @@ export function ActiveCustomerCard({
           ))}
         </div>
 
-        <div className="mt-3 pt-2 border-t flex justify-between items-center">
-          <span className="text-xs text-muted-foreground">Total Amount</span>
-          <span className="font-semibold text-sm">
+        <div className="mt-3 pt-2 border-t border-border-subtle flex justify-between items-center">
+          <span className="text-xs text-text-secondary">Total Amount</span>
+          <span className="font-semibold text-sm text-text-primary">
             {formatPrice(session.total_amount)}
           </span>
         </div>
-      </CardContent>
+      </div>
 
-      <CardFooter className="p-4 pt-1">
+      <div className="px-4 pb-4 pt-2">
         <Button
           className="w-full h-8 text-xs"
           size="sm"
+          disabled={!session.all_completed}
           onClick={() => onCheckout(session.session_id)}
         >
-          {session.all_completed ? 'Checkout' : 'Go to Checkout'}
+          Checkout
         </Button>
-      </CardFooter>
-    </Card>
+      </div>
+    </div>
   );
 }
