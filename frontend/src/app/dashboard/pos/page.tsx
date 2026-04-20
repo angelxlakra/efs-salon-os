@@ -108,7 +108,7 @@ export default function POSPage() {
           aria-label="Open cart"
         >
           <ShoppingCart className="h-6 w-6" />
-          <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-white text-accent text-[10px] font-bold">
+          <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-surface-card text-accent border border-border-subtle text-[10px] font-bold">
             {items.length}
           </span>
         </button>

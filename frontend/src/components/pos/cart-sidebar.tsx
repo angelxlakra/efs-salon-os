@@ -27,6 +27,12 @@ import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { StaffContributionCreate } from '@/types/multi-staff';
 
+interface AvailableStaff {
+  id: string;
+  display_name: string;
+  is_active: boolean;
+}
+
 interface CartSidebarProps {
   onCheckout: () => void;
   customerSearchRef?: RefObject<{ openSearch: () => void } | null>;
@@ -86,7 +92,7 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
   // Ad-hoc multi-staff team editor
   const [showTeamEditor, setShowTeamEditor] = useState(false);
   const [teamEditorItemId, setTeamEditorItemId] = useState<string | null>(null);
-  const [availableStaff, setAvailableStaff] = useState<any[]>([]);
+  const [availableStaff, setAvailableStaff] = useState<AvailableStaff[]>([]);
 
   // Fetch settings and staff on mount
   useEffect(() => {
@@ -221,7 +227,6 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
   const [isUpdatingSessionCustomer, setIsUpdatingSessionCustomer] = useState(false);
 
   const handleCustomerChange = (newCustomerId: string | null, newCustomerName: string | null, newCustomerPhone?: string | null) => {
-    console.log('handleCustomerChange called with:', newCustomerId, newCustomerName, newCustomerPhone);
     setCustomer(newCustomerId, newCustomerName || 'Walk-in Customer', newCustomerPhone || null);
   };
 
@@ -482,7 +487,7 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
               variant="ghost"
               size="sm"
               onClick={handleClearCart}
-              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+              className="text-red-500 hover:text-red-400 hover:bg-red-950/40"
             >
               Clear
             </Button>
@@ -546,7 +551,7 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
                 key={item.id}
                 className={`rounded-lg p-3 space-y-2 ${
                   item.isBooked
-                    ? 'bg-green-50 border-2 border-green-200'
+                    ? 'bg-green-950/40 border-2 border-green-800'
                     : 'bg-surface-row border-2 border-transparent'
                 }`}
               >
