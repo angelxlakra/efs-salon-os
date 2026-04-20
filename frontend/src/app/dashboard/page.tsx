@@ -65,7 +65,6 @@ interface DashboardStats {
   today_customers: number;
   active_services: number;
   pending_bills: number;
-  avg_service_duration_minutes?: number | null;
 }
 
 interface SalonSettings {
@@ -100,6 +99,13 @@ interface ServicePerformance {
 interface TrendDataPoint {
   date: string;
   value: number;
+}
+
+interface DailyMetric {
+  date: string;
+  revenue_paise: number;
+  customers_count: number;
+  services_count: number;
 }
 
 export default function DashboardPage() {
@@ -178,7 +184,6 @@ export default function DashboardPage() {
         today_customers: metrics.total_bills,
         active_services: metrics.active_appointments,
         pending_bills: metrics.pending_appointments,
-        avg_service_duration_minutes: metrics.avg_service_duration_minutes,
       });
 
       // Update settings (goals)
@@ -207,34 +212,25 @@ export default function DashboardPage() {
 
       // Update trends data
       if (trendsResponse.data?.daily_metrics) {
-        const dailyMetrics = trendsResponse.data.daily_metrics;
+        const dailyMetrics: DailyMetric[] = trendsResponse.data.daily_metrics;
         setTrendsData({
-          revenue: dailyMetrics.map((d: any) => ({
-            date: d.date,
-            value: d.revenue_paise,
-          })),
-          customers: dailyMetrics.map((d: any) => ({
-            date: d.date,
-            value: d.customers_count,
-          })),
-          services: dailyMetrics.map((d: any) => ({
-            date: d.date,
-            value: d.services_count,
-          })),
+          revenue:   dailyMetrics.map((d) => ({ date: d.date, value: d.revenue_paise })),
+          customers: dailyMetrics.map((d) => ({ date: d.date, value: d.customers_count })),
+          services:  dailyMetrics.map((d) => ({ date: d.date, value: d.services_count })),
         });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to fetch dashboard data:', error);
 
       // Set default empty state on error
       setActiveSessions([]);
 
       // Only show error toast on initial load, not during background refreshes
-      if (!silent) {
-        toast.error(
-          error.response?.data?.detail || 'Failed to load dashboard data'
-        );
-      }
+      const detail =
+        error instanceof Error && (error as any).response?.data?.detail
+          ? (error as any).response.data.detail
+          : 'Failed to load dashboard data';
+      if (!silent) toast.error(detail);
     } finally {
       setIsLoading(false);
     }
@@ -242,14 +238,6 @@ export default function DashboardPage() {
 
   const formatPrice = (paise: number) => {
     return `₹${(paise / 100).toLocaleString('en-IN')}`;
-  };
-
-  const formatDuration = (minutes: number | null | undefined) => {
-    if (!minutes) return 'N/A';
-    if (minutes < 60) return `${minutes} min`;
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
   };
 
   const getCurrentDate = () => {
@@ -322,7 +310,11 @@ export default function DashboardPage() {
         <StatCard
           title="Today's Revenue"
           value={formatPrice(stats.today_revenue)}
-          subValue={`${Math.min(100, Math.round((stats.today_revenue / (settings.daily_revenue_target_paise || 1)) * 100))}% of daily goal`}
+          subValue={
+            settings.daily_revenue_target_paise > 0
+              ? `${Math.min(100, Math.round((stats.today_revenue / settings.daily_revenue_target_paise) * 100))}% of daily goal`
+              : undefined
+          }
           sensitive
           visibilityKey="revenue-visible"
           trend={comparison ? <TrendIndicator value={comparison.revenue_percent_change} /> : undefined}
@@ -406,7 +398,9 @@ export default function DashboardPage() {
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-600">Avg. Bill Value</span>
                   <span className="font-semibold text-gray-900">
-                    {formatPrice(Math.round(stats.today_revenue / (stats.today_services || 1)))}
+                    {stats.today_services > 0
+                      ? formatPrice(Math.round(stats.today_revenue / stats.today_services))
+                      : '—'}
                   </span>
                 </div>
               </div>
