@@ -1,11 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, Filter, Download, Eye, Printer, RotateCcw, XCircle, Loader2, FileText, FileSpreadsheet } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import {
   Select,
   SelectContent,
@@ -61,7 +60,7 @@ export default function BillsPage() {
   const fetchBills = async () => {
     try {
       setIsLoading(true);
-      const params: any = {
+      const params: Record<string, string | number> = {
         page,
         limit: 20,
       };
@@ -79,9 +78,10 @@ export default function BillsPage() {
       setBills(data.bills || []);
       setTotal(data.pagination?.total || 0);
       setTotalPages(data.pagination?.pages || 1);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error fetching bills:', error);
-      toast.error(error.response?.data?.detail || 'Failed to load bills');
+      const msg = error instanceof Error ? error.message : 'Failed to load bills';
+      toast.error(msg);
       setBills([]);
       setTotal(0);
       setTotalPages(1);
@@ -112,19 +112,19 @@ export default function BillsPage() {
     });
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'draft':
-        return <Badge variant="secondary">Draft</Badge>;
-      case 'posted':
-        return <Badge className="bg-green-500">Paid</Badge>;
-      case 'void':
-        return <Badge variant="outline" className="text-text-secondary">Voided</Badge>;
-      case 'refunded':
-        return <Badge variant="destructive">Refunded</Badge>;
-      default:
-        return <Badge variant="outline">{status}</Badge>;
-    }
+  const getStatusChip = (status: string): React.ReactNode => {
+    const map: Record<string, { bg: string; text: string; label: string }> = {
+      posted:   { bg: 'bg-green-950/40',  text: 'text-green-400',  label: 'Paid' },
+      draft:    { bg: 'bg-amber-950/40',  text: 'text-amber-400',  label: 'Draft' },
+      void:     { bg: 'bg-zinc-900/60',   text: 'text-text-muted', label: 'Voided' },
+      refunded: { bg: 'bg-red-950/40',    text: 'text-red-400',    label: 'Refunded' },
+    };
+    const cfg = map[status] ?? { bg: 'bg-zinc-900/60', text: 'text-text-muted', label: status };
+    return (
+      <span className={`text-xs px-2 py-0.5 rounded-full ${cfg.bg} ${cfg.text}`}>
+        {cfg.label}
+      </span>
+    );
   };
 
   const handleViewBill = (billId: string) => {
@@ -143,9 +143,10 @@ export default function BillsPage() {
       window.open(url, '_blank');
 
       toast.success('Receipt opened in new tab');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error printing receipt:', error);
-      toast.error('Failed to print receipt');
+      const msg = error instanceof Error ? error.message : 'Failed to print receipt';
+      toast.error(msg);
     }
   };
 
@@ -163,9 +164,10 @@ export default function BillsPage() {
       toast.success('Bill voided successfully');
       fetchBills(); // Refresh the list
       setShowBillDetails(false); // Close dialog if open
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error voiding bill:', error);
-      toast.error(error.response?.data?.detail || 'Failed to void bill');
+      const msg = error instanceof Error ? error.message : 'Failed to void bill';
+      toast.error(msg);
     }
   };
 
@@ -186,15 +188,16 @@ export default function BillsPage() {
       });
       toast.success('Bill refunded successfully');
       fetchBills(); // Refresh the list
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error refunding bill:', error);
-      toast.error(error.response?.data?.detail || 'Failed to refund bill');
+      const msg = error instanceof Error ? error.message : 'Failed to refund bill';
+      toast.error(msg);
     }
   };
 
   const handleExport = async (format: 'csv' | 'pdf') => {
     try {
-      const params: any = {};
+      const params: Record<string, string | number> = {};
 
       if (statusFilter !== 'all') {
         params.status_filter = statusFilter;
@@ -226,9 +229,10 @@ export default function BillsPage() {
       window.URL.revokeObjectURL(url);
 
       toast.success(`Bills exported as ${format.toUpperCase()}`);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error exporting bills:', error);
-      toast.error(error.response?.data?.detail || 'Failed to export bills');
+      const msg = error instanceof Error ? error.message : 'Failed to export bills';
+      toast.error(msg);
     }
   };
 
@@ -349,20 +353,12 @@ export default function BillsPage() {
                       {bill.customer_name ?? 'Walk-in'}
                     </span>
                     <span className="font-semibold text-accent text-sm">
-                      ₹{(bill.rounded_total / 100).toLocaleString('en-IN')}
+                      {formatPrice(bill.rounded_total)}
                     </span>
                   </div>
                   {/* Row 3: status badge + View button */}
                   <div className="flex items-center justify-between gap-2">
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${
-                      bill.status === 'posted'
-                        ? 'bg-green-950/40 text-green-400'
-                        : bill.status === 'draft'
-                        ? 'bg-amber-950/40 text-amber-400'
-                        : 'bg-surface-row text-text-muted'
-                    }`}>
-                      {bill.status === 'posted' ? 'paid' : bill.status}
-                    </span>
+                    {getStatusChip(bill.status)}
                     <button
                       type="button"
                       className="text-xs text-text-secondary hover:text-text-primary transition-colors"
@@ -424,7 +420,7 @@ export default function BillsPage() {
                         {formatPrice(bill.rounded_total)}
                       </td>
                       <td className="px-4 py-3 text-center">
-                        {getStatusBadge(bill.status)}
+                        {getStatusChip(bill.status)}
                       </td>
                       <td className="px-4 py-3 text-center">
                         <DropdownMenu>
