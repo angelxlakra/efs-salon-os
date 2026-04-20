@@ -119,7 +119,7 @@ export default function BillsPage() {
       case 'posted':
         return <Badge className="bg-green-500">Paid</Badge>;
       case 'void':
-        return <Badge variant="outline" className="text-gray-500">Voided</Badge>;
+        return <Badge variant="outline" className="text-text-secondary">Voided</Badge>;
       case 'refunded':
         return <Badge variant="destructive">Refunded</Badge>;
       default:
@@ -236,8 +236,8 @@ export default function BillsPage() {
     return (
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-gray-400 mx-auto mb-2" />
-          <p className="text-sm text-gray-500">Loading bills...</p>
+          <Loader2 className="h-8 w-8 animate-spin text-text-muted mx-auto mb-2" />
+          <p className="text-sm text-text-secondary">Loading bills...</p>
         </div>
       </div>
     );
@@ -260,7 +260,7 @@ export default function BillsPage() {
             {/* Search */}
             <div className="flex-1 flex gap-2">
               <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-text-muted" />
                 <Input
                   placeholder="Search by invoice number..."
                   value={searchQuery}
@@ -319,104 +319,108 @@ export default function BillsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          {/* Mobile View */}
-          <div className="block sm:hidden">
+          {/* Mobile cards */}
+          <div className="md:hidden space-y-2 p-3">
             {bills.length === 0 ? (
-              <div className="p-8 text-center text-gray-500">
+              <div className="p-8 text-center text-text-secondary">
                 No bills found
               </div>
             ) : (
-              <div className="divide-y">
-                {bills.map((bill) => (
-                  <div key={bill.id} className="p-4 space-y-2">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="font-semibold">{bill.invoice_number}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {bill.customer_name || 'Walk-in'}
-                        </p>
-                      </div>
-                      {getStatusBadge(bill.status)}
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-muted-foreground">
-                        {formatDate(bill.created_at)}
-                      </span>
-                      <span className="font-semibold text-lg">
-                        {formatPrice(bill.rounded_total)}
-                      </span>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleViewBill(bill.id)}
-                        className="flex-1"
-                      >
-                        <Eye className="h-3.5 w-3.5 mr-1.5" />
-                        View
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleReprintReceipt(bill.id)}
-                        className="flex-1"
-                      >
-                        <Printer className="h-3.5 w-3.5 mr-1.5" />
-                        Print
-                      </Button>
-                    </div>
+              bills.map((bill) => (
+                <div
+                  key={bill.id}
+                  className="rounded-xl bg-surface-card border border-border-subtle p-4 space-y-2"
+                >
+                  {/* Row 1: invoice number + time */}
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono text-xs text-text-muted">
+                      {bill.invoice_number ?? '—'}
+                    </span>
+                    <span className="text-xs text-text-muted">
+                      {new Date(bill.posted_at ?? bill.created_at).toLocaleTimeString('en-IN', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </span>
                   </div>
-                ))}
-              </div>
+                  {/* Row 2: customer name + total */}
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-text-primary text-sm truncate max-w-[60%]">
+                      {bill.customer_name ?? 'Walk-in'}
+                    </span>
+                    <span className="font-semibold text-accent text-sm">
+                      ₹{(bill.rounded_total / 100).toLocaleString('en-IN')}
+                    </span>
+                  </div>
+                  {/* Row 3: status badge + View button */}
+                  <div className="flex items-center justify-between gap-2">
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${
+                      bill.status === 'posted'
+                        ? 'bg-green-950/40 text-green-400'
+                        : bill.status === 'draft'
+                        ? 'bg-amber-950/40 text-amber-400'
+                        : 'bg-surface-row text-text-muted'
+                    }`}>
+                      {bill.status === 'posted' ? 'paid' : bill.status}
+                    </span>
+                    <button
+                      type="button"
+                      className="text-xs text-text-secondary hover:text-text-primary transition-colors"
+                      onClick={() => { setSelectedBillId(bill.id); setShowBillDetails(true); }}
+                    >
+                      View
+                    </button>
+                  </div>
+                </div>
+              ))
             )}
           </div>
 
-          {/* Desktop View */}
-          <div className="hidden sm:block overflow-x-auto">
+          {/* Desktop table */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-50 border-b">
+              <thead className="bg-surface-page border-b border-border-subtle">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase">
                     Invoice #
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase">
                     Customer
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase">
                     Date & Time
                   </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-4 py-3 text-right text-xs font-medium text-text-secondary uppercase">
                     Amount
                   </th>
-                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-4 py-3 text-center text-xs font-medium text-text-secondary uppercase">
                     Status
                   </th>
-                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-4 py-3 text-center text-xs font-medium text-text-secondary uppercase">
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y">
+              <tbody className="divide-y divide-border-subtle">
                 {bills.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={6} className="px-4 py-8 text-center text-text-secondary">
                       No bills found
                     </td>
                   </tr>
                 ) : (
                   bills.map((bill) => (
-                    <tr key={bill.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 text-sm font-medium">
+                    <tr key={bill.id} className="hover:bg-surface-row">
+                      <td className="px-4 py-3 text-sm font-medium text-text-primary">
                         {bill.invoice_number}
                       </td>
                       <td className="px-4 py-3 text-sm">
-                        <p className="font-medium">{bill.customer_name || 'Walk-in'}</p>
+                        <p className="font-medium text-text-primary">{bill.customer_name || 'Walk-in'}</p>
                       </td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground">
+                      <td className="px-4 py-3 text-sm text-text-secondary">
                         {formatDate(bill.created_at)}
                       </td>
-                      <td className="px-4 py-3 text-sm font-semibold text-right">
+                      <td className="px-4 py-3 text-sm font-semibold text-right text-text-primary">
                         {formatPrice(bill.rounded_total)}
                       </td>
                       <td className="px-4 py-3 text-center">
@@ -465,8 +469,8 @@ export default function BillsPage() {
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between px-4 py-3 border-t">
-              <div className="text-sm text-muted-foreground">
+            <div className="flex items-center justify-between px-4 py-3 border-t border-border-subtle">
+              <div className="text-sm text-text-secondary">
                 Page {page} of {totalPages}
               </div>
               <div className="flex gap-2">
