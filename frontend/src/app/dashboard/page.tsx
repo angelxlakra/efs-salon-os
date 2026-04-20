@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Users, DollarSign, Scissors, TrendingUp, Clock, CreditCard } from 'lucide-react';
+import { Users } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,8 @@ import { useCartStore } from '@/stores/cart-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { ActiveCustomerCard } from '@/components/dashboard/active-customer-card';
 import { TrendIndicator } from '@/components/dashboard/trend-indicator';
+import { StatCard } from '@/components/dashboard/stat-card';
+import { ServiceQueue } from '@/components/dashboard/service-queue';
 import { DualRadialGoals } from '@/components/dashboard/radial-goal-progress';
 import { HourlyTrendChart } from '@/components/dashboard/hourly-trend-chart';
 import { ServiceDistributionChart } from '@/components/dashboard/service-distribution-chart';
@@ -37,7 +39,7 @@ interface WalkIn {
   customer_id: string | null;
   service: Service;
   assigned_staff: Staff;
-  status: string;
+  status: 'checked_in' | 'in_progress' | 'completed' | 'cancelled';
   checked_in_at: string | null;
   started_at: string | null;
   completed_at: string | null;
@@ -315,94 +317,32 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      {/* Quick Stats - Ultra Compact Design */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2">
-        <Card className="p-2 shadow-sm flex flex-col justify-between relative overflow-hidden">
-          <div className="flex items-center justify-between">
-            <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Revenue</p>
-            <DollarSign className="h-3 w-3 text-green-600" />
-          </div>
-          <div className="mt-1">
-            <div className="flex items-center justify-between">
-              <div className="text-lg font-bold text-gray-900 leading-none">
-                {formatPrice(stats.today_revenue)}
-              </div>
-              {comparison && (
-                <TrendIndicator value={comparison.revenue_percent_change} />
-              )}
-            </div>
-            <p className="text-[10px] text-gray-500 truncate mt-0.5">
-              {stats.today_services} services done
-            </p>
-          </div>
-          {trendsData.revenue.length > 0 && (
-            <div className="absolute top-1 right-1 opacity-30">
-              <DailyComparisonSparkline data={trendsData.revenue} color="#10b981" />
-            </div>
-          )}
-        </Card>
-
-        <Card className="p-2 shadow-sm flex flex-col justify-between relative overflow-hidden">
-          <div className="flex items-center justify-between">
-            <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Customers</p>
-            <Users className="h-3 w-3 text-blue-600" />
-          </div>
-          <div className="mt-1">
-            <div className="flex items-center justify-between">
-              <div className="text-lg font-bold text-gray-900 leading-none">
-                {stats.today_customers}
-              </div>
-              {comparison && (
-                <TrendIndicator value={comparison.customers_percent_change} />
-              )}
-            </div>
-            <p className="text-[10px] text-gray-500 truncate mt-0.5">Served today</p>
-          </div>
-          {trendsData.customers.length > 0 && (
-            <div className="absolute top-1 right-1 opacity-30">
-              <DailyComparisonSparkline data={trendsData.customers} color="#3b82f6" />
-            </div>
-          )}
-        </Card>
-
-        <Card className="p-2 shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Active</p>
-            <Scissors className="h-3 w-3 text-purple-600" />
-          </div>
-          <div className="mt-1">
-            <div className="text-lg font-bold text-gray-900 leading-none">
-              {activeSessions.length}
-            </div>
-            <p className="text-[10px] text-gray-500 truncate mt-0.5">In salon</p>
-          </div>
-        </Card>
-
-        <Card className="p-2 shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Pending</p>
-            <Clock className="h-3 w-3 text-orange-600" />
-          </div>
-          <div className="mt-1">
-            <div className="text-lg font-bold text-gray-900 leading-none">
-              {stats.pending_bills}
-            </div>
-            <p className="text-[10px] text-gray-500 truncate mt-0.5">Not billed</p>
-          </div>
-        </Card>
-
-        <Card className="p-2 shadow-sm flex flex-col justify-between hidden md:flex">
-          <div className="flex items-center justify-between">
-            <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Avg Time</p>
-            <TrendingUp className="h-3 w-3 text-indigo-600" />
-          </div>
-          <div className="mt-1">
-            <div className="text-lg font-bold text-gray-900 leading-none">
-              {formatDuration(stats.avg_service_duration_minutes)}
-            </div>
-            <p className="text-[10px] text-gray-500 truncate mt-0.5">Per service</p>
-          </div>
-        </Card>
+      {/* Quick Stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+        <StatCard
+          title="Today's Revenue"
+          value={formatPrice(stats.today_revenue)}
+          subValue={`${Math.min(100, Math.round((stats.today_revenue / (settings.daily_revenue_target_paise || 1)) * 100))}% of daily goal`}
+          sensitive
+          visibilityKey="revenue-visible"
+          trend={comparison ? <TrendIndicator value={comparison.revenue_percent_change} /> : undefined}
+        />
+        <StatCard
+          title="Services"
+          value={String(stats.today_services)}
+          subValue={`target: ${settings.daily_services_target}`}
+          trend={comparison ? <TrendIndicator value={comparison.services_percent_change} /> : undefined}
+        />
+        <StatCard
+          title="Customers"
+          value={String(stats.today_customers)}
+          trend={comparison ? <TrendIndicator value={comparison.customers_percent_change} /> : undefined}
+        />
+        <StatCard
+          title="Active Now"
+          value={String(stats.active_services)}
+          subValue={stats.pending_bills ? `${stats.pending_bills} pending` : undefined}
+        />
       </div>
 
       {/* Active Customers Section */}
@@ -473,49 +413,7 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          {/* Quick Actions */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Quick Actions</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <a
-                href="/dashboard/pos"
-                className="flex items-center justify-between p-3 rounded-lg border hover:border-primary hover:bg-primary/5 transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="bg-green-100 p-2 rounded-lg">
-                    <DollarSign className="h-5 w-5 text-green-600" />
-                  </div>
-                  <span className="font-medium">New Bill</span>
-                </div>
-              </a>
-
-              <a
-                href="/dashboard/customers"
-                className="flex items-center justify-between p-3 rounded-lg border hover:border-primary hover:bg-primary/5 transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="bg-blue-100 p-2 rounded-lg">
-                    <Users className="h-5 w-5 text-blue-600" />
-                  </div>
-                  <span className="font-medium">Add Customer</span>
-                </div>
-              </a>
-
-              <a
-                href="/dashboard/services"
-                className="flex items-center justify-between p-3 rounded-lg border hover:border-primary hover:bg-primary/5 transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="bg-purple-100 p-2 rounded-lg">
-                    <Scissors className="h-5 w-5 text-purple-600" />
-                  </div>
-                  <span className="font-medium">Manage Services</span>
-                </div>
-              </a>
-            </CardContent>
-          </Card>
+          <ServiceQueue sessions={activeSessions} />
         </div>
       </div>
 
