@@ -330,7 +330,7 @@ export default function InventoryPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-muted-foreground">Loading inventory...</div>
+        <div className="text-text-secondary">Loading inventory...</div>
       </div>
     );
   }
@@ -342,7 +342,7 @@ export default function InventoryPage() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div className="min-w-0">
           <h1 className="text-xl md:text-2xl font-bold">Inventory Management</h1>
-          <p className="text-sm text-muted-foreground">Manage SKUs, retail settings, and stock adjustments</p>
+          <p className="text-sm text-text-secondary">Manage SKUs, retail settings, and stock adjustments</p>
         </div>
         <Button
           variant="outline"
@@ -371,7 +371,7 @@ export default function InventoryPage() {
           {/* Search */}
           <div className="flex gap-4">
             <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-text-secondary" />
               <Input
                 placeholder="Search SKUs..."
                 value={searchTerm}
@@ -533,9 +533,9 @@ export default function InventoryPage() {
             </CardHeader>
             <CardContent>
               {loadingRequests ? (
-                <div className="text-center py-8 text-muted-foreground">Loading...</div>
+                <div className="text-center py-8 text-text-secondary">Loading...</div>
               ) : changeRequests.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground">
+                <div className="text-center py-12 text-text-secondary">
                   <CheckCircle className="h-12 w-12 mx-auto mb-4 opacity-20" />
                   <p>No pending change requests</p>
                 </div>
@@ -547,38 +547,41 @@ export default function InventoryPage() {
                         <div className="flex-1 min-w-0">
                           <div className="flex flex-wrap items-center gap-1.5 mb-2">
                             <span className="font-semibold truncate">{request.sku_name}</span>
-                            <Badge variant="outline" className="text-xs">{request.sku_code}</Badge>
-                            <Badge variant={
-                              request.change_type === 'receive' ? 'default' :
-                              request.change_type === 'consume' ? 'destructive' : 'secondary'
-                            } className="text-xs">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-surface-row text-text-muted">
+                              {request.sku_code}
+                            </span>
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                              request.change_type === 'receive' ? 'bg-blue-500/40 text-blue-400' :
+                              request.change_type === 'consume' ? 'bg-red-500/40 text-red-400' :
+                              'bg-slate-500/40 text-slate-400'
+                            }`}>
                               {request.change_type.toUpperCase()}
-                            </Badge>
+                            </span>
                           </div>
                           <div className="text-sm space-y-1">
                             <div>
-                              <span className="text-muted-foreground">Quantity: </span>
+                              <span className="text-text-secondary">Quantity: </span>
                               <span className="font-medium">
                                 {request.change_type === 'consume' ? '-' : '+'}{request.quantity}
                               </span>
                             </div>
                             {request.unit_cost && (
                               <div>
-                                <span className="text-muted-foreground">Unit Cost: </span>
+                                <span className="text-text-secondary">Unit Cost: </span>
                                 <span className="font-medium">{formatCurrency(request.unit_cost)}</span>
                               </div>
                             )}
                             <div>
-                              <span className="text-muted-foreground">Reason: </span>
+                              <span className="text-text-secondary">Reason: </span>
                               <span>{request.reason_code}</span>
                             </div>
                             {request.notes && (
                               <div>
-                                <span className="text-muted-foreground">Notes: </span>
+                                <span className="text-text-secondary">Notes: </span>
                                 <span className="text-sm">{request.notes}</span>
                               </div>
                             )}
-                            <div className="text-xs text-muted-foreground mt-2">
+                            <div className="text-xs text-text-secondary mt-2">
                               Requested at {new Date(request.requested_at).toLocaleString('en-IN')}
                             </div>
                           </div>
@@ -624,15 +627,15 @@ export default function InventoryPage() {
             <div className="space-y-4">
               <div>
                 <div className="text-sm font-medium mb-1">SKU: {adjustingSku.sku_code}</div>
-                <div className="text-sm text-muted-foreground">{adjustingSku.name}</div>
-                <div className="text-sm text-muted-foreground mt-1">
+                <div className="text-sm text-text-secondary">{adjustingSku.name}</div>
+                <div className="text-sm text-text-secondary mt-1">
                   Current Stock: {adjustingSku.current_stock} {adjustingSku.uom}
                 </div>
               </div>
 
               <div>
                 <Label htmlFor="adjustment-type">Adjustment Type *</Label>
-                <Select value={adjustmentType} onValueChange={(value: any) => setAdjustmentType(value)}>
+                <Select value={adjustmentType} onValueChange={(value) => setAdjustmentType(value as 'receive' | 'adjust' | 'consume')}>
                   <SelectTrigger id="adjustment-type">
                     <SelectValue />
                   </SelectTrigger>
@@ -670,7 +673,7 @@ export default function InventoryPage() {
                       onChange={(e) => setUnitCost(e.target.value)}
                       placeholder="Cost per unit"
                     />
-                    <p className="text-xs text-muted-foreground mt-1">
+                    <p className="text-xs text-text-secondary mt-1">
                       Base cost before any discounts
                     </p>
                   </div>
@@ -699,7 +702,7 @@ export default function InventoryPage() {
                         onChange={(e) => setSupplierDiscountPercent(e.target.value)}
                         placeholder="e.g., 15.5"
                       />
-                      <p className="text-xs text-muted-foreground mt-1">
+                      <p className="text-xs text-text-secondary mt-1">
                         Percentage discount from supplier
                       </p>
                     </div>
@@ -715,7 +718,7 @@ export default function InventoryPage() {
                         onChange={(e) => setSupplierDiscountFixed(e.target.value)}
                         placeholder="e.g., 50"
                       />
-                      <p className="text-xs text-muted-foreground mt-1">
+                      <p className="text-xs text-text-secondary mt-1">
                         Fixed amount discount
                       </p>
                     </div>
@@ -733,7 +736,7 @@ export default function InventoryPage() {
                           return final.toFixed(2);
                         })()}
                       </p>
-                      <p className="text-xs text-muted-foreground mt-1">
+                      <p className="text-xs text-text-secondary mt-1">
                         This will be used for calculating weighted average cost
                       </p>
                     </div>
@@ -808,8 +811,8 @@ export default function InventoryPage() {
             <div className="space-y-4">
               <div>
                 <div className="text-sm font-medium mb-1">SKU: {editingSku.sku_code}</div>
-                <div className="text-sm text-muted-foreground">{editingSku.name}</div>
-                <div className="text-sm text-muted-foreground mt-1">
+                <div className="text-sm text-text-secondary">{editingSku.name}</div>
+                <div className="text-sm text-text-secondary mt-1">
                   Cost: {formatCurrency(editingSku.avg_cost_per_unit)}
                 </div>
               </div>
@@ -834,7 +837,7 @@ export default function InventoryPage() {
                     <Camera className="h-4 w-4" />
                   </Button>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="text-xs text-text-secondary mt-1">
                   Type manually or scan with camera. Can be added or updated at any time.
                 </p>
               </div>
@@ -876,7 +879,7 @@ export default function InventoryPage() {
                       placeholder="Auto-calculated"
                     />
                     {retailPrice && (
-                      <div className="text-xs text-muted-foreground mt-1">
+                      <div className="text-xs text-text-secondary mt-1">
                         Calculated markup: {calculateMarkup()}%
                       </div>
                     )}
