@@ -5,7 +5,6 @@ import { Plus, Loader2, Edit2, Trash2, Search, User, Wallet, History, UserX, Rec
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { useAuthStore } from '@/stores/auth-store';
 import { titleCase } from '@/lib/utils';
 import { apiClient } from '@/lib/api-client';
@@ -30,6 +29,12 @@ interface Customer {
   pending_balance: number; // in paise
   last_visit_at: string | null;
   created_at: string;
+}
+
+interface ApiResponse {
+  items: Customer[];
+  pages: number;
+  total: number;
 }
 
 export default function CustomersPage() {
@@ -111,11 +116,11 @@ export default function CustomersPage() {
         params.append('exclude_walkins', 'true');
       }
 
-      const { data } = await apiClient.get(`/customers?${params}`);
+      const { data } = await apiClient.get<ApiResponse>(`/customers?${params}`);
       setCustomers(data.items || []);
       setTotalPages(data.pages || 1);
       setTotalCustomers(data.total || 0);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error('Failed to load customers');
       console.error(error);
     } finally {
@@ -133,8 +138,10 @@ export default function CustomersPage() {
       fetchCustomers();
       fetchStats();
       setDeleteDialog({ open: false, id: null });
-    } catch (error: any) {
-      toast.error(error.response?.data?.detail || 'Failed to delete customer');
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : 'Failed to delete customer';
+      toast.error(message);
     }
   };
 
@@ -175,8 +182,8 @@ export default function CustomersPage() {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-gray-400 mx-auto mb-2" />
-          <p className="text-sm text-gray-500">Loading customers...</p>
+          <Loader2 className="h-8 w-8 animate-spin text-text-muted mx-auto mb-2" />
+          <p className="text-sm text-text-secondary">Loading customers...</p>
         </div>
       </div>
     );
@@ -187,8 +194,8 @@ export default function CustomersPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Customers</h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <h1 className="text-3xl font-bold text-text-primary">Customers</h1>
+          <p className="text-sm text-text-secondary mt-1">
             Manage customer database and track visit history
           </p>
         </div>
@@ -229,7 +236,7 @@ export default function CustomersPage() {
         <Card>
           <CardHeader className="pb-3">
             <CardDescription>Pending Balance</CardDescription>
-            <CardTitle className="text-3xl text-red-600">{formatPrice(stats.total_pending)}</CardTitle>
+            <CardTitle className="text-3xl text-red-400">{formatPrice(stats.total_pending)}</CardTitle>
           </CardHeader>
         </Card>
       </div>
@@ -239,7 +246,7 @@ export default function CustomersPage() {
         <CardContent className="pt-6">
           <div className="flex gap-2">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-text-muted" />
               <Input
                 placeholder="Search by name, phone, or email..."
                 value={searchQuery}
@@ -266,11 +273,11 @@ export default function CustomersPage() {
       {customers.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16">
-            <User className="h-12 w-12 text-gray-300 mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+            <User className="h-12 w-12 text-text-muted mb-4" />
+            <h3 className="text-lg font-semibold text-text-primary mb-2">
               {searchQuery ? 'No customers found' : excludeWalkins ? 'No registered customers found' : 'No customers yet'}
             </h3>
-            <p className="text-gray-500 text-center mb-4">
+            <p className="text-text-secondary text-center mb-4">
               {searchQuery
                 ? 'Try adjusting your search'
                 : excludeWalkins
@@ -288,120 +295,46 @@ export default function CustomersPage() {
       ) : (
         <Card>
           <CardContent className="p-0">
-            {/* Mobile Card View */}
-            <div className="block md:hidden divide-y divide-gray-200">
-              {customers.map((customer) => (
-                <div key={customer.id} className="p-4 space-y-2">
-                  <div className="flex justify-between items-start">
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium text-gray-900 truncate">
-                        {titleCase(customer.first_name)} {titleCase(customer.last_name || '')}
-                      </p>
-                      <p className="text-sm text-gray-500">{formatPhone(customer.phone)}</p>
-                    </div>
-                    <div className="flex items-center gap-1 ml-2">
-                      <Badge variant="secondary" className="text-xs">{customer.total_visits} visits</Badge>
-                    </div>
-                  </div>
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-gray-500">Spent: <span className="text-gray-900 font-medium">{formatPrice(customer.total_spent)}</span></span>
-                    {customer.pending_balance > 0 ? (
-                      <span className="text-red-600 font-medium">Pending: {formatPrice(customer.pending_balance)}</span>
-                    ) : (
-                      <span className="text-gray-400 text-xs">Last: {formatDate(customer.last_visit_at)}</span>
-                    )}
-                  </div>
-                  {canEdit && (
-                    <div className="flex gap-2 pt-1">
-                      {customer.pending_balance > 0 && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setCollectPaymentDialog({ open: true, customer })}
-                          className="text-green-600 border-green-600 hover:bg-green-50 flex-1"
-                        >
-                          <Wallet className="h-3.5 w-3.5 mr-1" />
-                          Collect
-                        </Button>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setPaymentHistoryDialog({ open: true, customer })}
-                        title="Payment history"
-                      >
-                        <History className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setVisitHistoryDialog({ open: true, customer })}
-                        title="Visit history"
-                      >
-                        <Receipt className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setCustomerDialog({ open: true, customer })}
-                      >
-                        <Edit2 className="h-3.5 w-3.5" />
-                      </Button>
-                      {isOwner && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setDeleteDialog({ open: true, id: customer.id })}
-                        >
-                          <Trash2 className="h-3.5 w-3.5 text-red-600" />
-                        </Button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            {/* Desktop Table View */}
+            {/* Desktop table */}
             <div className="hidden md:block overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gray-50 border-b">
+                <thead className="bg-surface-page border-b border-border-subtle">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
                       Customer
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
                       Contact
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
                       Visits
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
                       Total Spent
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
                       Pending
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
                       Last Visit
                     </th>
                     {canEdit && (
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-right text-xs font-medium text-text-secondary uppercase tracking-wider">
                         Actions
                       </th>
                     )}
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="bg-surface-card divide-y divide-border-subtle">
                   {customers.map((customer) => (
-                    <tr key={customer.id} className="hover:bg-gray-50">
+                    <tr key={customer.id} className="hover:bg-surface-row">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div>
-                          <div className="text-sm font-medium text-gray-900">
+                          <div className="text-sm font-medium text-text-primary">
                             {titleCase(customer.first_name)} {titleCase(customer.last_name || '')}
                           </div>
                           {customer.gender && (
-                            <div className="text-sm text-gray-500 capitalize">
+                            <div className="text-sm text-text-secondary capitalize">
                               {customer.gender}
                             </div>
                           )}
@@ -409,28 +342,30 @@ export default function CustomersPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div>
-                          <div className="text-sm text-gray-900">
+                          <div className="text-sm text-text-primary">
                             {formatPhone(customer.phone)}
                           </div>
                           {customer.email && (
-                            <div className="text-sm text-gray-500">{customer.email}</div>
+                            <div className="text-sm text-text-secondary">{customer.email}</div>
                           )}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <Badge variant="secondary">{customer.total_visits}</Badge>
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-500/40 text-blue-400">
+                          {customer.total_visits}
+                        </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-text-primary">
                         {formatPrice(customer.total_spent)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-2">
                           {customer.pending_balance > 0 ? (
-                            <span className="text-red-600 font-medium text-sm">
+                            <span className="text-red-400 font-medium text-sm">
                               {formatPrice(customer.pending_balance)}
                             </span>
                           ) : (
-                            <span className="text-gray-400 text-sm">-</span>
+                            <span className="text-text-muted text-sm">-</span>
                           )}
                           <Button
                             variant="ghost"
@@ -439,11 +374,11 @@ export default function CustomersPage() {
                             className="h-6 w-6 p-0"
                             title="Payment history"
                           >
-                            <History className="h-3 w-3 text-gray-400" />
+                            <History className="h-3 w-3 text-text-muted" />
                           </Button>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-text-secondary">
                         {formatDate(customer.last_visit_at)}
                       </td>
                       {canEdit && (
@@ -456,7 +391,7 @@ export default function CustomersPage() {
                                 onClick={() =>
                                   setCollectPaymentDialog({ open: true, customer })
                                 }
-                                className="text-green-600 border-green-600 hover:bg-green-50"
+                                className="text-green-400 border-green-600 hover:bg-green-500/10"
                               >
                                 <Wallet className="h-4 w-4 mr-1" />
                                 Collect
@@ -489,7 +424,7 @@ export default function CustomersPage() {
                                   setDeleteDialog({ open: true, id: customer.id })
                                 }
                               >
-                                <Trash2 className="h-4 w-4 text-red-600" />
+                                <Trash2 className="h-4 w-4 text-red-400" />
                               </Button>
                             )}
                           </div>
@@ -501,11 +436,115 @@ export default function CustomersPage() {
               </table>
             </div>
 
+            {/* Mobile card list */}
+            <div className="md:hidden space-y-2 p-3">
+              {customers.map((customer) => (
+                <div
+                  key={customer.id}
+                  className="rounded-xl bg-surface-card border border-border-subtle p-4 space-y-2"
+                >
+                  {/* Row 1: name + gender chip */}
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-semibold text-text-primary text-sm truncate">
+                      {titleCase(customer.first_name)} {titleCase(customer.last_name || '')}
+                    </span>
+                    {customer.gender && (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-500/40 text-purple-400 capitalize shrink-0">
+                        {customer.gender}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Row 2: phone + visit count */}
+                  <div className="flex items-center justify-between text-xs text-text-secondary">
+                    <span>{formatPhone(customer.phone)}</span>
+                    <span className="inline-flex items-center gap-1">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-500/40 text-blue-400">
+                        {customer.total_visits}
+                      </span>
+                      <span>visits</span>
+                    </span>
+                  </div>
+
+                  {/* Row 3: total spent */}
+                  <div className="flex items-center justify-between text-xs text-text-secondary">
+                    <span>Total spent</span>
+                    <span className="text-text-primary font-medium">
+                      {formatPrice(customer.total_spent)}
+                    </span>
+                  </div>
+
+                  {/* Row 4: pending balance — shown only if > 0 */}
+                  {customer.pending_balance > 0 && (
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-text-secondary">Pending balance</span>
+                      <span className="text-red-400 font-semibold">
+                        {formatPrice(customer.pending_balance)}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Row 5: last visit */}
+                  <div className="flex items-center justify-between text-xs text-text-secondary">
+                    <span>Last visit</span>
+                    <span>{formatDate(customer.last_visit_at)}</span>
+                  </div>
+
+                  {/* Row 6: action buttons */}
+                  <div className="flex gap-2 pt-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setPaymentHistoryDialog({ open: true, customer })}
+                      className="h-8 px-2 text-xs text-text-secondary"
+                      title="View payment history"
+                    >
+                      <History className="h-3 w-3 mr-1" />
+                      History
+                    </Button>
+                    {canEdit && customer.pending_balance > 0 && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCollectPaymentDialog({ open: true, customer })}
+                        className="h-8 px-2 text-xs text-green-400 border-green-600 hover:bg-green-500/10"
+                      >
+                        <Wallet className="h-3 w-3 mr-1" />
+                        Collect
+                      </Button>
+                    )}
+                    {canEdit && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setCustomerDialog({ open: true, customer })}
+                        className="h-8 px-2 text-xs"
+                      >
+                        <Edit2 className="h-3 w-3 mr-1" />
+                        Edit
+                      </Button>
+                    )}
+                    {isOwner && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setDeleteDialog({ open: true, id: customer.id })}
+                        className="h-8 px-2 text-xs text-red-400"
+                      >
+                        <Trash2 className="h-3 w-3 mr-1" />
+                        Delete
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
             {/* Pagination */}
             {totalPages > 1 && (
-              <div className="px-4 py-3 border-t flex flex-col sm:flex-row items-center justify-between gap-2">
-                <div className="text-sm text-gray-500">
-                  Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, totalCustomers)} of {totalCustomers}
+              <div className="px-6 py-4 border-t border-border-subtle flex items-center justify-between">
+                <div className="text-sm text-text-secondary">
+                  Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, totalCustomers)} of {totalCustomers} customers
                 </div>
                 <div className="flex gap-2">
                   <Button
@@ -516,9 +555,11 @@ export default function CustomersPage() {
                   >
                     Previous
                   </Button>
-                  <span className="flex items-center text-sm text-gray-700 px-2">
-                    {currentPage} / {totalPages}
-                  </span>
+                  <div className="flex items-center gap-2 px-3">
+                    <span className="text-sm text-text-secondary">
+                      Page {currentPage} of {totalPages}
+                    </span>
+                  </div>
                   <Button
                     variant="outline"
                     size="sm"

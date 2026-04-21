@@ -6,19 +6,14 @@ import { ProductGrid } from '@/components/pos/product-grid';
 import { CartSidebar } from '@/components/pos/cart-sidebar';
 import { PaymentModal } from '@/components/pos/payment-modal';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { ShoppingCart } from 'lucide-react';
 import { useCartStore } from '@/stores/cart-store';
-import { useIsMobile } from '@/hooks/use-mobile';
 
 export default function POSPage() {
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const { items } = useCartStore();
-  const isMobile = useIsMobile();
-
   const serviceSearchRef = useRef<HTMLInputElement>(null);
   const customerSearchRef = useRef<{ openSearch: () => void }>(null);
 
@@ -68,37 +63,16 @@ export default function POSPage() {
           <div className="mb-4">
             <div className="flex items-center justify-between">
               <div className="flex-1">
-                <h1 className="text-2xl font-bold text-gray-900">Point of Sale</h1>
-                <p className="text-sm text-gray-500 mt-1">
+                <h1 className="text-2xl font-bold text-text-primary">Point of Sale</h1>
+                <p className="text-sm text-text-secondary mt-1">
                   Select services or products and process payments
                 </p>
               </div>
-              {/* Mobile Cart Button - Only visible on mobile */}
-              {isMobile && (
-                <Sheet open={isCartOpen} onOpenChange={setIsCartOpen}>
-                  <SheetTrigger asChild>
-                    <Button size="lg" className="relative md:hidden">
-                      <ShoppingCart className="h-5 w-5" />
-                      {items.length > 0 && (
-                        <Badge
-                          variant="destructive"
-                          className="absolute -top-2 -right-2 h-6 w-6 rounded-full p-0 flex items-center justify-center"
-                        >
-                          {items.length}
-                        </Badge>
-                      )}
-                    </Button>
-                  </SheetTrigger>
-                  <SheetContent side="right" className="w-full sm:w-96 p-0">
-                    <CartSidebar onCheckout={handleCheckout} customerSearchRef={customerSearchRef} />
-                  </SheetContent>
-                </Sheet>
-              )}
             </div>
-            <div className="mt-2 text-xs text-gray-400 space-x-4 hidden md:block">
-              <span><kbd className="px-1.5 py-0.5 bg-gray-100 rounded border">/</kbd> Search service</span>
-              <span><kbd className="px-1.5 py-0.5 bg-gray-100 rounded border">⌘+.</kbd> Select customer</span>
-              <span><kbd className="px-1.5 py-0.5 bg-gray-100 rounded border">⌘+↵</kbd> Checkout</span>
+            <div className="mt-2 text-xs text-text-muted space-x-4 hidden md:block">
+              <span><kbd className="px-1.5 py-0.5 bg-surface-row rounded border border-border-subtle">/</kbd> Search service</span>
+              <span><kbd className="px-1.5 py-0.5 bg-surface-row rounded border border-border-subtle">⌘+.</kbd> Select customer</span>
+              <span><kbd className="px-1.5 py-0.5 bg-surface-row rounded border border-border-subtle">⌘+↵</kbd> Checkout</span>
             </div>
           </div>
 
@@ -125,24 +99,27 @@ export default function POSPage() {
         </div>
       </div>
 
-      {/* Floating Cart Button for Mobile - Bottom Right */}
-      {isMobile && !isCartOpen && items.length > 0 && (
-        <div className="fixed bottom-6 right-6 z-40 md:hidden">
-          <Button
-            size="lg"
-            onClick={() => setIsCartOpen(true)}
-            className="h-16 w-16 rounded-full shadow-lg relative"
-          >
-            <ShoppingCart className="h-6 w-6" />
-            <Badge
-              variant="destructive"
-              className="absolute -top-1 -right-1 h-7 w-7 rounded-full p-0 flex items-center justify-center text-sm font-bold"
-            >
-              {items.length}
-            </Badge>
-          </Button>
-        </div>
+      {/* Mobile cart FAB */}
+      {items.length > 0 && (
+        <button
+          type="button"
+          className="fixed bottom-20 right-4 z-40 flex md:hidden items-center justify-center h-14 w-14 rounded-full bg-accent text-white shadow-lg shadow-accent/30 transition-transform active:scale-95"
+          onClick={() => setIsCartOpen(true)}
+          aria-label="Open cart"
+        >
+          <ShoppingCart className="h-6 w-6" />
+          <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-surface-card text-accent border border-border-subtle text-[10px] font-bold">
+            {items.length}
+          </span>
+        </button>
       )}
+
+      {/* Mobile cart sheet */}
+      <Sheet open={isCartOpen} onOpenChange={setIsCartOpen}>
+        <SheetContent side="bottom" className="h-[85vh] bg-surface-card border-border-subtle rounded-t-xl p-0">
+          <CartSidebar onCheckout={handleCheckout} customerSearchRef={customerSearchRef} />
+        </SheetContent>
+      </Sheet>
 
       {/* Payment Modal */}
       <PaymentModal

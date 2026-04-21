@@ -1,11 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Search, Download, Eye, Printer, RotateCcw, XCircle, Loader2, FileText, FileSpreadsheet, AlertTriangle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Search, Filter, Download, Eye, Printer, RotateCcw, XCircle, Loader2, FileText, FileSpreadsheet, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -72,7 +71,7 @@ export default function BillsPage() {
   const fetchBills = async () => {
     try {
       setIsLoading(true);
-      const params: any = {
+      const params: Record<string, string | number | boolean> = {
         page,
         limit: 20,
       };
@@ -95,9 +94,10 @@ export default function BillsPage() {
       setBills(data.bills || []);
       setTotal(data.pagination?.total || 0);
       setTotalPages(data.pagination?.pages || 1);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error fetching bills:', error);
-      toast.error(error.response?.data?.detail || 'Failed to load bills');
+      const msg = error instanceof Error ? error.message : 'Failed to load bills';
+      toast.error(msg);
       setBills([]);
       setTotal(0);
       setTotalPages(1);
@@ -128,19 +128,19 @@ export default function BillsPage() {
     });
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'draft':
-        return <Badge variant="secondary">Draft</Badge>;
-      case 'posted':
-        return <Badge className="bg-green-500">Paid</Badge>;
-      case 'void':
-        return <Badge variant="outline" className="text-gray-500">Voided</Badge>;
-      case 'refunded':
-        return <Badge variant="destructive">Refunded</Badge>;
-      default:
-        return <Badge variant="outline">{status}</Badge>;
-    }
+  const getStatusChip = (status: string): React.ReactNode => {
+    const map: Record<string, { bg: string; text: string; label: string }> = {
+      posted:   { bg: 'bg-green-950/40',  text: 'text-green-400',  label: 'Paid' },
+      draft:    { bg: 'bg-amber-950/40',  text: 'text-amber-400',  label: 'Draft' },
+      void:     { bg: 'bg-zinc-900/60',   text: 'text-text-muted', label: 'Voided' },
+      refunded: { bg: 'bg-red-950/40',    text: 'text-red-400',    label: 'Refunded' },
+    };
+    const cfg = map[status] ?? { bg: 'bg-zinc-900/60', text: 'text-text-muted', label: status };
+    return (
+      <span className={`text-xs px-2 py-0.5 rounded-full ${cfg.bg} ${cfg.text}`}>
+        {cfg.label}
+      </span>
+    );
   };
 
   const hasPendingBalance = (bill: Bill) =>
@@ -163,9 +163,10 @@ export default function BillsPage() {
       window.open(url, '_blank');
 
       toast.success('Receipt opened in new tab');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error printing receipt:', error);
-      toast.error('Failed to print receipt');
+      const msg = error instanceof Error ? error.message : 'Failed to print receipt';
+      toast.error(msg);
     }
   };
 
@@ -183,9 +184,10 @@ export default function BillsPage() {
       toast.success('Bill voided successfully');
       fetchBills(); // Refresh the list
       setShowBillDetails(false); // Close dialog if open
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error voiding bill:', error);
-      toast.error(error.response?.data?.detail || 'Failed to void bill');
+      const msg = error instanceof Error ? error.message : 'Failed to void bill';
+      toast.error(msg);
     }
   };
 
@@ -206,15 +208,16 @@ export default function BillsPage() {
       });
       toast.success('Bill refunded successfully');
       fetchBills(); // Refresh the list
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error refunding bill:', error);
-      toast.error(error.response?.data?.detail || 'Failed to refund bill');
+      const msg = error instanceof Error ? error.message : 'Failed to refund bill';
+      toast.error(msg);
     }
   };
 
   const handleExport = async (format: 'csv' | 'pdf') => {
     try {
-      const params: any = {};
+      const params: Record<string, string | number> = {};
 
       if (statusFilter !== 'all') {
         params.status_filter = statusFilter;
@@ -246,9 +249,10 @@ export default function BillsPage() {
       window.URL.revokeObjectURL(url);
 
       toast.success(`Bills exported as ${format.toUpperCase()}`);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error exporting bills:', error);
-      toast.error(error.response?.data?.detail || 'Failed to export bills');
+      const msg = error instanceof Error ? error.message : 'Failed to export bills';
+      toast.error(msg);
     }
   };
 
@@ -256,8 +260,8 @@ export default function BillsPage() {
     return (
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-gray-400 mx-auto mb-2" />
-          <p className="text-sm text-gray-500">Loading bills...</p>
+          <Loader2 className="h-8 w-8 animate-spin text-text-muted mx-auto mb-2" />
+          <p className="text-sm text-text-secondary">Loading bills...</p>
         </div>
       </div>
     );
@@ -268,7 +272,7 @@ export default function BillsPage() {
       {/* Header */}
       <div>
         <h1 className="text-2xl md:text-3xl font-bold">Bills & Transactions</h1>
-        <p className="text-sm text-muted-foreground mt-1">
+        <p className="text-sm text-text-secondary mt-1">
           View and manage all sales transactions
         </p>
       </div>
@@ -302,7 +306,7 @@ export default function BillsPage() {
             {/* Search */}
             <div className="flex-1 flex gap-2">
               <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-text-muted" />
                 <Input
                   placeholder="Search by invoice #, customer name, or phone..."
                   value={searchQuery}
@@ -363,120 +367,117 @@ export default function BillsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          {/* Mobile View */}
-          <div className="block sm:hidden">
+          {/* Mobile cards */}
+          <div className="md:hidden space-y-2 p-3">
             {bills.length === 0 ? (
-              <div className="p-8 text-center text-gray-500">
+              <div className="p-8 text-center text-text-secondary">
                 No bills found
               </div>
             ) : (
-              <div className="divide-y">
-                {bills.map((bill) => (
-                  <div key={bill.id} className={`p-4 space-y-2${hasPendingBalance(bill) ? ' bg-red-50 border-l-4 border-red-500' : ''}`}>
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="font-semibold">{bill.invoice_number}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {titleCase(bill.customer_name) || 'Walk-in'}
-                        </p>
-                        {hasPendingBalance(bill) && (
-                          <p className="text-sm font-semibold text-red-600 flex items-center gap-1.5">
-                            <AlertTriangle className="h-4 w-4" />
-                            Pending: {formatPrice(bill.rounded_total - bill.total_paid - (bill.write_off_amount ?? 0))}
-                          </p>
-                        )}
-                      </div>
-                      {getStatusBadge(bill.status)}
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-muted-foreground">
-                        {formatDate(bill.created_at)}
-                      </span>
-                      <span className="font-semibold text-lg">
-                        {formatPrice(bill.rounded_total)}
-                      </span>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleViewBill(bill.id)}
-                        className="flex-1"
-                      >
-                        <Eye className="h-3.5 w-3.5 mr-1.5" />
-                        View
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleReprintReceipt(bill.id)}
-                        className="flex-1"
-                      >
-                        <Printer className="h-3.5 w-3.5 mr-1.5" />
-                        Print
-                      </Button>
-                    </div>
+              bills.map((bill) => (
+                <div
+                  key={bill.id}
+                  className="rounded-xl bg-surface-card border border-border-subtle p-4 space-y-2"
+                >
+                  {/* Row 1: invoice number + time */}
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono text-xs text-text-muted">
+                      {bill.invoice_number ?? '—'}
+                    </span>
+                    <span className="text-xs text-text-muted">
+                      {new Date(bill.posted_at ?? bill.created_at).toLocaleTimeString('en-IN', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </span>
                   </div>
-                ))}
-              </div>
+                  {/* Row 2: customer name + total */}
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-text-primary text-sm truncate max-w-[60%]">
+                      {bill.customer_name ?? 'Walk-in'}
+                    </span>
+                    <span className="font-semibold text-accent text-sm">
+                      {formatPrice(bill.rounded_total)}
+                    </span>
+                  </div>
+                  {/* Pending balance indicator */}
+                  {hasPendingBalance(bill) && (
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-red-400">
+                      <AlertTriangle className="h-3.5 w-3.5" />
+                      Pending: {formatPrice(bill.rounded_total - bill.total_paid - (bill.write_off_amount ?? 0))}
+                    </div>
+                  )}
+                  {/* Row 3: status badge + View button */}
+                  <div className="flex items-center justify-between gap-2">
+                    {getStatusChip(bill.status)}
+                    <button
+                      type="button"
+                      className="text-xs text-text-secondary hover:text-text-primary transition-colors"
+                      onClick={() => { setSelectedBillId(bill.id); setShowBillDetails(true); }}
+                    >
+                      View
+                    </button>
+                  </div>
+                </div>
+              ))
             )}
           </div>
 
-          {/* Desktop View */}
-          <div className="hidden sm:block overflow-x-auto">
+          {/* Desktop table */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-50 border-b">
+              <thead className="bg-surface-page border-b border-border-subtle">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase">
                     Invoice #
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase">
                     Customer
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase">
                     Date & Time
                   </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-4 py-3 text-right text-xs font-medium text-text-secondary uppercase">
                     Amount
                   </th>
-                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-4 py-3 text-center text-xs font-medium text-text-secondary uppercase">
                     Status
                   </th>
-                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-4 py-3 text-center text-xs font-medium text-text-secondary uppercase">
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y">
+              <tbody className="divide-y divide-border-subtle">
                 {bills.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={6} className="px-4 py-8 text-center text-text-secondary">
                       No bills found
                     </td>
                   </tr>
                 ) : (
                   bills.map((bill) => (
-                    <tr key={bill.id} className={hasPendingBalance(bill) ? 'bg-red-50 border-l-4 border-red-500' : 'hover:bg-gray-50'}>
-                      <td className="px-4 py-3 text-sm font-medium">
+                    <tr key={bill.id} className={hasPendingBalance(bill) ? 'bg-red-950/20 border-l-4 border-red-500' : 'hover:bg-surface-row'}>
+                      <td className="px-4 py-3 text-sm font-medium text-text-primary">
                         {bill.invoice_number}
                       </td>
                       <td className="px-4 py-3 text-sm">
-                        <p className="font-medium">{titleCase(bill.customer_name) || 'Walk-in'}</p>
+                        <p className="font-medium text-text-primary">{titleCase(bill.customer_name) || 'Walk-in'}</p>
                         {hasPendingBalance(bill) && (
-                          <p className="text-xs font-semibold text-red-600 flex items-center gap-1 mt-0.5">
+                          <p className="text-xs font-semibold text-red-400 flex items-center gap-1 mt-0.5">
                             <AlertTriangle className="h-3 w-3" />
                             Pending {formatPrice(bill.rounded_total - bill.total_paid - (bill.write_off_amount ?? 0))}
                           </p>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground">
+                      <td className="px-4 py-3 text-sm text-text-secondary">
                         {formatDate(bill.created_at)}
                       </td>
-                      <td className="px-4 py-3 text-sm font-semibold text-right">
+                      <td className="px-4 py-3 text-sm font-semibold text-right text-text-primary">
                         {formatPrice(bill.rounded_total)}
                       </td>
                       <td className="px-4 py-3 text-center">
-                        {getStatusBadge(bill.status)}
+                        {getStatusChip(bill.status)}
                       </td>
                       <td className="px-4 py-3 text-center">
                         <DropdownMenu>
@@ -521,8 +522,8 @@ export default function BillsPage() {
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between px-4 py-3 border-t">
-              <div className="text-sm text-muted-foreground">
+            <div className="flex items-center justify-between px-4 py-3 border-t border-border-subtle">
+              <div className="text-sm text-text-secondary">
                 Page {page} of {totalPages}
               </div>
               <div className="flex gap-2">

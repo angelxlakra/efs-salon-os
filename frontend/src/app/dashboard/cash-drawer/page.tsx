@@ -91,9 +91,10 @@ export default function CashDrawerPage() {
       setIsLoading(true)
       const { data } = await apiClient.get<CashDrawerSummary>("/cash/current")
       setSummary(data)
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error fetching cash drawer:", error)
-      toast.error(error.response?.data?.detail || "Failed to load cash drawer")
+      const apiError = error as { response?: { data?: { detail?: string } } }
+      toast.error(apiError.response?.data?.detail || "Failed to load cash drawer")
     } finally {
       setIsLoading(false)
     }
@@ -115,9 +116,10 @@ export default function CashDrawerPage() {
       // Reset form
       setOpeningFloat("")
       setOpeningDenoms({ note_5: 0, note_10: 0, note_20: 0, note_50: 0, note_100: 0, note_200: 0, note_500: 0 })
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error opening drawer:", error)
-      toast.error(error.response?.data?.detail || "Failed to open cash drawer")
+      const apiError = error as { response?: { data?: { detail?: string } } }
+      toast.error(apiError.response?.data?.detail || "Failed to open cash drawer")
     } finally {
       setIsSubmitting(false)
     }
@@ -146,9 +148,10 @@ export default function CashDrawerPage() {
       setCashTakenOut("")
       setCashTakenOutReason("")
       setNotes("")
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error closing drawer:", error)
-      toast.error(error.response?.data?.detail || "Failed to close cash drawer")
+      const apiError = error as { response?: { data?: { detail?: string } } }
+      toast.error(apiError.response?.data?.detail || "Failed to close cash drawer")
     } finally {
       setIsSubmitting(false)
     }
@@ -169,8 +172,8 @@ export default function CashDrawerPage() {
     return (
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-gray-400 mx-auto mb-2" />
-          <p className="text-sm text-gray-500">Loading cash drawer...</p>
+          <Loader2 className="h-8 w-8 animate-spin text-text-muted mx-auto mb-2" />
+          <p className="text-sm text-text-muted">Loading cash drawer...</p>
         </div>
       </div>
     )
@@ -180,8 +183,8 @@ export default function CashDrawerPage() {
     return (
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center">
-          <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-2" />
-          <p className="text-gray-500">Failed to load cash drawer</p>
+          <AlertCircle className="h-12 w-12 text-text-muted mx-auto mb-2" />
+          <p className="text-text-muted">Failed to load cash drawer</p>
         </div>
       </div>
     )
@@ -205,7 +208,7 @@ export default function CashDrawerPage() {
         <CardContent className="p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <DollarSign className="h-5 w-5 text-gray-500" />
+              <DollarSign className="h-5 w-5 text-text-muted" />
               <div>
                 <p className="text-sm font-medium">Drawer Status</p>
                 <p className="text-xs text-muted-foreground">
@@ -217,7 +220,7 @@ export default function CashDrawerPage() {
                 </p>
               </div>
             </div>
-            <Badge className={isDrawerOpen ? "bg-green-500" : "bg-gray-500"}>
+            <Badge className={isDrawerOpen ? "bg-green-500/40 text-green-400" : "bg-surface-row text-text-muted"}>
               {isDrawerOpen ? "Open" : "Closed"}
             </Badge>
           </div>
@@ -241,7 +244,7 @@ export default function CashDrawerPage() {
               <CardTitle className="text-sm font-medium text-muted-foreground">Cash In</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-600">{formatPrice(summary.cash_payments)}</div>
+              <div className="text-2xl font-bold text-green-400">{formatPrice(summary.cash_payments)}</div>
             </CardContent>
           </Card>
 
@@ -250,7 +253,7 @@ export default function CashDrawerPage() {
               <CardTitle className="text-sm font-medium text-muted-foreground">Cash Out (Refunds)</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-red-600">{formatPrice(summary.cash_refunds)}</div>
+              <div className="text-2xl font-bold text-red-400">{formatPrice(summary.cash_refunds)}</div>
             </CardContent>
           </Card>
 
@@ -259,7 +262,7 @@ export default function CashDrawerPage() {
               <CardTitle className="text-sm font-medium text-muted-foreground">Expected Cash</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-blue-600">{formatPrice(summary.expected_cash)}</div>
+              <div className="text-2xl font-bold text-accent">{formatPrice(summary.expected_cash)}</div>
             </CardContent>
           </Card>
         </div>

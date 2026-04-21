@@ -32,7 +32,7 @@ export default function PurchaseInvoicesPage() {
   const loadInvoices = async () => {
     try {
       setLoading(true);
-      const params: any = { size: 50 };
+      const params: Record<string, string | number> = { size: 50 };
       if (statusFilter !== 'all') params.status = statusFilter;
       if (searchDebounced) params.search = searchDebounced;
       if (startDate) params.start_date = startDate;
@@ -59,18 +59,17 @@ export default function PurchaseInvoicesPage() {
     });
   };
 
-  const getStatusBadge = (status: string) => {
-    const variants: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
-      draft: 'secondary',
-      received: 'default',
-      partially_paid: 'secondary',
-      paid: 'default',
+  const getStatusChip = (status: string) => {
+    const styles: Record<string, string> = {
+      draft: 'bg-slate-500/40 text-slate-400',
+      received: 'bg-blue-500/40 text-blue-400',
+      partially_paid: 'bg-amber-500/40 text-amber-400',
+      paid: 'bg-green-500/40 text-green-400',
     };
-
     return (
-      <Badge variant={variants[status] || 'secondary'}>
+      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${styles[status] ?? 'bg-slate-500/40 text-slate-400'}`}>
         {status.replace('_', ' ').toUpperCase()}
-      </Badge>
+      </span>
     );
   };
 
@@ -82,7 +81,7 @@ export default function PurchaseInvoicesPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold">Purchase Invoices</h1>
-          <p className="text-muted-foreground text-sm">Track and manage supplier invoices</p>
+          <p className="text-text-secondary text-sm">Track and manage supplier invoices</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" className="sm:size-auto" onClick={() => router.push('/dashboard/purchases/suppliers')}>
@@ -145,7 +144,7 @@ export default function PurchaseInvoicesPage() {
       {/* Search and Date Filters */}
       <div className="flex flex-col sm:flex-row gap-2">
         <div className="relative flex-1">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-text-muted" />
           <Input
             placeholder="Search by invoice # or supplier..."
             value={searchQuery}
@@ -172,7 +171,7 @@ export default function PurchaseInvoicesPage() {
       </div>
 
       {invoices.length > 0 && (
-        <p className="text-sm text-muted-foreground">
+        <p className="text-sm text-text-secondary">
           Showing {invoices.length} invoice{invoices.length !== 1 ? 's' : ''}
           {searchDebounced && ` matching "${searchDebounced}"`}
         </p>
@@ -184,94 +183,125 @@ export default function PurchaseInvoicesPage() {
       ) : filteredInvoices.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center">
-            <FileText className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-            <p className="text-muted-foreground">
+            <FileText className="mx-auto h-12 w-12 text-text-muted mb-4" />
+            <p className="text-text-secondary">
               No purchase invoices found
             </p>
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-3">
-          {filteredInvoices.map((invoice) => (
-            <Card key={invoice.id} className="hover:shadow-md transition-shadow">
-              <CardContent className="p-4 md:p-6">
-                <div className="space-y-3">
-                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <h3 className="text-base sm:text-lg font-semibold">{invoice.invoice_number}</h3>
-                        {getStatusBadge(invoice.status)}
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        <span className="font-medium">{invoice.supplier_name}</span>
-                      </p>
-                      <p className="text-xs sm:text-sm text-muted-foreground">
-                        {formatDate(invoice.invoice_date)}
-                        {invoice.due_date && ` • Due: ${formatDate(invoice.due_date)}`}
-                      </p>
-                    </div>
+        <>
+          {/* Mobile Cards */}
+          <div className="md:hidden space-y-2">
+            {filteredInvoices.map((invoice) => (
+              <div key={invoice.id} className="bg-surface-card border border-border-subtle rounded-lg p-4 space-y-2">
+                {/* Row 1: invoice ref + date */}
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-mono text-xs text-text-muted">{invoice.invoice_number}</span>
+                  <span className="text-xs text-text-secondary">{formatDate(invoice.invoice_date)}</span>
+                </div>
+                {/* Row 2: supplier name + status chip */}
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-text-primary font-semibold text-sm">{invoice.supplier_name}</span>
+                  {getStatusChip(invoice.status)}
+                </div>
+                {/* Row 3: total amount + view button */}
+                <div className="flex items-center justify-between gap-2 pt-1 border-t border-border-subtle">
+                  <span className="text-accent font-bold">{formatCurrency(invoice.total_amount)}</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => router.push(`/dashboard/purchases/invoices/${invoice.id}`)}
+                  >
+                    <Eye className="mr-1 h-4 w-4" />
+                    View
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
 
-                    <div className="text-left sm:text-right shrink-0">
-                      <div className="text-xl sm:text-2xl font-bold">
-                        {formatCurrency(invoice.total_amount)}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        Paid: {formatCurrency(invoice.paid_amount)}
-                      </div>
-                      {invoice.balance_due > 0 && (
-                        <div className="text-sm font-medium text-orange-600">
-                          Due: {formatCurrency(invoice.balance_due)}
+          {/* Desktop Cards */}
+          <div className="hidden md:block space-y-3">
+            {filteredInvoices.map((invoice) => (
+              <div key={invoice.id} className="bg-surface-card border border-border-subtle rounded-lg p-6 hover:bg-surface-row transition-colors">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-start gap-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <h3 className="text-lg font-semibold text-text-primary">{invoice.invoice_number}</h3>
+                          {getStatusChip(invoice.status)}
                         </div>
-                      )}
+                        <p className="text-sm text-text-primary font-medium mb-1">{invoice.supplier_name}</p>
+                        <p className="text-sm text-text-secondary">
+                          Invoice Date: {formatDate(invoice.invoice_date)}
+                          {invoice.due_date && ` • Due: ${formatDate(invoice.due_date)}`}
+                        </p>
+                      </div>
+
+                      <div className="text-right min-w-[200px]">
+                        <div className="text-2xl font-bold text-accent">
+                          {formatCurrency(invoice.total_amount)}
+                        </div>
+                        <div className="text-sm text-text-secondary">
+                          Paid: {formatCurrency(invoice.paid_amount)}
+                        </div>
+                        {invoice.balance_due > 0 && (
+                          <div className="text-sm font-medium text-amber-400">
+                            Due: {formatCurrency(invoice.balance_due)}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
+                </div>
 
-                  <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2 mt-4">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => router.push(`/dashboard/purchases/invoices/${invoice.id}`)}
+                  >
+                    <Eye className="mr-1.5 h-4 w-4" />
+                    View
+                  </Button>
+
+                  {invoice.status === 'draft' && (
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => router.push(`/dashboard/purchases/invoices/${invoice.id}`)}
+                      onClick={async () => {
+                        try {
+                          await purchaseApi.markGoodsReceived(invoice.id);
+                          toast.success('Goods marked as received');
+                          loadInvoices();
+                        } catch (error) {
+                          console.error('Error marking goods received:', error);
+                          toast.error('Failed to mark goods as received');
+                        }
+                      }}
                     >
-                      <Eye className="mr-1.5 h-4 w-4" />
-                      View
+                      <CheckCircle className="mr-1.5 h-4 w-4" />
+                      Received
                     </Button>
+                  )}
 
-                    {invoice.status === 'draft' && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={async () => {
-                          try {
-                            await purchaseApi.markGoodsReceived(invoice.id);
-                            toast.success('Goods marked as received');
-                            loadInvoices();
-                          } catch (error) {
-                            console.error('Error marking goods received:', error);
-                            toast.error('Failed to mark goods as received');
-                          }
-                        }}
-                      >
-                        <CheckCircle className="mr-1.5 h-4 w-4" />
-                        Received
-                      </Button>
-                    )}
-
-                    {(invoice.status === 'received' || invoice.status === 'partially_paid') && invoice.balance_due > 0 && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => router.push(`/dashboard/purchases/payments/new?invoice_id=${invoice.id}`)}
-                      >
-                        <DollarSign className="mr-1.5 h-4 w-4" />
-                        Pay
-                      </Button>
-                    )}
-                  </div>
+                  {(invoice.status === 'received' || invoice.status === 'partially_paid') && invoice.balance_due > 0 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => router.push(`/dashboard/purchases/payments/new?invoice_id=${invoice.id}`)}
+                    >
+                      <DollarSign className="mr-1.5 h-4 w-4" />
+                      Pay
+                    </Button>
+                  )}
                 </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+              </div>
+            ))}
+          </div>
+        </>
       )}
     </div>
   );

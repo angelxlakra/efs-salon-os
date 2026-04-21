@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Users, DollarSign, Scissors, TrendingUp, Clock, Cake } from 'lucide-react';
+import { Users, Cake } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,8 @@ import { useCartStore } from '@/stores/cart-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { ActiveCustomerCard } from '@/components/dashboard/active-customer-card';
 import { TrendIndicator } from '@/components/dashboard/trend-indicator';
+import { StatCard } from '@/components/dashboard/stat-card';
+import { ServiceQueue } from '@/components/dashboard/service-queue';
 import { DualRadialGoals } from '@/components/dashboard/radial-goal-progress';
 import { HourlyTrendChart } from '@/components/dashboard/hourly-trend-chart';
 import { ServiceDistributionChart } from '@/components/dashboard/service-distribution-chart';
@@ -38,7 +40,7 @@ interface WalkIn {
   customer_id: string | null;
   service: Service;
   assigned_staff: Staff;
-  status: string;
+  status: 'checked_in' | 'in_progress' | 'completed' | 'cancelled';
   checked_in_at: string | null;
   started_at: string | null;
   completed_at: string | null;
@@ -64,7 +66,6 @@ interface DashboardStats {
   today_customers: number;
   active_services: number;
   pending_bills: number;
-  avg_service_duration_minutes?: number | null;
 }
 
 interface SalonSettings {
@@ -99,6 +100,13 @@ interface ServicePerformance {
 interface TrendDataPoint {
   date: string;
   value: number;
+}
+
+interface DailyMetric {
+  date: string;
+  revenue_paise: number;
+  customers_count: number;
+  services_count: number;
 }
 
 export default function DashboardPage() {
@@ -180,7 +188,6 @@ export default function DashboardPage() {
         today_customers: metrics.total_bills,
         active_services: metrics.active_appointments,
         pending_bills: metrics.pending_appointments,
-        avg_service_duration_minutes: metrics.avg_service_duration_minutes,
       });
 
       // Update settings (goals)
@@ -214,34 +221,25 @@ export default function DashboardPage() {
 
       // Update trends data
       if (trendsResponse.data?.daily_metrics) {
-        const dailyMetrics = trendsResponse.data.daily_metrics;
+        const dailyMetrics: DailyMetric[] = trendsResponse.data.daily_metrics;
         setTrendsData({
-          revenue: dailyMetrics.map((d: any) => ({
-            date: d.date,
-            value: d.revenue_paise,
-          })),
-          customers: dailyMetrics.map((d: any) => ({
-            date: d.date,
-            value: d.customers_count,
-          })),
-          services: dailyMetrics.map((d: any) => ({
-            date: d.date,
-            value: d.services_count,
-          })),
+          revenue:   dailyMetrics.map((d) => ({ date: d.date, value: d.revenue_paise })),
+          customers: dailyMetrics.map((d) => ({ date: d.date, value: d.customers_count })),
+          services:  dailyMetrics.map((d) => ({ date: d.date, value: d.services_count })),
         });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to fetch dashboard data:', error);
 
       // Set default empty state on error
       setActiveSessions([]);
 
       // Only show error toast on initial load, not during background refreshes
-      if (!silent) {
-        toast.error(
-          error.response?.data?.detail || 'Failed to load dashboard data'
-        );
-      }
+      const detail =
+        error instanceof Error && (error as any).response?.data?.detail
+          ? (error as any).response.data.detail
+          : 'Failed to load dashboard data';
+      if (!silent) toast.error(detail);
     } finally {
       setIsLoading(false);
     }
@@ -249,14 +247,6 @@ export default function DashboardPage() {
 
   const formatPrice = (paise: number) => {
     return `₹${(paise / 100).toLocaleString('en-IN')}`;
-  };
-
-  const formatDuration = (minutes: number | null | undefined) => {
-    if (!minutes) return 'N/A';
-    if (minutes < 60) return `${minutes} min`;
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
   };
 
   const getCurrentDate = () => {
@@ -319,7 +309,7 @@ export default function DashboardPage() {
     <div className="space-y-3">
       {/* Header with Date */}
       <div className="flex justify-end -mb-1">
-        <p className="text-xs font-medium text-gray-500 bg-gray-50 px-2 py-0.5 rounded-full border">
+        <p className="text-xs font-medium text-text-secondary bg-surface-card px-2 py-0.5 rounded-full border border-border-subtle">
           {getCurrentDate()}
         </p>
       </div>
@@ -327,115 +317,56 @@ export default function DashboardPage() {
       {/* Birthday Banner — only shown when there are birthdays today */}
       {birthdayUsers.length > 0 && (
         <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-pink-500 via-purple-500 to-yellow-400 p-[2px]">
-          <div className="flex items-center gap-4 rounded-xl bg-gradient-to-r from-pink-50 via-purple-50 to-yellow-50 px-5 py-4">
+          <div className="flex items-center gap-4 rounded-xl bg-surface-card px-5 py-4">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-pink-400 to-purple-500 shadow-lg">
               <Cake className="h-6 w-6 text-white" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-bold text-purple-800">
+              <p className="text-sm font-bold text-text-primary">
                 {birthdayUsers.length === 1
                   ? `Happy Birthday, ${birthdayUsers[0].full_name}!`
                   : `Happy Birthday to ${birthdayUsers.map(u => u.full_name).join(' & ')}!`}
               </p>
-              <p className="text-xs text-purple-600 mt-0.5">
+              <p className="text-xs text-text-secondary mt-0.5">
                 {birthdayUsers.length === 1
                   ? 'Wishing them a wonderful day!'
                   : `${birthdayUsers.length} team members celebrating today!`}
               </p>
             </div>
-            <div className="text-2xl select-none">🎉</div>
           </div>
         </div>
       )}
 
-      {/* Quick Stats - Ultra Compact Design */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2">
-        <Card className="p-2 shadow-sm flex flex-col justify-between relative overflow-hidden">
-          <div className="flex items-center justify-between">
-            <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Revenue</p>
-            <DollarSign className="h-3 w-3 text-green-600" />
-          </div>
-          <div className="mt-1">
-            <div className="flex items-center justify-between">
-              <div className="text-lg font-bold text-gray-900 leading-none">
-                {formatPrice(stats.today_revenue)}
-              </div>
-              {comparison && (
-                <TrendIndicator value={comparison.revenue_percent_change} />
-              )}
-            </div>
-            <p className="text-[10px] text-gray-500 truncate mt-0.5">
-              {stats.today_services} services done
-            </p>
-          </div>
-          {trendsData.revenue.length > 0 && (
-            <div className="absolute top-1 right-1 opacity-30">
-              <DailyComparisonSparkline data={trendsData.revenue} color="#10b981" />
-            </div>
-          )}
-        </Card>
-
-        <Card className="p-2 shadow-sm flex flex-col justify-between relative overflow-hidden">
-          <div className="flex items-center justify-between">
-            <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Customers</p>
-            <Users className="h-3 w-3 text-blue-600" />
-          </div>
-          <div className="mt-1">
-            <div className="flex items-center justify-between">
-              <div className="text-lg font-bold text-gray-900 leading-none">
-                {stats.today_customers}
-              </div>
-              {comparison && (
-                <TrendIndicator value={comparison.customers_percent_change} />
-              )}
-            </div>
-            <p className="text-[10px] text-gray-500 truncate mt-0.5">Served today</p>
-          </div>
-          {trendsData.customers.length > 0 && (
-            <div className="absolute top-1 right-1 opacity-30">
-              <DailyComparisonSparkline data={trendsData.customers} color="#3b82f6" />
-            </div>
-          )}
-        </Card>
-
-        <Card className="p-2 shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Active</p>
-            <Scissors className="h-3 w-3 text-purple-600" />
-          </div>
-          <div className="mt-1">
-            <div className="text-lg font-bold text-gray-900 leading-none">
-              {activeSessions.length}
-            </div>
-            <p className="text-[10px] text-gray-500 truncate mt-0.5">In salon</p>
-          </div>
-        </Card>
-
-        <Card className="p-2 shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Pending</p>
-            <Clock className="h-3 w-3 text-orange-600" />
-          </div>
-          <div className="mt-1">
-            <div className="text-lg font-bold text-gray-900 leading-none">
-              {stats.pending_bills}
-            </div>
-            <p className="text-[10px] text-gray-500 truncate mt-0.5">Not billed</p>
-          </div>
-        </Card>
-
-        <Card className="p-2 shadow-sm flex flex-col justify-between hidden md:flex">
-          <div className="flex items-center justify-between">
-            <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Avg Time</p>
-            <TrendingUp className="h-3 w-3 text-indigo-600" />
-          </div>
-          <div className="mt-1">
-            <div className="text-lg font-bold text-gray-900 leading-none">
-              {formatDuration(stats.avg_service_duration_minutes)}
-            </div>
-            <p className="text-[10px] text-gray-500 truncate mt-0.5">Per service</p>
-          </div>
-        </Card>
+      {/* Quick Stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+        <StatCard
+          title="Today's Revenue"
+          value={formatPrice(stats.today_revenue)}
+          subValue={
+            settings.daily_revenue_target_paise > 0
+              ? `${Math.min(100, Math.round((stats.today_revenue / settings.daily_revenue_target_paise) * 100))}% of daily goal`
+              : undefined
+          }
+          sensitive
+          visibilityKey="revenue-visible"
+          trend={comparison ? <TrendIndicator value={comparison.revenue_percent_change} /> : undefined}
+        />
+        <StatCard
+          title="Services"
+          value={String(stats.today_services)}
+          subValue={`target: ${settings.daily_services_target}`}
+          trend={comparison ? <TrendIndicator value={comparison.services_percent_change} /> : undefined}
+        />
+        <StatCard
+          title="Customers"
+          value={String(stats.today_customers)}
+          trend={comparison ? <TrendIndicator value={comparison.customers_percent_change} /> : undefined}
+        />
+        <StatCard
+          title="Active Now"
+          value={String(stats.active_services)}
+          subValue={stats.pending_bills ? `${stats.pending_bills} pending` : undefined}
+        />
       </div>
 
       {/* Active Customers Section */}
@@ -459,9 +390,9 @@ export default function DashboardPage() {
             <CardContent>
               {activeSessions.length === 0 ? (
                 <div className="text-center py-12">
-                  <Users className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                  <p className="text-gray-500">No active customers right now</p>
-                  <p className="text-sm text-gray-400 mt-1">
+                  <Users className="h-12 w-12 text-text-muted mx-auto mb-3" />
+                  <p className="text-text-secondary">No active customers right now</p>
+                  <p className="text-sm text-text-muted mt-1">
                     Customers in service will appear here
                   </p>
                 </div>
@@ -495,60 +426,20 @@ export default function DashboardPage() {
                 servicesTarget={settings.daily_services_target}
                 currentServices={stats.today_services}
               />
-              <div className="pt-4 mt-4 border-t">
+              <div className="pt-4 mt-4 border-t border-border-subtle">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600">Avg. Bill Value</span>
-                  <span className="font-semibold text-gray-900">
-                    {formatPrice(Math.round(stats.today_revenue / (stats.today_services || 1)))}
+                  <span className="text-text-secondary">Avg. Bill Value</span>
+                  <span className="font-semibold text-text-primary">
+                    {stats.today_services > 0
+                      ? formatPrice(Math.round(stats.today_revenue / stats.today_services))
+                      : '—'}
                   </span>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* Quick Actions */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Quick Actions</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <a
-                href="/dashboard/pos"
-                className="flex items-center justify-between p-3 rounded-lg border hover:border-primary hover:bg-primary/5 transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="bg-green-100 p-2 rounded-lg">
-                    <DollarSign className="h-5 w-5 text-green-600" />
-                  </div>
-                  <span className="font-medium">New Bill</span>
-                </div>
-              </a>
-
-              <a
-                href="/dashboard/customers"
-                className="flex items-center justify-between p-3 rounded-lg border hover:border-primary hover:bg-primary/5 transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="bg-blue-100 p-2 rounded-lg">
-                    <Users className="h-5 w-5 text-blue-600" />
-                  </div>
-                  <span className="font-medium">Add Customer</span>
-                </div>
-              </a>
-
-              <a
-                href="/dashboard/services"
-                className="flex items-center justify-between p-3 rounded-lg border hover:border-primary hover:bg-primary/5 transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="bg-purple-100 p-2 rounded-lg">
-                    <Scissors className="h-5 w-5 text-purple-600" />
-                  </div>
-                  <span className="font-medium">Manage Services</span>
-                </div>
-              </a>
-            </CardContent>
-          </Card>
+          <ServiceQueue sessions={activeSessions} />
         </div>
       </div>
 
@@ -565,7 +456,7 @@ export default function DashboardPage() {
               {hourlyData.length > 0 ? (
                 <HourlyTrendChart data={hourlyData} peakHour={peakHour} />
               ) : (
-                <div className="h-64 flex items-center justify-center text-gray-500">
+                <div className="h-64 flex items-center justify-center text-text-secondary">
                   <p className="text-sm">Loading hourly data...</p>
                 </div>
               )}
@@ -587,7 +478,7 @@ export default function DashboardPage() {
                   totalServices={stats.today_services}
                 />
               ) : (
-                <div className="h-64 flex items-center justify-center text-gray-500">
+                <div className="h-64 flex items-center justify-center text-text-secondary">
                   <p className="text-sm">No service data available</p>
                 </div>
               )}

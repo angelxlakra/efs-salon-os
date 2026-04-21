@@ -14,7 +14,6 @@ import { toast } from 'sonner';
 import {
   Settings,
   Building2,
-  MapPin,
   Phone,
   Mail,
   Globe,
@@ -25,8 +24,10 @@ import {
   Loader2,
   AlertCircle,
   RotateCcw,
-  Target
+  Target,
+  Check,
 } from 'lucide-react';
+import { AccentName, getAccent, setAccent } from '@/lib/theme';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Dialog,
@@ -66,7 +67,8 @@ export default function SettingsPage() {
   const { user } = useAuthStore();
   const isOwner = user?.role === 'owner';
 
-  const [settings, setSettings] = useState<any>(null);
+  const [settings, setSettings] = useState<Record<string, unknown> | null>(null);
+  const [currentAccent, setCurrentAccent] = useState<AccentName>('violet');
   const [originalData, setOriginalData] = useState<FormDataType | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -101,6 +103,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     setHasMounted(true);
+    setCurrentAccent(getAccent());
     fetchSettings();
   }, []);
 
@@ -135,9 +138,9 @@ export default function SettingsPage() {
       setFormData(initialData);
       setOriginalData(initialData);
       setHasChanges(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error('Failed to load settings');
-      console.error(error);
+      console.error('Settings fetch failed:', error);
     } finally {
       setIsLoading(false);
     }
@@ -241,9 +244,10 @@ export default function SettingsPage() {
       toast.success('Settings updated successfully');
       setHasChanges(false);
       fetchSettings();
-    } catch (error: any) {
-      toast.error(error.response?.data?.detail || 'Failed to update settings');
-      console.error(error);
+    } catch (error: unknown) {
+      const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      toast.error(detail || 'Failed to update settings');
+      console.error('Settings save failed:', error);
     } finally {
       setIsSaving(false);
     }
@@ -260,9 +264,9 @@ export default function SettingsPage() {
       toast.success('Settings reset to defaults');
       setHasChanges(false);
       fetchSettings();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error('Failed to reset settings');
-      console.error(error);
+      console.error('Settings reset failed:', error);
     } finally {
       setIsSaving(false);
     }
@@ -288,8 +292,8 @@ export default function SettingsPage() {
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center h-96 gap-4">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <p className="text-sm text-muted-foreground">Loading settings...</p>
+        <Loader2 className="h-8 w-8 animate-spin text-accent" />
+        <p className="text-sm text-text-secondary">Loading settings...</p>
       </div>
     );
   }
@@ -299,11 +303,11 @@ export default function SettingsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-2">
+          <h1 className="text-3xl font-bold tracking-tight text-text-primary flex items-center gap-2">
             <Settings className="h-8 w-8" />
             Salon Settings
           </h1>
-          <p className="text-muted-foreground mt-1">
+          <p className="text-text-secondary mt-1">
             Manage your salon's business information and receipt customization.
           </p>
         </div>
@@ -426,7 +430,7 @@ export default function SettingsPage() {
             <div className="space-y-2">
               <Label htmlFor="contact_phone">Phone Number</Label>
               <div className="flex items-center gap-2">
-                <Phone className="h-4 w-4 text-muted-foreground" />
+                <Phone className="h-4 w-4 text-text-secondary" />
                 <Input
                   id="contact_phone"
                   value={formData.contact_phone}
@@ -438,7 +442,7 @@ export default function SettingsPage() {
             <div className="space-y-2">
               <Label htmlFor="contact_email">Email Address</Label>
               <div className="flex items-center gap-2">
-                <Mail className="h-4 w-4 text-muted-foreground" />
+                <Mail className="h-4 w-4 text-text-secondary" />
                 <Input
                   id="contact_email"
                   type="email"
@@ -451,7 +455,7 @@ export default function SettingsPage() {
             <div className="space-y-2">
               <Label htmlFor="contact_website">Website</Label>
               <div className="flex items-center gap-2">
-                <Globe className="h-4 w-4 text-muted-foreground" />
+                <Globe className="h-4 w-4 text-text-secondary" />
                 <Input
                   id="contact_website"
                   value={formData.contact_website}
@@ -486,7 +490,7 @@ export default function SettingsPage() {
                 placeholder="29XXXXX1234X1ZX"
                 maxLength={15}
               />
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-text-secondary">
                 GST Identification Number for tax invoices
               </p>
             </div>
@@ -499,7 +503,7 @@ export default function SettingsPage() {
                 placeholder="ABCDE1234F"
                 maxLength={10}
               />
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-text-secondary">
                 Permanent Account Number
               </p>
             </div>
@@ -528,7 +532,7 @@ export default function SettingsPage() {
               placeholder="e.g., Welcome! We're glad to serve you."
               rows={2}
             />
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-text-secondary">
               Custom message displayed at the top of receipts
             </p>
           </div>
@@ -542,7 +546,7 @@ export default function SettingsPage() {
               placeholder="e.g., Thank you for your visit! See you soon."
               rows={2}
             />
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-text-secondary">
               Custom message displayed at the bottom of receipts
             </p>
           </div>
@@ -553,7 +557,7 @@ export default function SettingsPage() {
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
                 <Label htmlFor="receipt_show_gstin">Show GSTIN on Receipts</Label>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-text-secondary">
                   Display GST Identification Number on printed receipts
                 </p>
               </div>
@@ -567,7 +571,7 @@ export default function SettingsPage() {
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
                 <Label htmlFor="receipt_show_logo">Show Logo on Receipts</Label>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-text-secondary">
                   Display salon logo on printed receipts (if configured)
                 </p>
               </div>
@@ -603,7 +607,7 @@ export default function SettingsPage() {
               placeholder="SAL"
               maxLength={10}
             />
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-text-secondary">
               Invoice format: {formData.invoice_prefix}-YY-NNNN (e.g., {formData.invoice_prefix}-26-0001)
             </p>
           </div>
@@ -617,7 +621,7 @@ export default function SettingsPage() {
               placeholder="e.g., All services are non-refundable. Advance booking required for premium services."
               rows={3}
             />
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-text-secondary">
               Terms displayed on invoices (optional)
             </p>
           </div>
@@ -648,7 +652,7 @@ export default function SettingsPage() {
                 onChange={(e) => handleChange('daily_revenue_target_paise', parseInt(e.target.value) * 100)}
                 placeholder="20000"
               />
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-text-secondary">
                 Target daily revenue in rupees (default: ₹20,000)
               </p>
             </div>
@@ -663,10 +667,61 @@ export default function SettingsPage() {
                 onChange={(e) => handleChange('daily_services_target', parseInt(e.target.value) || 0)}
                 placeholder="25"
               />
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-text-secondary">
                 Target number of services per day (default: 25)
               </p>
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Appearance */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Palette className="h-5 w-5" />
+            Appearance
+          </CardTitle>
+          <CardDescription>
+            Choose an accent colour for the app. Your preference is saved locally on this device.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-3">
+            {(
+              [
+                { name: 'violet' as AccentName, label: 'Violet', hex: '#7c3aed' },
+                { name: 'rose' as AccentName, label: 'Rose', hex: '#e11d48' },
+                { name: 'amber' as AccentName, label: 'Amber', hex: '#d97706' },
+                { name: 'teal' as AccentName, label: 'Teal', hex: '#0d9488' },
+              ] as const
+            ).map((palette) => (
+              <button
+                key={palette.name}
+                type="button"
+                onClick={() => {
+                  setAccent(palette.name);
+                  setCurrentAccent(palette.name);
+                }}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg border transition-all hover:bg-surface-hover"
+                style={{
+                  borderColor: currentAccent === palette.name ? palette.hex : 'var(--color-border-subtle)',
+                  background: currentAccent === palette.name ? `${palette.hex}18` : undefined,
+                }}
+                aria-pressed={currentAccent === palette.name}
+                aria-label={`${palette.label} accent`}
+              >
+                <span
+                  className="h-4 w-4 rounded-full flex items-center justify-center shrink-0"
+                  style={{ background: palette.hex }}
+                >
+                  {currentAccent === palette.name && (
+                    <Check className="h-2.5 w-2.5 text-white" strokeWidth={3} />
+                  )}
+                </span>
+                <span className="text-sm font-medium text-text-primary">{palette.label}</span>
+              </button>
+            ))}
           </div>
         </CardContent>
       </Card>
@@ -686,7 +741,7 @@ export default function SettingsPage() {
           <div className="flex items-center justify-between">
             <div>
               <h4 className="font-medium">Reset to Default Settings</h4>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-text-secondary">
                 Reset all settings to factory defaults. This action cannot be undone.
               </p>
             </div>
@@ -704,9 +759,9 @@ export default function SettingsPage() {
 
       {/* Bottom Save Button */}
       {hasChanges && (
-        <div className="sticky bottom-0 bg-background border-t pt-4 pb-2 -mx-6 px-6 shadow-lg">
+        <div className="sticky bottom-0 bg-surface-sidebar border-t border-border-subtle pt-4 pb-2 -mx-6 px-6 shadow-lg">
           <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-text-secondary">
               You have unsaved changes
             </p>
             <div className="flex gap-2">
@@ -745,15 +800,15 @@ export default function SettingsPage() {
             {changesSummary.length > 0 ? (
               <div className="space-y-3">
                 {changesSummary.map((change, index) => (
-                  <div key={index} className="border rounded-lg p-3 bg-muted/50">
+                  <div key={index} className="border border-border-subtle rounded-lg p-3 bg-surface-row">
                     <p className="font-medium text-sm mb-2">{change.label}</p>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                       <div>
-                        <p className="text-muted-foreground mb-1">Previous:</p>
+                        <p className="text-text-secondary mb-1">Previous:</p>
                         <p className="text-red-600 line-through">{change.oldValue}</p>
                       </div>
                       <div>
-                        <p className="text-muted-foreground mb-1">New:</p>
+                        <p className="text-text-secondary mb-1">New:</p>
                         <p className="text-green-600 font-medium">{change.newValue}</p>
                       </div>
                     </div>
@@ -761,7 +816,7 @@ export default function SettingsPage() {
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">No changes detected.</p>
+              <p className="text-sm text-text-secondary">No changes detected.</p>
             )}
           </DialogBody>
 

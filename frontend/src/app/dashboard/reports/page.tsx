@@ -11,16 +11,16 @@ export default function ReportsPage() {
       description: 'View detailed revenue, costs, and profitability metrics',
       icon: TrendingUp,
       href: '/dashboard/reports/profit-loss',
-      iconColor: 'text-green-600',
-      bgColor: 'bg-green-50',
+      iconColor: 'text-green-400',
+      bgColor: 'bg-green-500/10',
     },
     {
       title: 'Daily Summary',
       description: 'Daily revenue, expenses, and transaction summaries',
       icon: FileText,
       href: '/dashboard',
-      iconColor: 'text-blue-600',
-      bgColor: 'bg-blue-50',
+      iconColor: 'text-blue-400',
+      bgColor: 'bg-blue-500/10',
       disabled: true,
     },
     {
@@ -28,8 +28,8 @@ export default function ReportsPage() {
       description: 'Service and product sales performance over time',
       icon: BarChart3,
       href: '/dashboard',
-      iconColor: 'text-purple-600',
-      bgColor: 'bg-purple-50',
+      iconColor: 'text-purple-400',
+      bgColor: 'bg-purple-500/10',
       disabled: true,
     },
     {
@@ -37,17 +37,17 @@ export default function ReportsPage() {
       description: 'Operating expense analysis by category',
       icon: PieChart,
       href: '/dashboard',
-      iconColor: 'text-orange-600',
-      bgColor: 'bg-orange-50',
+      iconColor: 'text-orange-400',
+      bgColor: 'bg-orange-500/10',
       disabled: true,
     },
   ];
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 bg-surface-page min-h-full">
       <div>
-        <h1 className="text-2xl font-bold">Reports</h1>
-        <p className="text-muted-foreground">
+        <h1 className="text-2xl font-bold text-text-primary">Reports</h1>
+        <p className="text-text-secondary">
           Access financial and operational reports for your salon
         </p>
       </div>

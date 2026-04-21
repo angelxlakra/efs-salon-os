@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { CheckCircle, Edit, Trash2 } from 'lucide-react';
@@ -68,27 +67,29 @@ export function ExpenseList({ filters, refreshTrigger, onExpenseUpdated, onEditE
     });
   };
 
-  const getStatusBadge = (status: ExpenseStatus) => {
-    const variants = {
-      [ExpenseStatus.APPROVED]: 'bg-green-100 text-green-800',
-      [ExpenseStatus.PENDING]: 'bg-yellow-100 text-yellow-800',
-      [ExpenseStatus.REJECTED]: 'bg-red-100 text-red-800',
-    };
+  const formatCategory = (category: string) =>
+    category.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
 
+  const getStatusChip = (status: ExpenseStatus) => {
+    const styles: Record<ExpenseStatus, string> = {
+      [ExpenseStatus.APPROVED]: 'bg-green-500/40 text-green-400',
+      [ExpenseStatus.PENDING]: 'bg-amber-500/40 text-amber-400',
+      [ExpenseStatus.REJECTED]: 'bg-red-500/40 text-red-400',
+    };
     return (
-      <Badge className={variants[status]}>
+      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${styles[status]}`}>
         {status.charAt(0).toUpperCase() + status.slice(1)}
-      </Badge>
+      </span>
     );
   };
 
   if (loading) {
-    return <Card className="p-8 text-center text-gray-500">Loading expenses...</Card>;
+    return <Card className="p-8 text-center text-text-secondary">Loading expenses...</Card>;
   }
 
   if (expenses.length === 0) {
     return (
-      <Card className="p-8 text-center text-gray-500">
+      <Card className="p-8 text-center text-text-secondary">
         No expenses found. Create your first expense to get started.
       </Card>
     );
@@ -96,75 +97,84 @@ export function ExpenseList({ filters, refreshTrigger, onExpenseUpdated, onEditE
 
   return (
     <>
-      <Card>
-        {/* Mobile Card View */}
-        <div className="block md:hidden divide-y divide-gray-200">
-          {expenses.map((expense) => (
-            <div key={expense.id} className="p-4 space-y-2">
-              <div className="flex justify-between items-start gap-2">
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-gray-900 line-clamp-2">{expense.description}</p>
-                  {expense.vendor_name && (
-                    <p className="text-xs text-gray-500 mt-0.5">Vendor: {expense.vendor_name}</p>
-                  )}
-                </div>
-                {getStatusBadge(expense.status)}
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-xs text-gray-500">{formatDate(expense.expense_date)}</span>
-                <span className="font-semibold text-gray-900">{formatCurrency(expense.amount)}</span>
-              </div>
-              <div className="flex gap-2 pt-1">
-                {expense.status === ExpenseStatus.PENDING && isOwner && (
-                  <Button size="sm" variant="outline" onClick={() => setApprovingExpense(expense)}>
-                    <CheckCircle className="h-3.5 w-3.5 mr-1" /> Approve
+      {/* Mobile Cards */}
+      <div className="md:hidden space-y-2">
+        {expenses.map((expense) => (
+          <div key={expense.id} className="bg-surface-card border border-border-subtle rounded-lg p-4 space-y-2">
+            {/* Row 1: date + category chip */}
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs text-text-secondary">{formatDate(expense.expense_date)}</span>
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-500/40 text-purple-400">
+                {formatCategory(expense.category)}
+              </span>
+            </div>
+            {/* Row 2: description + amount */}
+            <div className="flex items-start justify-between gap-2">
+              <span className="text-text-primary font-semibold text-sm">{expense.description}</span>
+              <span className="text-accent font-bold text-sm shrink-0">{formatCurrency(expense.amount)}</span>
+            </div>
+            {/* Row 3: payment method / vendor + status */}
+            <div className="flex items-center justify-between gap-2 pt-1 border-t border-border-subtle">
+              <span className="text-text-secondary text-xs">
+                {expense.vendor_name ? `Vendor: ${expense.vendor_name}` : ' '}
+              </span>
+              <div className="flex items-center gap-1">
+                {getStatusChip(expense.status)}
+                {expense.status === ExpenseStatus.PENDING && (
+                  <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setApprovingExpense(expense)}>
+                    <CheckCircle className="h-4 w-4" />
                   </Button>
                 )}
-                {(isOwner || expense.status !== ExpenseStatus.APPROVED) && (
-                  <Button size="sm" variant="outline" onClick={() => onEditExpense(expense)}>
-                    <Edit className="h-3.5 w-3.5" />
-                  </Button>
-                )}
-                {isOwner && (
-                  <Button size="sm" variant="outline" onClick={() => handleDelete(expense.id)}>
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
+                {expense.status !== ExpenseStatus.APPROVED && (
+                  <>
+                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => onEditExpense(expense)}>
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => handleDelete(expense.id)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </>
                 )}
               </div>
             </div>
-          ))}
+          </div>
+        ))}
+        <div className="text-xs text-text-muted text-center py-2">
+          Showing {expenses.length} of {total} expenses
         </div>
+      </div>
 
-        {/* Desktop Table View */}
-        <div className="hidden md:block overflow-x-auto">
+      {/* Desktop Table */}
+      <Card className="hidden md:block">
+        <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-50 border-b">
+            <thead className="bg-surface-page border-b border-border-subtle">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase">Date</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase">Category</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase">Description</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-text-secondary uppercase">Amount</th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-text-secondary uppercase">Status</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-text-secondary uppercase">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
+            <tbody className="divide-y divide-border-subtle">
               {expenses.map((expense) => (
-                <tr key={expense.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 text-sm text-gray-900">{formatDate(expense.expense_date)}</td>
-                  <td className="px-6 py-4 text-sm text-gray-600">
-                    {expense.category.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
+                <tr key={expense.id} className="hover:bg-surface-row">
+                  <td className="px-6 py-4 text-sm text-text-primary">{formatDate(expense.expense_date)}</td>
+                  <td className="px-6 py-4 text-sm text-text-secondary">
+                    {formatCategory(expense.category)}
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-900">
+                  <td className="px-6 py-4 text-sm text-text-primary">
                     {expense.description}
                     {expense.vendor_name && (
-                      <div className="text-xs text-gray-500 mt-1">Vendor: {expense.vendor_name}</div>
+                      <div className="text-xs text-text-muted mt-1">Vendor: {expense.vendor_name}</div>
                     )}
                   </td>
-                  <td className="px-6 py-4 text-sm text-right font-medium text-gray-900">
+                  <td className="px-6 py-4 text-sm text-right font-medium text-accent">
                     {formatCurrency(expense.amount)}
                   </td>
-                  <td className="px-6 py-4 text-center">{getStatusBadge(expense.status)}</td>
+                  <td className="px-6 py-4 text-center">{getStatusChip(expense.status)}</td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end gap-2">
                       {expense.status === ExpenseStatus.PENDING && isOwner && (
@@ -203,8 +213,8 @@ export function ExpenseList({ filters, refreshTrigger, onExpenseUpdated, onEditE
         </div>
 
         {/* Pagination */}
-        <div className="px-4 py-3 border-t flex items-center justify-between">
-          <div className="text-sm text-gray-500">
+        <div className="px-6 py-4 border-t border-border-subtle flex items-center justify-between">
+          <div className="text-sm text-text-secondary">
             Showing {expenses.length} of {total} expenses
           </div>
         </div>

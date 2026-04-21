@@ -60,10 +60,10 @@ export default function ExpensesPage() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">
+            <h1 className="text-2xl font-bold text-text-primary">
               {editingExpense ? 'Edit Expense' : 'New Expense'}
             </h1>
-            <p className="text-sm text-gray-500 mt-1">
+            <p className="text-sm text-text-secondary mt-1">
               {editingExpense ? `Updating expense from ${editingExpense.expense_date}` : 'Record a new business expense'}
             </p>
           </div>
@@ -92,8 +92,8 @@ export default function ExpensesPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Expenses</h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <h1 className="text-2xl font-bold text-text-primary">Expenses</h1>
+          <p className="text-sm text-text-secondary mt-1">
             Track and manage business expenses
           </p>
         </div>

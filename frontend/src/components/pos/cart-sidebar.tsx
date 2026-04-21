@@ -28,6 +28,12 @@ import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { StaffContributionCreate } from '@/types/multi-staff';
 
+interface AvailableStaff {
+  id: string;
+  display_name: string;
+  is_active: boolean;
+}
+
 interface CartSidebarProps {
   onCheckout: () => void;
   customerSearchRef?: RefObject<{ openSearch: () => void } | null>;
@@ -87,7 +93,7 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
   // Ad-hoc multi-staff team editor
   const [showTeamEditor, setShowTeamEditor] = useState(false);
   const [teamEditorItemId, setTeamEditorItemId] = useState<string | null>(null);
-  const [availableStaff, setAvailableStaff] = useState<any[]>([]);
+  const [availableStaff, setAvailableStaff] = useState<AvailableStaff[]>([]);
 
   // Fetch settings and staff on mount
   useEffect(() => {
@@ -228,7 +234,6 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
   const [isUpdatingSessionCustomer, setIsUpdatingSessionCustomer] = useState(false);
 
   const handleCustomerChange = (newCustomerId: string | null, newCustomerName: string | null, newCustomerPhone?: string | null) => {
-    console.log('handleCustomerChange called with:', newCustomerId, newCustomerName, newCustomerPhone);
     setCustomer(newCustomerId, newCustomerName || 'Walk-in Customer', newCustomerPhone || null);
   };
 
@@ -511,21 +516,21 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
   });
 
   return (
-    <div className="w-full bg-white md:rounded-xl md:border border-gray-200 flex flex-col md:sticky md:top-0 h-full md:h-[calc(100vh-7rem)] md:shadow-sm">
+    <div className="w-full bg-surface-card md:rounded-xl md:border border-border-subtle flex flex-col md:sticky md:top-0 h-full md:h-[calc(100vh-7rem)] md:shadow-sm">
       {/* Header */}
-      <div className="p-4 pr-12 md:pr-4 border-b border-gray-200 flex-shrink-0 relative">
+      <div className="p-4 pr-12 md:pr-4 border-b border-border-subtle flex-shrink-0 relative">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <ShoppingCart className="h-5 w-5 text-gray-700" />
-            <h2 className="font-semibold text-gray-900">Cart</h2>
-            <span className="text-sm text-gray-500">({items.length})</span>
+            <ShoppingCart className="h-5 w-5 text-text-primary" />
+            <h2 className="font-semibold text-text-primary">Cart</h2>
+            <span className="text-sm text-text-secondary">({items.length})</span>
           </div>
           {items.length > 0 && (
             <Button
               variant="ghost"
               size="sm"
               onClick={handleClearCart}
-              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+              className="text-red-500 hover:text-red-400 hover:bg-red-950/40"
             >
               Clear
             </Button>
@@ -571,14 +576,14 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
       <ScrollArea className="flex-1 p-4">
         {isLoadingSession ? (
           <div className="flex flex-col items-center justify-center h-64 text-center">
-            <div className="h-12 w-12 rounded-full border-4 border-gray-200 border-t-black animate-spin mb-3" />
-            <p className="text-gray-500 text-sm">Loading active services...</p>
+            <div className="h-12 w-12 rounded-full border-4 border-border-subtle border-t-text-primary animate-spin mb-3" />
+            <p className="text-text-secondary text-sm">Loading active services...</p>
           </div>
         ) : items.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 text-center">
-            <ShoppingCart className="h-12 w-12 text-gray-300 mb-3" />
-            <p className="text-gray-500 text-sm">Your cart is empty</p>
-            <p className="text-gray-400 text-xs mt-1">
+            <ShoppingCart className="h-12 w-12 text-text-muted mb-3" />
+            <p className="text-text-secondary text-sm">Your cart is empty</p>
+            <p className="text-text-muted text-xs mt-1">
               Add services to get started
             </p>
           </div>
@@ -589,15 +594,15 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
                 key={item.id}
                 className={`rounded-lg p-3 space-y-2 ${
                   item.isBooked
-                    ? 'bg-green-50 border-2 border-green-200'
-                    : 'bg-gray-50 border-2 border-transparent'
+                    ? 'bg-green-950/40 border-2 border-green-800'
+                    : 'bg-surface-row border-2 border-transparent'
                 }`}
               >
                 {/* Item Name and Remove */}
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
-                      <h4 className="font-medium text-gray-900 text-sm">
+                      <h4 className="font-medium text-text-primary text-sm">
                         {item.isProduct ? item.productName : item.serviceName}
                       </h4>
                       {item.isProduct && (
@@ -611,7 +616,7 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
                         </Badge>
                       )}
                     </div>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-text-secondary">
                       {formatPrice(item.unitPrice)} each
                       {!item.isProduct && item.duration && ` • ${item.duration} min`}
                     </p>
@@ -621,10 +626,10 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
                     size="sm"
                     onClick={() => handleRemoveItem(item)}
                     disabled={cancellingItemId === item.id}
-                    className="h-7 w-7 p-0 text-gray-400 hover:text-red-600"
+                    className="h-7 w-7 p-0 text-text-muted hover:text-red-600"
                   >
                     {cancellingItemId === item.id ? (
-                      <div className="h-4 w-4 border-2 border-gray-300 border-t-red-600 rounded-full animate-spin" />
+                      <div className="h-4 w-4 border-2 border-border-subtle border-t-red-600 rounded-full animate-spin" />
                     ) : (
                       <Trash2 className="h-4 w-4" />
                     )}
@@ -637,7 +642,7 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
                     // Multi-staff service - show list of staff with roles
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <p className="text-xs text-gray-600 font-medium">Staff Team:</p>
+                        <p className="text-xs text-text-secondary font-medium">Staff Team:</p>
                         <Button
                           variant="ghost"
                           size="sm"
@@ -736,7 +741,7 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
 
       {/* Footer - Totals and Checkout */}
       {items.length > 0 && (
-        <div className="border-t border-gray-200 p-4 space-y-3 flex-shrink-0">
+        <div className="border-t border-border-subtle p-4 space-y-3 flex-shrink-0">
           {/* Discount Input */}
           <div className="space-y-2">
             <div className="flex gap-2">
@@ -777,7 +782,7 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
 
           {/* Price Breakdown */}
           <div className="space-y-1.5 text-sm">
-            <div className="flex justify-between text-gray-600">
+            <div className="flex justify-between text-text-secondary">
               <span>Subtotal</span>
               <span>{formatPrice(subtotal)}</span>
             </div>
@@ -795,13 +800,13 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
               </div>
             )}
             {hasGST() && (
-              <div className="flex justify-between text-gray-600">
+              <div className="flex justify-between text-text-secondary">
                 <span>GST (included)</span>
                 <span>{formatPrice(taxAmount)}</span>
               </div>
             )}
             <Separator />
-            <div className="flex justify-between text-lg font-bold text-gray-900">
+            <div className="flex justify-between text-lg font-bold text-text-primary">
               <span>Total</span>
               <span>{formatPrice(total)}</span>
             </div>
@@ -944,9 +949,9 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
                 handleUpdateSessionCustomer(id, name, phone);
               }}
             />
-            {isUpdatingSessionCustomer && (
-              <p className="text-sm text-center text-gray-500 mt-4">Updating...</p>
-            )}
+          {isUpdatingSessionCustomer && (
+            <p className="text-sm text-center text-text-secondary mt-4">Updating...</p>
+          )}
           </DialogBody>
         </DialogContent>
       </Dialog>
