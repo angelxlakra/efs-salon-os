@@ -54,6 +54,25 @@ interface ServiceGridProps {
   onServiceSelect?: (serviceId: string, serviceName: string, price: number, duration: number, staffId?: string | null) => void;
 }
 
+const CATEGORY_COLORS = [
+  'bg-rose-100 text-rose-700',
+  'bg-purple-100 text-purple-700',
+  'bg-blue-100 text-blue-700',
+  'bg-teal-100 text-teal-700',
+  'bg-amber-100 text-amber-700',
+  'bg-emerald-100 text-emerald-700',
+  'bg-orange-100 text-orange-700',
+  'bg-indigo-100 text-indigo-700',
+];
+
+function getCategoryColor(name: string): string {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
+  }
+  return CATEGORY_COLORS[hash % CATEGORY_COLORS.length];
+}
+
 export function ServiceGrid({ searchInputRef, hideStaffSelection = false, onServiceSelect }: ServiceGridProps) {
   const [services, setServices] = useState<Service[]>([]);
   const [filteredServices, setFilteredServices] = useState<Service[]>([]);
@@ -80,14 +99,16 @@ export function ServiceGrid({ searchInputRef, hideStaffSelection = false, onServ
     fetchStaffWithBusyness();
   }, []);
 
-  // Scroll to center when service is expanded
+  // Scroll the expanded card into view if it gets pushed off-screen by the expansion
   useEffect(() => {
-    if (expandedServiceId && expandedCardRef.current) {
-      expandedCardRef.current.scrollIntoView({
+    if (!expandedServiceId) return;
+    const timer = setTimeout(() => {
+      expandedCardRef.current?.scrollIntoView({
         behavior: 'smooth',
-        block: 'center',
+        block: 'nearest',
       });
-    }
+    }, 50);
+    return () => clearTimeout(timer);
   }, [expandedServiceId]);
 
   // Filter services based on search and category
@@ -119,7 +140,7 @@ export function ServiceGrid({ searchInputRef, hideStaffSelection = false, onServ
   const fetchServices = async () => {
     try {
       setIsLoading(true);
-      const { data } = await apiClient.get('/catalog/services');
+      const { data } = await apiClient.get('/catalog/services', { params: { sort_by: 'popularity' } });
       console.log({data: data.services});
 
       setServices(data.services || []);
@@ -162,18 +183,33 @@ export function ServiceGrid({ searchInputRef, hideStaffSelection = false, onServ
         return;
       }
 
-      // For owner/receptionist: Fetch staff list and busyness data in parallel
+      // For owner/receptionist: Fetch staff list, busyness, and today's attendance in parallel
       // Only show service providers (exclude receptionists)
-      const [staffResponse, busynessResponse] = await Promise.all([
+      const [staffResponse, busynessResponse, attendanceResponse] = await Promise.all([
         apiClient.get('/staff', { params: { is_active: true, service_providers_only: true } }),
         apiClient.get('/staff/availability/busyness'),
+        apiClient.get('/attendance', { params: { size: 100 } }),
       ]);
 
       const staffList = staffResponse.data.items || staffResponse.data || [];
       const busynessData = busynessResponse.data || [];
+      const attendanceRecords: { staff_id: string; status: string }[] =
+        attendanceResponse.data.items || [];
 
-      // Merge busyness data with staff list
-      const staffWithBusyness: StaffWithBusyness[] = staffList.map((s: Staff) => ({
+      // Build set of staff who are present or on a half day today
+      const presentStaffIds = new Set<string>(
+        attendanceRecords
+          .filter((r) => r.status === 'present' || r.status === 'half_day')
+          .map((r) => r.staff_id)
+      );
+
+      // Filter to present staff only; if attendance hasn't been marked yet show all
+      const presentStaff = attendanceRecords.length > 0
+        ? staffList.filter((s: Staff) => presentStaffIds.has(s.id))
+        : staffList;
+
+      // Merge busyness data with present staff list
+      const staffWithBusyness: StaffWithBusyness[] = presentStaff.map((s: Staff) => ({
         ...s,
         busyness: busynessData.find((b: StaffBusyness) => b.staff_id === s.id),
       }));
@@ -458,7 +494,7 @@ export function ServiceGrid({ searchInputRef, hideStaffSelection = false, onServ
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 items-start">
             {filteredServices.map((service) => {
               const isExpanded = expandedServiceId === service.id;
               const cartCount = getServiceCartCount(service.id);
@@ -483,26 +519,25 @@ export function ServiceGrid({ searchInputRef, hideStaffSelection = false, onServ
                       isExpanded ? '' : 'hover:border-black hover:shadow-lg'
                     }`}
                   >
-                    {/* Cart Count Badge - Top Left */}
-                    {isInCart && (
-                      <Badge
-                        className="absolute top-2 left-2 bg-green-600 text-white text-xs flex items-center gap-1"
+                    {/* Top Row: Cart Badge (left) + Category Badge (right) */}
+                    <div className="flex items-start justify-between mb-2 min-h-[1.5rem]">
+                      <div>
+                        {isInCart && (
+                          <Badge className="bg-green-600 text-white text-xs flex items-center gap-1">
+                            <ShoppingCart className="h-3 w-3" />
+                            {cartCount}
+                          </Badge>
+                        )}
+                      </div>
+                      <span
+                        className={`text-[10px] font-semibold leading-tight px-1.5 py-0.5 rounded whitespace-normal break-words ml-2 ${getCategoryColor(service.category.name)}`}
                       >
-                        <ShoppingCart className="h-3 w-3" />
-                        {cartCount}
-                      </Badge>
-                    )}
-
-                    {/* Category Badge */}
-                    <Badge
-                      variant="secondary"
-                      className="absolute top-2 right-2 text-xs max-w-[50%] truncate"
-                    >
-                      {service.category.name}
-                    </Badge>
+                        {service.category.name}
+                      </span>
+                    </div>
 
                     {/* Service Name */}
-                    <h3 className="font-semibold text-gray-900 mt-6 mb-2 pr-8">
+                    <h3 className="font-semibold text-gray-900 mb-2">
                       {service.name}
                     </h3>
 
@@ -570,7 +605,7 @@ export function ServiceGrid({ searchInputRef, hideStaffSelection = false, onServ
                               No active staff available
                             </div>
                           ) : (
-                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-1.5">
                               {staff.map((staffMember) => (
                                 <button
                                   key={staffMember.id}
@@ -582,33 +617,22 @@ export function ServiceGrid({ searchInputRef, hideStaffSelection = false, onServ
                                     )
                                   }
                                   title={getStaffBusynessText(staffMember)}
-                                  className="group/staff relative flex flex-col gap-2 px-3 py-3 bg-gray-50 hover:bg-black hover:text-white border border-gray-200 hover:border-black rounded-lg transition-all text-left"
+                                  className="flex items-center justify-between gap-2 w-full px-2.5 py-2 bg-gray-50 hover:bg-black hover:text-white border border-gray-200 hover:border-black rounded-lg transition-all text-left"
                                 >
-                                  {/* Staff Name and Icon */}
-                                  <div className="flex items-center gap-2">
-                                    <User className="h-4 w-4 flex-shrink-0" />
-                                    <span className="truncate font-medium text-sm">
+                                  <div className="flex items-center gap-1.5 min-w-0">
+                                    <User className="h-3 w-3 flex-shrink-0" />
+                                    <span className="truncate font-medium text-xs">
                                       {staffMember.display_name}
                                     </span>
                                   </div>
-
-                                  {/* Busyness Info */}
-                                  {staffMember.busyness && (
-                                    <div className="flex items-center justify-between gap-2 text-xs">
-                                      {getStatusBadge(staffMember.busyness.status)}
-                                      {staffMember.busyness.total_wait_minutes > 0 && (
-                                        <div className="flex items-center gap-1 text-gray-600 group-hover/staff:text-white">
-                                          <Clock className="h-3 w-3" />
-                                          <span>{formatWaitTime(staffMember.busyness.total_wait_minutes)}</span>
-                                        </div>
-                                      )}
-                                    </div>
-                                  )}
-
-                                  {/* Tooltip on hover - using CSS */}
-                                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg shadow-lg opacity-0 group-hover/staff:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-10">
-                                    {getStaffBusynessText(staffMember)}
-                                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900"></div>
+                                  <div className="flex items-center gap-1.5 flex-shrink-0 text-xs">
+                                    {staffMember.busyness && getStatusBadge(staffMember.busyness.status)}
+                                    {staffMember.busyness && staffMember.busyness.total_wait_minutes > 0 && (
+                                      <span className="text-gray-500 flex items-center gap-0.5">
+                                        <Clock className="h-3 w-3" />
+                                        {formatWaitTime(staffMember.busyness.total_wait_minutes)}
+                                      </span>
+                                    )}
                                   </div>
                                 </button>
                               ))}

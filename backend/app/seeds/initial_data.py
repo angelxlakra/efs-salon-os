@@ -106,7 +106,7 @@ def seed_owner_user(db: Session, roles):
     owner_user = User(
         role_id=roles["owner"].id,
         username="owner",
-        email="owner@salon.local",
+        email="owner@example.com",
         password_hash=password_hash,
         full_name="Salon Owner",
         is_active=True
@@ -195,7 +195,7 @@ def seed_salon_settings(db: Session):
         salon_state="State",
         salon_pincode="400001",
         contact_phone="+91 98765 43210",
-        contact_email="info@salon.local",
+        contact_email="info@example.com",
         receipt_header_text="Welcome! We're glad to serve you.",
         receipt_footer_text="Thank you for your visit! See you soon.",
         receipt_show_gstin=True,

@@ -27,7 +27,7 @@ class CashDrawer(Base, ULIDMixin):
     variance = Column(Integer)  # paise (counted - expected)
 
     # Denomination tracking
-    opening_denominations = Column(JSONB, nullable=True)  # {"50": 10, "100": 20, "200": 5, "500": 8}
+    opening_denominations = Column(JSONB, nullable=True)  # {"10": 0, "20": 0, "50": 10, "100": 20, "200": 5, "500": 8}
     closing_denominations = Column(JSONB, nullable=True)
     cash_taken_out = Column(Integer, nullable=True, default=0)  # paise
     cash_taken_out_reason = Column(Text, nullable=True)

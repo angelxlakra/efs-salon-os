@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, Loader2, Edit2, Trash2, FolderPlus, Upload, Users } from 'lucide-react';
+import { Plus, Loader2, Edit2, Trash2, FolderPlus, Upload, Users, History, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useAuthStore } from '@/stores/auth-store';
 import { apiClient } from '@/lib/api-client';
@@ -13,6 +14,7 @@ import { CategoryDialog } from '@/components/services/category-dialog';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { ImportDialog } from '@/components/services/import-dialog';
 import { ServiceStaffTemplateManager } from '@/components/services/ServiceStaffTemplateManager';
+import { ServiceHistoryDialog } from '@/components/services/service-history-dialog';
 
 interface ServiceCategory {
   id: string;
@@ -45,6 +47,7 @@ export default function ServicesPage() {
   const [catalog, setCatalog] = useState<CatalogData>({ categories: [], services: [] });
   const [isLoading, setIsLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Dialog states
   const [serviceDialog, setServiceDialog] = useState<{ open: boolean; service: Service | null }>({
@@ -62,6 +65,10 @@ export default function ServicesPage() {
   });
   const [importDialog, setImportDialog] = useState(false);
   const [templateDialog, setTemplateDialog] = useState<{ open: boolean; service: Service | null }>({
+    open: false,
+    service: null,
+  });
+  const [historyDialog, setHistoryDialog] = useState<{ open: boolean; service: Service | null }>({
     open: false,
     service: null,
   });
@@ -121,12 +128,26 @@ export default function ServicesPage() {
   };
 
   const getServicesByCategory = (categoryId: string) => {
-    return catalog.services.filter((s) => s.category_id === categoryId);
+    let services = catalog.services.filter((s) => s.category_id === categoryId);
+    if (searchQuery.trim()) {
+      const tokens = searchQuery.toLowerCase().trim().split(/\s+/).filter((t) => t.length > 0);
+      services = services.filter((s) =>
+        tokens.every((token) => s.name.toLowerCase().includes(token))
+      );
+    }
+    return services;
   };
 
-  const filteredCategories = selectedCategory
-    ? catalog.categories.filter((c) => c.id === selectedCategory)
-    : catalog.categories;
+  const filteredCategories = (() => {
+    let cats = selectedCategory
+      ? catalog.categories.filter((c) => c.id === selectedCategory)
+      : catalog.categories;
+    // When searching, hide categories that have no matching services
+    if (searchQuery.trim()) {
+      cats = cats.filter((c) => getServicesByCategory(c.id).length > 0);
+    }
+    return cats;
+  })();
 
   if (isLoading) {
     return (
@@ -197,6 +218,20 @@ export default function ServicesPage() {
         </Card>
       </div>
 
+      {/* Search */}
+      {catalog.categories.length > 0 && (
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Input
+            type="text"
+            placeholder="Search services..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+      )}
+
       {/* Category Filter */}
       {catalog.categories.length > 0 && (
         <div className="flex gap-2 overflow-x-auto pb-2">
@@ -239,6 +274,15 @@ export default function ServicesPage() {
             )}
           </CardContent>
         </Card>
+      ) : filteredCategories.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <p className="text-gray-500">No services found</p>
+          {searchQuery && (
+            <Button variant="link" onClick={() => setSearchQuery('')} className="mt-2">
+              Clear search
+            </Button>
+          )}
+        </div>
       ) : (
         <div className="space-y-6">
           {filteredCategories.map((category) => {
@@ -351,17 +395,31 @@ export default function ServicesPage() {
                             </span>
                           </div>
                           {canManageServices && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="w-full mt-3"
-                              onClick={() =>
-                                setTemplateDialog({ open: true, service })
-                              }
-                            >
-                              <Users className="h-3 w-3 mr-2" />
-                              Staff Roles
-                            </Button>
+                            <div className="flex gap-2 mt-3">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="flex-1"
+                                onClick={() =>
+                                  setTemplateDialog({ open: true, service })
+                                }
+                              >
+                                <Users className="h-3 w-3 mr-2" />
+                                Staff Roles
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="flex-1"
+                                onClick={() =>
+                                  setHistoryDialog({ open: true, service })
+                                }
+                                title="View service history"
+                              >
+                                <History className="h-3 w-3 mr-2" />
+                                History
+                              </Button>
+                            </div>
                           )}
                         </div>
                       ))}
@@ -431,6 +489,15 @@ export default function ServicesPage() {
           toast.success('Staff roles updated');
         }}
       />
+
+      {historyDialog.service && (
+        <ServiceHistoryDialog
+          open={historyDialog.open}
+          onClose={() => setHistoryDialog({ open: false, service: null })}
+          serviceId={historyDialog.service.id}
+          serviceName={historyDialog.service.name}
+        />
+      )}
     </div>
   );
 }

@@ -10,7 +10,7 @@ from typing import Optional
 from urllib.parse import urlparse
 from pydantic_settings import BaseSettings, SettingsConfigDict
 import re
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 
 
 class Settings(BaseSettings):
@@ -75,6 +75,16 @@ class Settings(BaseSettings):
     api_prefix: str = "/api"
     cors_origins: str | list[str] = "http://localhost:3000"
 
+    # Central Sync
+    central_sync_enabled: bool = False
+    central_api_url: str = ""
+    central_api_key: str = ""
+    central_sync_push_interval_minutes: int = 1
+    central_sync_pull_interval_minutes: int = 10
+    central_sync_metrics_push_interval_minutes: int = 5
+    central_transfer_poll_interval_minutes: int = 15
+    central_other_stores_json: str = "[]"
+
     # Cloud Backup (S3-compatible — works with B2, AWS S3, MinIO)
     backup_s3_endpoint: Optional[str] = None
     backup_s3_bucket: Optional[str] = None
@@ -102,6 +112,20 @@ class Settings(BaseSettings):
             # Split by comma and strip whitespace
             return [origin.strip() for origin in v.split(',') if origin.strip()]
         return v
+
+    @model_validator(mode='after')
+    def validate_central_sync_settings(self) -> 'Settings':
+        """When central sync is enabled, URL and API key must be non-empty."""
+        if self.central_sync_enabled:
+            if not self.central_api_url or not self.central_api_url.strip():
+                raise ValueError(
+                    "CENTRAL_API_URL must be set when CENTRAL_SYNC_ENABLED=true"
+                )
+            if not self.central_api_key or not self.central_api_key.strip():
+                raise ValueError(
+                    "CENTRAL_API_KEY must be set when CENTRAL_SYNC_ENABLED=true"
+                )
+        return self
 
     @field_validator('redis_url')
     @classmethod

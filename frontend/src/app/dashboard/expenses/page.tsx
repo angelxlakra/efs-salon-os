@@ -69,7 +69,7 @@ export default function ExpensesPage() {
           </div>
         </div>
 
-        <div className="max-w-3xl">
+        <div className="max-w-[768px]">
           <Card>
             <CardHeader>
               <CardTitle>Expense Details</CardTitle>

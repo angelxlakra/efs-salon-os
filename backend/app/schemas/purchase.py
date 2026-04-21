@@ -83,8 +83,15 @@ class PurchaseItemBase(BaseModel):
     barcode: Optional[str] = Field(None, max_length=100)
     uom: str = Field(..., max_length=20)
     quantity: Decimal = Field(..., gt=0)
-    unit_cost: int = Field(..., gt=0)  # In paise
-    discount_amount: int = Field(0, ge=0)  # Discount in paise
+    unit_cost: int = Field(..., gt=0)  # All-in cost per unit in paise (incl. GST, after discount)
+    discount_amount: int = Field(0, ge=0)  # Flat line discount in paise
+
+    # GST / auto-calc fields
+    rate_incl_tax: Optional[int] = Field(None, ge=0)   # MRP per unit in paise (reference)
+    tax_rate_percent: int = Field(18, ge=0, le=28)     # GST rate %, e.g. 18
+    discount_percent: Optional[Decimal] = Field(None, ge=0, le=100)  # Trade discount %
+    cgst_amount: int = Field(0, ge=0)   # Line-level CGST in paise
+    sgst_amount: int = Field(0, ge=0)   # Line-level SGST in paise
 
 
 class PurchaseItemCreate(PurchaseItemBase):
@@ -118,6 +125,7 @@ class PurchaseInvoiceCreate(PurchaseInvoiceBase):
     """Schema for creating a purchase invoice."""
     items: List[PurchaseItemCreate] = Field(..., min_items=1)
     invoice_discount_amount: int = Field(0, ge=0)  # Invoice-level discount in paise
+    round_off_amount: int = Field(0)               # Rounding adjustment in paise (can be negative)
 
 
 class PurchaseInvoiceUpdate(BaseModel):
@@ -134,6 +142,7 @@ class PurchaseInvoiceEditRequest(BaseModel):
     """Schema for editing invoice with discounts (any status)."""
     items: List[PurchaseItemCreate] = Field(..., min_items=1)
     invoice_discount_amount: int = Field(0, ge=0)  # Invoice-level discount in paise
+    round_off_amount: int = Field(0)               # Rounding adjustment in paise (can be negative)
     notes: Optional[str] = None
 
 
@@ -142,7 +151,8 @@ class PurchaseInvoiceResponse(PurchaseInvoiceBase):
     id: str
     subtotal: int  # Sum of items before invoice discount
     invoice_discount_amount: int  # Invoice-level discount
-    total_amount: int  # In paise (after discounts)
+    round_off_amount: int  # Rounding adjustment (can be negative)
+    total_amount: int  # In paise (after discounts + round-off)
     paid_amount: int
     balance_due: int
     status: PurchaseStatus

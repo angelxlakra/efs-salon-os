@@ -269,7 +269,7 @@ export function BarcodeScanner({ onScan, onClose, autoClose = false, disabled = 
 
   return (
     <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 overflow-y-auto">
-      <Card className="w-full max-w-3xl my-auto">
+      <Card className="w-full max-w-[768px] my-auto">
         <CardContent className="p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold">Scan Barcode</h3>

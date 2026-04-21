@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { Loader2 } from 'lucide-react';
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -112,7 +113,8 @@ export function CategoryDialog({ open, category, onClose, onSuccess }: CategoryD
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent size="sm">
+        <form onSubmit={handleSubmit(onSubmit)} className="contents">
         <DialogHeader>
           <DialogTitle>{isEdit ? 'Edit Category' : 'Create New Category'}</DialogTitle>
           <DialogDescription>
@@ -120,7 +122,7 @@ export function CategoryDialog({ open, category, onClose, onSuccess }: CategoryD
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <DialogBody className="space-y-4">
           {/* Name */}
           <div className="space-y-2">
             <Label htmlFor="name">Category Name *</Label>
@@ -165,6 +167,7 @@ export function CategoryDialog({ open, category, onClose, onSuccess }: CategoryD
               disabled={isSubmitting}
             />
           </div>
+        </DialogBody>
 
           <DialogFooter>
             <Button

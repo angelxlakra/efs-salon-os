@@ -101,6 +101,8 @@ Supplier information for inventory procurement.
 | `address` | Text | Yes | Business address |
 | `notes` | Text | Yes | Internal notes |
 | `is_active` | Boolean | No | Active status (default: true) |
+| `gstin` | String(15) | Yes | GST Identification Number |
+| `payment_terms` | String(255) | Yes | e.g., "Net 30", "50% advance, 50% on delivery" |
 | `created_at` | DateTime(tz) | No | Creation timestamp |
 | `updated_at` | DateTime(tz) | No | Last update timestamp |
 
@@ -109,6 +111,15 @@ Supplier information for inventory procurement.
 | Relationship | Target | Type | Description |
 |--------------|--------|------|-------------|
 | `skus` | SKU | One-to-Many | SKUs from this supplier |
+| `purchase_invoices` | PurchaseInvoice | One-to-Many | Purchase invoices from this supplier |
+| `payments` | SupplierPayment | One-to-Many | Payments made to this supplier |
+
+### Properties
+
+| Property | Return Type | Description |
+|----------|-------------|-------------|
+| `total_outstanding` | int | Sum of balance_due across all invoices (paise) |
+| `total_purchases` | int | Sum of total_amount across all invoices (paise) |
 
 ---
 
@@ -130,11 +141,17 @@ Stock Keeping Unit - individual inventory items.
 | `sku_code` | String | No | Yes (unique) | SKU identifier code |
 | `name` | String | No | - | Product name |
 | `description` | Text | Yes | - | Product description |
+| `brand_name` | String(255) | Yes | - | Brand/manufacturer name |
+| `volume` | String(50) | Yes | - | Product volume/size (e.g., "500ml", "100gm") |
+| `barcode` | String(100) | Yes | Yes | Product barcode for purchase lookup |
 | `uom` | Enum(UOMEnum) | No | - | Unit of measurement |
 | `reorder_point` | Numeric(10,2) | No | - | Stock level to trigger reorder (default: 0) |
 | `current_stock` | Numeric(10,2) | No | Yes | Current stock quantity (default: 0) |
 | `avg_cost_per_unit` | Integer | No | - | Weighted avg cost in paise per UOM (default: 0) |
 | `is_active` | Boolean | No | Yes | Active status (default: true) |
+| `is_sellable` | Boolean | No | Yes | Whether item can be sold at POS (default: false) |
+| `retail_price` | Integer | Yes | - | Retail price in paise (tax-inclusive) |
+| `retail_markup_percent` | Numeric(5,2) | Yes | - | Markup percentage over cost |
 | `created_at` | DateTime(tz) | No | - | Creation timestamp |
 | `updated_at` | DateTime(tz) | No | - | Last update timestamp |
 
@@ -146,6 +163,7 @@ Stock Keeping Unit - individual inventory items.
 | `supplier` | Supplier | Many-to-One | Primary supplier |
 | `change_requests` | InventoryChangeRequest | One-to-Many | Change request history |
 | `ledger_entries` | StockLedger | One-to-Many | Stock movement history |
+| `bill_items` | BillItem | One-to-Many | Bill items referencing this SKU |
 
 ### Properties
 
@@ -199,6 +217,9 @@ Requests for inventory changes requiring owner approval.
 | `change_type` | Enum(ChangeType) | No | - | receive/adjust/consume |
 | `quantity` | Numeric(10,2) | No | - | Quantity to change |
 | `unit_cost` | Integer | Yes | - | Cost per unit in paise (for receives) |
+| `supplier_invoice_number` | String(100) | Yes | - | Supplier invoice reference |
+| `supplier_discount_percent` | Numeric(5,2) | Yes | - | Supplier discount percentage |
+| `supplier_discount_fixed` | Integer | Yes | - | Supplier fixed discount in paise |
 | `reason_code` | String | No | - | Reason for change |
 | `notes` | Text | Yes | - | Additional notes |
 | `status` | Enum(ChangeStatus) | No | Yes | pending/approved/rejected (default: pending) |

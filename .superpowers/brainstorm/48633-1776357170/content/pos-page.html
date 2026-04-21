@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>POS Page</title>
+<style>
+* { margin:0;padding:0;box-sizing:border-box; }
+body { background:#070707;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#fff;padding:20px; }
+
+.app { display:flex;height:800px;border-radius:16px;overflow:hidden;border:1px solid #1e1e1e;box-shadow:0 40px 100px rgba(0,0,0,0.85); }
+
+/* Sidebar (same as dashboard, just reference) */
+.sidebar { width:44px;background:#0a0a0a;border-right:1px solid #161616;display:flex;flex-direction:column;align-items:center;padding:12px 0;gap:6px;flex-shrink:0; }
+.sb-logo { width:26px;height:26px;background:#fff;border-radius:6px;display:flex;align-items:center;justify-content:center;margin-bottom:8px; }
+.sb-logo-inner { width:14px;height:14px;background:#000;border-radius:2px; }
+.sb-dot { width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center; }
+.sb-dot.active { background:#160d2b; }
+.sb-ico { width:14px;height:14px;border-radius:3px;background:#2a2a2a; }
+.sb-ico.active { background:#7c3aed; }
+.sb-sep { width:20px;height:1px;background:#1e1e1e;margin:4px 0; }
+
+/* Main */
+.main { flex:1;display:flex;flex-direction:column;background:#0f0f0f;min-width:0; }
+
+/* Topbar */
+.topbar { height:46px;background:#0a0a0a;border-bottom:1px solid #161616;display:flex;align-items:center;justify-content:space-between;padding:0 18px;flex-shrink:0; }
+.tb-l { display:flex;align-items:center;gap:10px; }
+.hbg { display:flex;flex-direction:column;gap:3.5px;cursor:default; }
+.hl { width:14px;height:1.5px;background:#3a3a3a;border-radius:2px; }
+.bc { font-size:11px;color:#2e2e2e; }
+.bc span { color:#555; }
+.bc b { color:#888; }
+.kb { display:inline-flex;align-items:center;gap:3px; }
+.kbd { background:#1a1a1a;border:1px solid #2a2a2a;border-radius:4px;padding:2px 5px;font-size:9px;color:#555;font-weight:600; }
+
+/* POS body — flex row */
+.pos-body { flex:1;display:flex;gap:0;min-height:0;overflow:hidden; }
+
+/* Left: service browser */
+.svc-browser { flex:1;display:flex;flex-direction:column;padding:16px;gap:12px;min-width:0;overflow:hidden; }
+
+.pg-hdr { display:flex;align-items:flex-start;justify-content:space-between; }
+.pg-h { font-size:16px;font-weight:800;color:#e2e8f0;letter-spacing:-0.3px; }
+.pg-s { font-size:10px;color:#3a3a3a;margin-top:3px; }
+.kbd-hints { display:flex;gap:10px; }
+
+/* Search bar */
+.search-wrap { position:relative; }
+.search-bar { width:100%;background:#141414;border:1px solid #222;border-radius:9px;padding:9px 12px 9px 36px;font-size:12px;color:#888;outline:none; }
+.search-bar::placeholder { color:#404040; }
+.search-ico { position:absolute;left:12px;top:50%;transform:translateY(-50%);width:14px;height:14px;border-radius:3px;background:#333; }
+.kbd-slash { position:absolute;right:10px;top:50%;transform:translateY(-50%);background:#1a1a1a;border:1px solid #282828;border-radius:4px;padding:2px 6px;font-size:9px;color:#444;font-weight:700; }
+
+/* Category tabs */
+.cat-tabs { display:flex;gap:6px;overflow-x:auto;padding-bottom:2px; }
+.cat-tabs::-webkit-scrollbar { height:0; }
+.cat-tab { padding:5px 12px;border-radius:20px;font-size:10px;font-weight:700;white-space:nowrap;cursor:default;border:1px solid #1e1e1e;color:#444;background:#141414; }
+.cat-tab.active { background:#160d2b;color:#c4b5fd;border-color:#2d1f4e; }
+.cat-tab:hover:not(.active) { background:#1a1a1a;color:#777; }
+
+/* Section tabs (Services / Products) */
+.sec-tabs { display:flex;gap:0;background:#141414;border:1px solid #1e1e1e;border-radius:8px;padding:3px;width:fit-content; }
+.sec-tab { padding:5px 14px;border-radius:6px;font-size:10px;font-weight:700;cursor:default;color:#444; }
+.sec-tab.active { background:#1e1e1e;color:#ccc; }
+
+/* Service grid */
+.svc-grid { display:grid;grid-template-columns:repeat(3,1fr);gap:8px;overflow-y:auto;flex:1; }
+.svc-grid::-webkit-scrollbar { width:3px; }
+.svc-grid::-webkit-scrollbar-thumb { background:#222;border-radius:2px; }
+
+.svc-card { background:#141414;border:1px solid #1e1e1e;border-radius:10px;padding:11px 12px;cursor:default;transition:all .12s;position:relative;overflow:hidden; }
+.svc-card:hover { background:#181818;border-color:#2a2a2a; }
+.svc-card.in-cart { border-color:#3d2a7a;background:#160d2b; }
+.svc-card.in-cart::after { content:'✓';position:absolute;top:8px;right:9px;font-size:9px;color:#a78bfa;font-weight:900; }
+.svc-cat-dot { width:6px;height:6px;border-radius:50%;margin-bottom:7px; }
+.svc-name { font-size:11px;font-weight:700;color:#ccc;line-height:1.3;margin-bottom:5px; }
+.svc-price { font-size:13px;font-weight:800;color:#e2e8f0;letter-spacing:-0.3px; }
+.svc-meta { display:flex;align-items:center;gap:6px;margin-top:4px; }
+.svc-dur { font-size:9px;color:#444; }
+.svc-busy { font-size:8px;font-weight:700;padding:2px 5px;border-radius:4px; }
+.busy-avail { background:#052e16;color:#4ade80;border:1px solid #166534; }
+.busy-mod { background:#1c1000;color:#f59e0b;border:1px solid #78350f; }
+.busy-high { background:#1c0000;color:#f87171;border:1px solid #7f1d1d; }
+
+/* ── Cart sidebar ── */
+.cart { width:320px;flex-shrink:0;background:#0a0a0a;border-left:1px solid #161616;display:flex;flex-direction:column; }
+
+.cart-hdr { padding:14px 16px 12px;border-bottom:1px solid #161616;display:flex;align-items:center;justify-content:space-between;flex-shrink:0; }
+.cart-title { font-size:12px;font-weight:700;color:#888; }
+.cart-count { background:#1a0f2e;color:#7c3aed;font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;border:1px solid #2d1f4e; }
+
+/* Customer chip */
+.cust-section { padding:10px 14px;border-bottom:1px solid #161616;flex-shrink:0; }
+.cust-chip { display:flex;align-items:center;gap:8px;background:#141414;border:1px solid #1e1e1e;border-radius:8px;padding:8px 10px;cursor:default; }
+.cust-chip:hover { border-color:#2a2a2a; }
+.cust-av { width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,#1a0f2e,#2d1f4e);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#a78bfa;flex-shrink:0; }
+.cust-name { font-size:11px;font-weight:600;color:#ccc;flex:1; }
+.cust-phone { font-size:9px;color:#444;margin-top:1px; }
+.cust-edit { font-size:9px;color:#3a3a3a; }
+
+/* Cart items */
+.cart-items { flex:1;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:6px; }
+.cart-items::-webkit-scrollbar { width:0; }
+
+.cart-item { background:#141414;border:1px solid #1e1e1e;border-radius:9px;overflow:hidden; }
+.ci-top { padding:9px 10px;display:flex;align-items:flex-start;gap:8px; }
+.ci-dot { width:6px;height:6px;border-radius:50%;margin-top:4px;flex-shrink:0; }
+.ci-body { flex:1;min-width:0; }
+.ci-name { font-size:11px;font-weight:600;color:#ccc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+.ci-staff { font-size:9px;color:#555;margin-top:2px;display:flex;align-items:center;gap:4px; }
+.ci-staff-name { color:#7c3aed;font-weight:600; }
+.ci-price { font-size:12px;font-weight:700;color:#e2e8f0;white-space:nowrap;flex-shrink:0; }
+.ci-controls { padding:0 10px 8px;display:flex;align-items:center;gap:6px; }
+.qty-btn { width:20px;height:20px;border-radius:5px;background:#1e1e1e;border:1px solid #2a2a2a;display:flex;align-items:center;justify-content:center;cursor:default;font-size:12px;color:#888;font-weight:700;flex-shrink:0; }
+.qty-val { font-size:11px;font-weight:700;color:#ccc;width:16px;text-align:center; }
+.staff-btn { flex:1;background:#191919;border:1px solid #242424;border-radius:5px;padding:4px 7px;font-size:9px;color:#555;cursor:default;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+.del-btn { width:20px;height:20px;border-radius:5px;background:#1c0000;border:1px solid #330000;display:flex;align-items:center;justify-content:center;cursor:default;font-size:10px;color:#7f1d1d;flex-shrink:0; }
+
+/* Discount row */
+.discount-row { padding:8px 12px;border-top:1px solid #141414;display:flex;align-items:center;gap:6px;flex-shrink:0; }
+.disc-input { flex:1;background:#141414;border:1px solid #1e1e1e;border-radius:6px;padding:6px 9px;font-size:11px;color:#888;outline:none; }
+.disc-apply { background:#1a0f2e;color:#a78bfa;border:1px solid #2d1f4e;border-radius:6px;padding:5px 10px;font-size:10px;font-weight:700;cursor:default; }
+
+/* Totals */
+.totals { padding:10px 14px;border-top:1px solid #161616;display:flex;flex-direction:column;gap:5px;flex-shrink:0; }
+.total-row { display:flex;justify-content:space-between;align-items:center; }
+.total-label { font-size:10px;color:#444; }
+.total-val { font-size:10px;color:#666;font-weight:600; }
+.total-row.main .total-label { font-size:13px;font-weight:700;color:#ccc; }
+.total-row.main .total-val { font-size:16px;font-weight:800;color:#e2e8f0;letter-spacing:-0.3px; }
+.total-sep { height:1px;background:#1a1a1a;margin:3px 0; }
+.gst-note { font-size:9px;color:#333;text-align:right;margin-top:2px; }
+
+/* Cart actions */
+.cart-actions { padding:10px 12px 14px;display:flex;flex-direction:column;gap:6px;flex-shrink:0; }
+.book-btn { width:100%;background:#1a1a1a;border:1px solid #2a2a2a;color:#888;border-radius:8px;padding:9px;font-size:11px;font-weight:700;cursor:default;letter-spacing:0.3px; }
+.checkout-btn { width:100%;background:#7c3aed;color:#fff;border:none;border-radius:8px;padding:10px;font-size:12px;font-weight:700;cursor:default;letter-spacing:0.3px;box-shadow:0 4px 16px rgba(124,58,237,0.3); }
+.clear-btn { width:100%;background:transparent;border:none;color:#3a3a3a;font-size:10px;cursor:default;padding:4px; }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- Collapsed sidebar (icon-only) -->
+  <div class="sidebar">
+    <div class="sb-logo"><div class="sb-logo-inner"></div></div>
+    <div class="sb-dot"><div class="sb-ico"></div></div>
+    <div class="sb-dot active"><div class="sb-ico active"></div></div>
+    <div class="sb-dot"><div class="sb-ico"></div></div>
+    <div class="sb-dot"><div class="sb-ico"></div></div>
+    <div class="sb-sep"></div>
+    <div class="sb-dot"><div class="sb-ico"></div></div>
+    <div class="sb-dot"><div class="sb-ico"></div></div>
+    <div class="sb-dot"><div class="sb-ico"></div></div>
+    <div class="sb-dot"><div class="sb-ico"></div></div>
+  </div>
+
+  <div class="main">
+
+    <!-- Topbar -->
+    <div class="topbar">
+      <div class="tb-l">
+        <div class="hbg"><div class="hl"></div><div class="hl"></div><div class="hl"></div></div>
+        <div class="bc"><span>Dashboard</span> › <b>Point of Sale</b></div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <span class="kb"><span class="kbd">/</span><span style="font-size:9px;color:#333;">search</span></span>
+        <span class="kb"><span class="kbd">⌘.</span><span style="font-size:9px;color:#333;">customer</span></span>
+        <span class="kb"><span class="kbd">⌘↵</span><span style="font-size:9px;color:#333;">checkout</span></span>
+      </div>
+    </div>
+
+    <!-- POS body -->
+    <div class="pos-body">
+
+      <!-- Left: service browser -->
+      <div class="svc-browser">
+
+        <!-- Header -->
+        <div class="pg-hdr">
+          <div>
+            <div class="pg-h">Point of Sale</div>
+            <div class="pg-s">Select services or products</div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <div class="sec-tabs">
+              <div class="sec-tab active">Services</div>
+              <div class="sec-tab">Products</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Search -->
+        <div class="search-wrap">
+          <div class="search-ico"></div>
+          <input class="search-bar" placeholder="Search services..." />
+          <div class="kbd-slash">/</div>
+        </div>
+
+        <!-- Category tabs -->
+        <div class="cat-tabs">
+          <div class="cat-tab active">All</div>
+          <div class="cat-tab">Hair</div>
+          <div class="cat-tab">Skin & Face</div>
+          <div class="cat-tab">Nails</div>
+          <div class="cat-tab">Threading</div>
+          <div class="cat-tab">Massage</div>
+          <div class="cat-tab">Waxing</div>
+          <div class="cat-tab">Colour</div>
+        </div>
+
+        <!-- Service grid -->
+        <div class="svc-grid">
+
+          <div class="svc-card in-cart">
+            <div class="svc-cat-dot" style="background:#7c3aed;"></div>
+            <div class="svc-name">Haircut</div>
+            <div class="svc-price">₹300</div>
+            <div class="svc-meta">
+              <span class="svc-dur">⏱ 30 min</span>
+              <span class="svc-busy busy-avail">2 free</span>
+            </div>
+          </div>
+
+          <div class="svc-card">
+            <div class="svc-cat-dot" style="background:#7c3aed;"></div>
+            <div class="svc-name">Hair Colour</div>
+            <div class="svc-price">₹800</div>
+            <div class="svc-meta">
+              <span class="svc-dur">⏱ 90 min</span>
+              <span class="svc-busy busy-mod">1 busy</span>
+            </div>
+          </div>
+
+          <div class="svc-card">
+            <div class="svc-cat-dot" style="background:#7c3aed;"></div>
+            <div class="svc-name">Blow Dry</div>
+            <div class="svc-price">₹250</div>
+            <div class="svc-meta">
+              <span class="svc-dur">⏱ 20 min</span>
+              <span class="svc-busy busy-avail">3 free</span>
+            </div>
+          </div>
+
+          <div class="svc-card in-cart">
+            <div class="svc-cat-dot" style="background:#ec4899;"></div>
+            <div class="svc-name">Facial (Basic)</div>
+            <div class="svc-price">₹600</div>
+            <div class="svc-meta">
+              <span class="svc-dur">⏱ 45 min</span>
+              <span class="svc-busy busy-mod">1 busy</span>
+            </div>
+          </div>
+
+          <div class="svc-card">
+            <div class="svc-cat-dot" style="background:#ec4899;"></div>
+            <div class="svc-name">Gold Facial</div>
+            <div class="svc-price">₹1,200</div>
+            <div class="svc-meta">
+              <span class="svc-dur">⏱ 60 min</span>
+              <span class="svc-busy busy-avail">2 free</span>
+            </div>
+          </div>
+
+          <div class="svc-card">
+            <div class="svc-cat-dot" style="background:#f59e0b;"></div>
+            <div class="svc-name">Eyebrow Threading</div>
+            <div class="svc-price">₹60</div>
+            <div class="svc-meta">
+              <span class="svc-dur">⏱ 10 min</span>
+              <span class="svc-busy busy-avail">3 free</span>
+            </div>
+          </div>
+
+          <div class="svc-card">
+            <div class="svc-cat-dot" style="background:#f59e0b;"></div>
+            <div class="svc-name">Upper Lip</div>
+            <div class="svc-price">₹30</div>
+            <div class="svc-meta">
+              <span class="svc-dur">⏱ 5 min</span>
+              <span class="svc-busy busy-avail">3 free</span>
+            </div>
+          </div>
+
+          <div class="svc-card">
+            <div class="svc-cat-dot" style="background:#06b6d4;"></div>
+            <div class="svc-name">Manicure</div>
+            <div class="svc-price">₹400</div>
+            <div class="svc-meta">
+              <span class="svc-dur">⏱ 40 min</span>
+              <span class="svc-busy busy-high">all busy</span>
+            </div>
+          </div>
+
+          <div class="svc-card">
+            <div class="svc-cat-dot" style="background:#06b6d4;"></div>
+            <div class="svc-name">Pedicure</div>
+            <div class="svc-price">₹500</div>
+            <div class="svc-meta">
+              <span class="svc-dur">⏱ 50 min</span>
+              <span class="svc-busy busy-avail">1 free</span>
+            </div>
+          </div>
+
+          <div class="svc-card">
+            <div class="svc-cat-dot" style="background:#22c55e;"></div>
+            <div class="svc-name">Head Massage</div>
+            <div class="svc-price">₹350</div>
+            <div class="svc-meta">
+              <span class="svc-dur">⏱ 30 min</span>
+              <span class="svc-busy busy-avail">2 free</span>
+            </div>
+          </div>
+
+          <div class="svc-card">
+            <div class="svc-cat-dot" style="background:#22c55e;"></div>
+            <div class="svc-name">Back Massage</div>
+            <div class="svc-price">₹500</div>
+            <div class="svc-meta">
+              <span class="svc-dur">⏱ 45 min</span>
+              <span class="svc-busy busy-mod">1 busy</span>
+            </div>
+          </div>
+
+          <div class="svc-card">
+            <div class="svc-cat-dot" style="background:#a855f7;"></div>
+            <div class="svc-name">Full Arms Wax</div>
+            <div class="svc-price">₹280</div>
+            <div class="svc-meta">
+              <span class="svc-dur">⏱ 25 min</span>
+              <span class="svc-busy busy-avail">2 free</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Cart -->
+      <div class="cart">
+
+        <div class="cart-hdr">
+          <div class="cart-title">Bill</div>
+          <div class="cart-count">2 items</div>
+        </div>
+
+        <!-- Customer -->
+        <div class="cust-section">
+          <div class="cust-chip">
+            <div class="cust-av">P</div>
+            <div style="flex:1;min-width:0;">
+              <div class="cust-name">Priya Sharma</div>
+              <div class="cust-phone">+91 98765 43210</div>
+            </div>
+            <div class="cust-edit">✎</div>
+          </div>
+        </div>
+
+        <!-- Items -->
+        <div class="cart-items">
+
+          <!-- Item 1: Haircut -->
+          <div class="cart-item">
+            <div class="ci-top">
+              <div class="ci-dot" style="background:#7c3aed;"></div>
+              <div class="ci-body">
+                <div class="ci-name">Haircut</div>
+                <div class="ci-staff">Staff: <span class="ci-staff-name">Riya</span></div>
+              </div>
+              <div class="ci-price">₹300</div>
+            </div>
+            <div class="ci-controls">
+              <div class="qty-btn">−</div>
+              <div class="qty-val">1</div>
+              <div class="qty-btn">+</div>
+              <div class="staff-btn">Riya · change staff</div>
+              <div class="del-btn">✕</div>
+            </div>
+          </div>
+
+          <!-- Item 2: Facial -->
+          <div class="cart-item">
+            <div class="ci-top">
+              <div class="ci-dot" style="background:#ec4899;"></div>
+              <div class="ci-body">
+                <div class="ci-name">Facial (Basic)</div>
+                <div class="ci-staff">Staff: <span class="ci-staff-name">Sneha</span></div>
+              </div>
+              <div class="ci-price">₹600</div>
+            </div>
+            <div class="ci-controls">
+              <div class="qty-btn">−</div>
+              <div class="qty-val">1</div>
+              <div class="qty-btn">+</div>
+              <div class="staff-btn">Sneha · change staff</div>
+              <div class="del-btn">✕</div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Discount -->
+        <div class="discount-row">
+          <input class="disc-input" placeholder="Discount amount (₹)" />
+          <button class="disc-apply">Apply</button>
+        </div>
+
+        <!-- Totals -->
+        <div class="totals">
+          <div class="total-row">
+            <span class="total-label">Subtotal</span>
+            <span class="total-val">₹900.00</span>
+          </div>
+          <div class="total-row">
+            <span class="total-label">Discount</span>
+            <span class="total-val" style="color:#4ade80;">− ₹0.00</span>
+          </div>
+          <div class="total-row">
+            <span class="total-label">GST (18%)</span>
+            <span class="total-val">₹162.00</span>
+          </div>
+          <div class="total-sep"></div>
+          <div class="total-row main">
+            <span class="total-label">Total</span>
+            <span class="total-val">₹1,062.00</span>
+          </div>
+          <div class="gst-note">incl. CGST ₹81 + SGST ₹81</div>
+        </div>
+
+        <!-- Actions -->
+        <div class="cart-actions">
+          <button class="book-btn">Book Services (Walk-in)</button>
+          <button class="checkout-btn">Proceed to Payment →</button>
+          <button class="clear-btn">Clear bill</button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

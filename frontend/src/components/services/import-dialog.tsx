@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Upload, Download, FileText, AlertCircle, CheckCircle2, Loader2, X } from 'lucide-react';
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -135,7 +136,7 @@ service,Hair Color & Treatment,Highlights,Partial highlights,1800,90,2`;
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent size="lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Upload className="h-5 w-5" />
@@ -146,7 +147,7 @@ service,Hair Color & Treatment,Highlights,Partial highlights,1800,90,2`;
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <DialogBody className="space-y-4">
           {/* Download Template Button */}
           <div className="flex justify-end">
             <Button
@@ -282,7 +283,7 @@ service,Hair Color & Treatment,Highlights,Partial highlights,1800,90,2`;
               </AlertDescription>
             </Alert>
           )}
-        </div>
+        </DialogBody>
 
         <DialogFooter>
           <Button type="button" variant="outline" onClick={handleClose}>

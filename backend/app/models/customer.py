@@ -28,6 +28,9 @@ class Customer(Base, ULIDMixin, TimestampMixin, SoftDeleteMixin):
     pending_balance = Column(Integer, nullable=False, default=0)  # in paise - outstanding amount owed
     last_visit_at = Column(DateTime(timezone=True), index=True)
 
+    # Central sync tracking
+    last_synced_to_central = Column(DateTime(timezone=True), nullable=True)
+
     # Relationships
     pending_payment_collections = relationship("PendingPaymentCollection", back_populates="customer", lazy="dynamic")
 

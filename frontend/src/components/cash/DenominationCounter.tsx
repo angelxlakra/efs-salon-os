@@ -5,6 +5,9 @@ import { Input } from "@/components/ui/input"
 import { Minus, Plus } from "lucide-react"
 
 export interface DenominationCounts {
+  note_5: number
+  note_10: number
+  note_20: number
   note_50: number
   note_100: number
   note_200: number
@@ -22,6 +25,9 @@ const denominations = [
   { value: 200, key: 'note_200' as keyof DenominationCounts, color: 'bg-yellow-50 border-yellow-200', textColor: 'text-yellow-900' },
   { value: 100, key: 'note_100' as keyof DenominationCounts, color: 'bg-pink-50 border-pink-200', textColor: 'text-pink-900' },
   { value: 50, key: 'note_50' as keyof DenominationCounts, color: 'bg-green-50 border-green-200', textColor: 'text-green-900' },
+  { value: 20, key: 'note_20' as keyof DenominationCounts, color: 'bg-orange-50 border-orange-200', textColor: 'text-orange-900' },
+  { value: 10, key: 'note_10' as keyof DenominationCounts, color: 'bg-amber-50 border-amber-200', textColor: 'text-amber-900' },
+  { value: 5, key: 'note_5' as keyof DenominationCounts, color: 'bg-slate-50 border-slate-200', textColor: 'text-slate-900' },
 ]
 
 export function DenominationCounter({
@@ -30,6 +36,9 @@ export function DenominationCounter({
   readonly = false
 }: DenominationCounterProps) {
   const total = (
+    value.note_5 * 5 +
+    value.note_10 * 10 +
+    value.note_20 * 20 +
     value.note_50 * 50 +
     value.note_100 * 100 +
     value.note_200 * 200 +

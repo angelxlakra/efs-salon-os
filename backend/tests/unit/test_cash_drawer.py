@@ -146,3 +146,51 @@ def test_reopen_without_close(client, db_session):
     response = client.post("/api/cash/reopen", json={"reason": "Testing reopen"})
     assert response.status_code == 400
     assert "currently open" in response.json()["detail"]
+
+
+# ── Denomination integration tests (need TestClient/DB) ──────────────
+
+def test_open_drawer_with_denominations(client, db_session):
+    """Test opening drawer using denomination breakdown instead of flat float."""
+    response = client.post("/api/cash/open", json={
+        "opening_denominations": {
+            "note_10": 5,
+            "note_20": 3,
+            "note_50": 2,
+            "note_100": 4,
+            "note_200": 1,
+            "note_500": 2,
+        }
+    })
+    assert response.status_code == 200
+    data = response.json()
+    # (5*10 + 3*20 + 2*50 + 4*100 + 1*200 + 2*500) = 1810 rupees = 181000 paise
+    assert data["opening_float"] == 181000
+    assert data["opening_denominations"] == {"10": 5, "20": 3, "50": 2, "100": 4, "200": 1, "500": 2}
+
+
+def test_close_drawer_with_denominations(client, db_session):
+    """Test closing drawer using denomination breakdown."""
+    client.post("/api/cash/open", json={"opening_float": 100000})
+
+    response = client.post("/api/cash/close", json={
+        "closing_denominations": {
+            "note_10": 10,
+            "note_20": 5,
+            "note_50": 4,
+            "note_100": 3,
+            "note_200": 2,
+            "note_500": 1,
+        }
+    })
+    assert response.status_code == 200
+    data = response.json()
+    # (10*10 + 5*20 + 4*50 + 3*100 + 2*200 + 1*500) = 1400 rupees = 140000 paise
+    assert data["closing_counted"] == 140000
+    assert data["closing_denominations"] == {"10": 10, "20": 5, "50": 4, "100": 3, "200": 2, "500": 1}
+
+
+def test_open_without_any_amount_returns_422(client, db_session):
+    """Opening with neither float nor denominations should return 422."""
+    response = client.post("/api/cash/open", json={})
+    assert response.status_code == 422

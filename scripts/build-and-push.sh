@@ -185,12 +185,12 @@ create_deployment_package() {
     cp .env.example "$PACKAGE_DIR/"
 
     # Copy HTTPS setup files (CRITICAL for mobile camera)
-    cp setup-https.sh "$PACKAGE_DIR/"
+    cp scripts/setup-https.sh "$PACKAGE_DIR/"
     chmod +x "$PACKAGE_DIR/setup-https.sh"
     cp HTTPS-SETUP.md "$PACKAGE_DIR/" 2>/dev/null || true
 
     # Copy quick start guide
-    cp QUICKSTART.md "$PACKAGE_DIR/" 2>/dev/null || true
+    cp docs/deployment/07-quickstart.md "$PACKAGE_DIR/QUICKSTART.md" 2>/dev/null || true
 
     # Copy main documentation
     cp README.md "$PACKAGE_DIR/" 2>/dev/null || true
@@ -202,9 +202,9 @@ create_deployment_package() {
     mkdir -p "$PACKAGE_DIR/scripts"
 
     # Copy Windows/WSL2 networking scripts
-    cp wsl-port-forward.ps1 "$PACKAGE_DIR/scripts/" 2>/dev/null || true
-    cp setup-auto-forward.ps1 "$PACKAGE_DIR/scripts/" 2>/dev/null || true
-    cp diagnose-network.ps1 "$PACKAGE_DIR/scripts/" 2>/dev/null || true
+    cp scripts/wsl-port-forward.ps1 "$PACKAGE_DIR/scripts/" 2>/dev/null || true
+    cp scripts/setup-auto-forward.ps1 "$PACKAGE_DIR/scripts/" 2>/dev/null || true
+    cp scripts/diagnose-network.ps1 "$PACKAGE_DIR/scripts/" 2>/dev/null || true
 
     # Create start script
     cat > "$PACKAGE_DIR/scripts/start.sh" << 'EOF'

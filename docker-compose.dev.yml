@@ -22,7 +22,7 @@ volumes:
 
 services:
   postgres:
-    image: postgres:15-alpine
+    image: postgres:16-alpine
     container_name: salon-postgres-dev
     environment:
       - POSTGRES_DB=${POSTGRES_DB:-salon_db}
@@ -72,6 +72,9 @@ services:
       - SALON_ADDRESS=${SALON_ADDRESS:-Dev Address}
       - GSTIN=${GSTIN:-00XXXXX0000X0ZX}
       - TZ=${TZ:-Asia/Kolkata}
+      - CENTRAL_SYNC_ENABLED=${CENTRAL_SYNC_ENABLED:-false}
+      - CENTRAL_API_URL=${CENTRAL_API_URL:-}
+      - CENTRAL_API_KEY=${CENTRAL_API_KEY:-}
     volumes:
       # Bind mount source code for hot reload
       - ./backend/app:/app/app
@@ -110,6 +113,11 @@ services:
       - BACKUP_S3_ACCESS_KEY=${BACKUP_S3_ACCESS_KEY:-}
       - BACKUP_S3_SECRET_KEY=${BACKUP_S3_SECRET_KEY:-}
       - BACKUP_S3_REGION=${BACKUP_S3_REGION:-us-west-004}
+      - CENTRAL_SYNC_ENABLED=${CENTRAL_SYNC_ENABLED:-false}
+      - CENTRAL_API_URL=${CENTRAL_API_URL:-}
+      - CENTRAL_API_KEY=${CENTRAL_API_KEY:-}
+      - CENTRAL_SYNC_PUSH_INTERVAL_MINUTES=${CENTRAL_SYNC_PUSH_INTERVAL_MINUTES:-1}
+      - CENTRAL_SYNC_PULL_INTERVAL_MINUTES=${CENTRAL_SYNC_PULL_INTERVAL_MINUTES:-10}
     volumes:
       - ./backend/app:/app/app
     networks:

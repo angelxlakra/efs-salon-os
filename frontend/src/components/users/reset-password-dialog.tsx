@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -94,7 +95,7 @@ export function ResetPasswordDialog({ open, user, onClose, onSuccess }: ResetPas
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent size="sm">
         <DialogHeader>
           <DialogTitle>Reset Password</DialogTitle>
           <DialogDescription>
@@ -103,7 +104,8 @@ export function ResetPasswordDialog({ open, user, onClose, onSuccess }: ResetPas
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="contents">
+          <DialogBody className="space-y-4">
             <FormField
               control={form.control}
               name="new_password"
@@ -131,8 +133,9 @@ export function ResetPasswordDialog({ open, user, onClose, onSuccess }: ResetPas
                 </FormItem>
               )}
             />
+          </DialogBody>
 
-            <DialogFooter className="pt-4">
+            <DialogFooter>
               <Button type="button" variant="outline" onClick={onClose}>
                 Cancel
               </Button>

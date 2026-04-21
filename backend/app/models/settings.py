@@ -1,6 +1,6 @@
 """Salon settings model for configurable salon information."""
 
-from sqlalchemy import Column, String, Text, Boolean, Integer
+from sqlalchemy import Column, DateTime, String, Text, Boolean, Integer
 from app.database import Base
 from app.models.base import TimestampMixin, ULIDMixin
 
@@ -50,6 +50,10 @@ class SalonSettings(Base, ULIDMixin, TimestampMixin):
     # Dashboard Goals
     daily_revenue_target_paise = Column(Integer, nullable=False, default=2000000)  # Default ₹20,000
     daily_services_target = Column(Integer, nullable=False, default=25)  # Default 25 services
+
+    # Central sync tracking
+    central_last_pull_at = Column(DateTime(timezone=True), nullable=True)
+    central_sync_enabled = Column(Boolean, nullable=False, default=False)
 
     def __repr__(self):
         return f"<SalonSettings {self.salon_name}>"

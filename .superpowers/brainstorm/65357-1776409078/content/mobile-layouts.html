@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mobile Layouts</title>
+<style>
+* { margin:0;padding:0;box-sizing:border-box; }
+body { background:#070707;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#fff;padding:24px; }
+
+.page-title { font-size:13px;color:#666;text-transform:uppercase;letter-spacing:2px;margin-bottom:6px; }
+.page-sub { font-size:11px;color:#444;margin-bottom:28px;line-height:1.6;max-width:700px; }
+
+/* Phone frame */
+.phones { display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap; }
+.phone-wrap { display:flex;flex-direction:column;align-items:center;gap:10px; }
+.phone-label { font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:#444; }
+
+.phone {
+  width:280px;
+  background:#0a0a0a;
+  border-radius:28px;
+  overflow:hidden;
+  border:6px solid #1a1a1a;
+  box-shadow:0 20px 60px rgba(0,0,0,0.8), inset 0 0 0 1px #2a2a2a;
+  position:relative;
+}
+.phone-notch { height:28px;background:#0a0a0a;display:flex;align-items:center;justify-content:space-between;padding:0 20px 0 70px;flex-shrink:0; }
+.notch-time { font-size:10px;font-weight:700;color:#888; }
+.notch-icons { display:flex;gap:4px;align-items:center; }
+.ni { width:10px;height:6px;background:#888;border-radius:1px; }
+.nb { width:16px;height:6px;background:#888;border-radius:1px; }
+
+.phone-body { overflow-y:auto;background:#0f0f0f; }
+.phone-body::-webkit-scrollbar { width:0; }
+
+/* ── PHONE 1: Dashboard mobile ── */
+.mob-topbar { height:40px;background:#0a0a0a;border-bottom:1px solid #161616;display:flex;align-items:center;justify-content:space-between;padding:0 14px;flex-shrink:0; }
+.mob-hbg { display:flex;flex-direction:column;gap:3px; }
+.mob-hl { width:14px;height:1.5px;background:#444;border-radius:2px; }
+.mob-logo { width:22px;height:22px;background:#fff;border-radius:5px;display:flex;align-items:center;justify-content:center; }
+.mob-logo-inner { width:12px;height:12px;background:#000;border-radius:2px; }
+.mob-title { font-size:12px;font-weight:700;color:#bbb;flex:1;margin-left:8px; }
+.mob-av { width:24px;height:24px;border-radius:6px;background:linear-gradient(135deg,#4c1d95,#6d28d9);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#e9d5ff; }
+
+.mob-content { padding:12px;display:flex;flex-direction:column;gap:10px; }
+
+/* Stats: 2-col on mobile */
+.mob-stats { display:grid;grid-template-columns:1fr 1fr;gap:8px; }
+.mob-sc { background:#141414;border:1px solid #1e1e1e;border-radius:10px;padding:10px 12px; }
+.mob-sc:first-child { border-top:2px solid #7c3aed; }
+.mob-sl { font-size:8px;text-transform:uppercase;letter-spacing:1px;color:#3a3a3a;font-weight:700; }
+.mob-sv { font-size:16px;font-weight:800;color:#e2e8f0;margin-top:3px;letter-spacing:-0.3px; }
+.mob-sv.hidden { color:#222;letter-spacing:3px;font-size:12px; }
+.mob-sd { font-size:8px;color:#22c55e;margin-top:2px; }
+.mob-sd.n { color:#333; }
+.mob-eye { font-size:9px;float:right;color:#3a3a3a;margin-top:-14px; }
+
+/* Active customer — full width card on mobile */
+.mob-card { background:#141414;border:1px solid #1e1e1e;border-radius:12px;overflow:hidden; }
+.mob-card-hdr { padding:10px 12px;border-bottom:1px solid #181818;display:flex;align-items:center;justify-content:space-between; }
+.mob-card-title { font-size:11px;font-weight:700;color:#777; }
+.mob-card-body { padding:10px;display:flex;flex-direction:column;gap:7px; }
+
+/* Customer tile — full width on mobile */
+.mob-ctile { background:#1a1a1a;border:1px solid #202020;border-radius:10px;overflow:hidden; }
+.mob-ct-hdr { padding:8px 10px;display:flex;align-items:center;gap:7px;border-bottom:1px solid #1e1e1e; }
+.mob-ct-av { width:24px;height:24px;border-radius:6px;background:linear-gradient(135deg,#1a0f2e,#2d1f4e);display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#a78bfa;flex-shrink:0; }
+.mob-ct-name { font-size:10px;font-weight:700;color:#ccc;flex:1; }
+.mob-ct-time { font-size:8px;color:#555;background:#111;padding:2px 5px;border-radius:12px;border:1px solid #1e1e1e; }
+.mob-ct-svcs { padding:6px 10px;display:flex;flex-direction:column;gap:4px; }
+.mob-svc-row { display:flex;align-items:center;gap:5px; }
+.mob-sdot { width:6px;height:6px;border-radius:50%;flex-shrink:0; }
+.mob-svc-nm { font-size:9px;font-weight:600;color:#aaa;flex:1; }
+.mob-svc-st { font-size:8px;color:#404040; }
+.mob-act { width:16px;height:16px;border-radius:4px;border:1px solid #2a2a2a;background:#222;display:flex;align-items:center;justify-content:center;flex-shrink:0; }
+.mob-play { width:0;height:0;border-style:solid;border-width:2.5px 0 2.5px 5px;border-color:transparent transparent transparent #a78bfa;margin-left:1px; }
+.mob-chk { font-size:7px;color:#4ade80;font-weight:900; }
+.mob-ct-foot { padding:6px 10px;border-top:1px solid #1e1e1e;display:flex;align-items:center;justify-content:space-between; }
+.mob-total { font-size:10px;font-weight:700;color:#ccc; }
+.mob-total-lbl { font-size:8px;color:#3a3a3a; }
+.mob-co-btn { background:#7c3aed;color:#fff;border:none;border-radius:6px;font-size:8px;font-weight:700;padding:4px 9px;cursor:default; }
+.mob-co-btn.dim { background:#1e1e1e;color:#404040;border:1px solid #252525; }
+
+/* Bottom nav */
+.mob-bottom-nav { height:52px;background:#0a0a0a;border-top:1px solid #161616;display:flex;align-items:center;justify-content:space-around;padding:0 8px;flex-shrink:0; }
+.mob-nav-item { display:flex;flex-direction:column;align-items:center;gap:3px;padding:4px 10px;border-radius:8px; }
+.mob-nav-item.active { background:#160d2b; }
+.mob-nav-ico { width:16px;height:16px;border-radius:4px;background:#2a2a2a; }
+.mob-nav-ico.active { background:#7c3aed; }
+.mob-nav-lbl { font-size:7px;font-weight:600;color:#3a3a3a; }
+.mob-nav-lbl.active { color:#a78bfa; }
+
+/* ── PHONE 2: POS mobile ── */
+.mob-pos-body { padding:12px;display:flex;flex-direction:column;gap:10px; }
+
+.mob-search { background:#141414;border:1px solid #1e1e1e;border-radius:8px;padding:8px 10px 8px 30px;font-size:11px;color:#444;width:100%;position:relative; }
+.mob-search-wrap { position:relative; }
+.mob-search-ico { position:absolute;left:10px;top:50%;transform:translateY(-50%);width:12px;height:12px;border-radius:3px;background:#333; }
+
+.mob-cat-scroll { display:flex;gap:5px;overflow-x:auto;padding-bottom:2px; }
+.mob-cat-scroll::-webkit-scrollbar { height:0; }
+.mob-cat-pill { padding:4px 10px;border-radius:20px;font-size:9px;font-weight:700;white-space:nowrap;cursor:default;border:1px solid #1e1e1e;color:#444;background:#141414; }
+.mob-cat-pill.active { background:#160d2b;color:#c4b5fd;border-color:#2d1f4e; }
+
+/* 2-col service grid on mobile */
+.mob-svc-grid { display:grid;grid-template-columns:1fr 1fr;gap:7px; }
+.mob-svc-card { background:#141414;border:1px solid #1e1e1e;border-radius:9px;padding:10px;position:relative; }
+.mob-svc-card.in-cart { border-color:#3d2a7a;background:#160d2b; }
+.mob-svc-card.in-cart::after { content:'✓';position:absolute;top:7px;right:8px;font-size:8px;color:#a78bfa;font-weight:900; }
+.mob-svc-dot { width:5px;height:5px;border-radius:50%;margin-bottom:5px; }
+.mob-svc-nm { font-size:10px;font-weight:700;color:#ccc;line-height:1.3;margin-bottom:4px; }
+.mob-svc-price { font-size:12px;font-weight:800;color:#e2e8f0; }
+.mob-svc-meta { display:flex;align-items:center;gap:4px;margin-top:3px; }
+.mob-svc-dur { font-size:8px;color:#444; }
+.mob-busy { font-size:7px;font-weight:700;padding:1px 4px;border-radius:3px; }
+.b-avail { background:#052e16;color:#4ade80;border:1px solid #166534; }
+.b-mod { background:#1c1000;color:#f59e0b;border:1px solid #78350f; }
+
+/* Floating cart FAB */
+.mob-fab { position:absolute;bottom:14px;right:14px;width:48px;height:48px;background:#7c3aed;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 20px rgba(124,58,237,0.5); }
+.mob-fab-ico { width:20px;height:20px;background:#fff;border-radius:4px;opacity:0.9; }
+.mob-fab-badge { position:absolute;top:-2px;right:-2px;width:16px;height:16px;background:#ef4444;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:800;color:#fff;border:2px solid #0f0f0f; }
+
+/* ── PHONE 3: Table → Card (Bills page) ── */
+.mob-bills-body { padding:12px;display:flex;flex-direction:column;gap:10px; }
+.mob-ph { font-size:15px;font-weight:800;color:#e2e8f0;letter-spacing:-0.3px; }
+.mob-ps { font-size:9px;color:#3a3a3a;margin-top:2px;margin-bottom:2px; }
+
+.mob-filter { display:flex;gap:5px;overflow-x:auto; }
+.mob-filter::-webkit-scrollbar { height:0; }
+.mob-fpill { padding:4px 9px;border-radius:20px;font-size:8px;font-weight:700;white-space:nowrap;cursor:default;border:1px solid #1e1e1e;color:#444;background:#141414; }
+.mob-fpill.active { background:#160d2b;color:#c4b5fd;border-color:#2d1f4e; }
+
+/* Bill card (replaces table row on mobile) */
+.bill-card { background:#141414;border:1px solid #1e1e1e;border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:6px; }
+.bill-card-row1 { display:flex;align-items:center;justify-content:space-between; }
+.bill-num { font-size:9px;font-weight:700;color:#555; }
+.bill-time { font-size:9px;color:#444; }
+.bill-card-row2 { display:flex;align-items:center;justify-content:space-between;gap:8px; }
+.bill-cust { font-size:11px;font-weight:700;color:#ccc;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+.bill-amt { font-size:13px;font-weight:800;color:#e2e8f0;white-space:nowrap; }
+.bill-card-row3 { display:flex;align-items:center;justify-content:space-between; }
+.bill-svcs { font-size:9px;color:#444;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+.bill-status { font-size:8px;font-weight:700;padding:2px 7px;border-radius:20px; }
+.bs-paid { background:#052e16;color:#4ade80;border:1px solid #166534; }
+.bs-pending { background:#1c0820;color:#c084fc;border:1px solid #6b21a8; }
+.bs-refund { background:#1c0000;color:#f87171;border:1px solid #7f1d1d; }
+
+/* Annotation strip */
+.annotations { margin-top:28px;display:grid;grid-template-columns:repeat(3,1fr);gap:12px; }
+.ann { background:#141414;border:1px solid #1e1e1e;border-radius:10px;padding:12px 14px; }
+.ann h4 { font-size:11px;font-weight:700;color:#bbb;margin-bottom:5px; }
+.ann p { font-size:10px;color:#555;line-height:1.55; }
+.tag { display:inline-block;background:#1a0f2e;color:#a78bfa;font-size:8px;font-weight:700;padding:2px 5px;border-radius:3px;margin-right:3px; }
+</style>
+</head>
+<body>
+
+<p class="page-title">Section 3 — Mobile Layouts</p>
+<p class="page-sub">Three key patterns that cover 90% of the 65 mobile audit issues: responsive stat grid, full-width customer tiles, bottom nav, 2-col service grid + FAB, and table-to-card conversions.</p>
+
+<div class="phones">
+
+  <!-- Phone 1: Dashboard -->
+  <div class="phone-wrap">
+    <div class="phone-label">Dashboard</div>
+    <div class="phone">
+      <div class="phone-notch">
+        <span class="notch-time">9:41</span>
+        <div class="notch-icons"><div class="ni"></div><div class="nb"></div></div>
+      </div>
+      <div class="phone-body">
+        <div class="mob-topbar">
+          <div class="mob-hbg"><div class="mob-hl"></div><div class="mob-hl"></div><div class="mob-hl"></div></div>
+          <div class="mob-logo"><div class="mob-logo-inner"></div></div>
+          <div class="mob-title">Dashboard</div>
+          <div class="mob-av">A</div>
+        </div>
+        <div class="mob-content">
+          <!-- 2-col stats on mobile -->
+          <div class="mob-stats">
+            <div class="mob-sc">
+              <div class="mob-sl">Revenue</div>
+              <div class="mob-sv hidden">● ● ●</div>
+              <div class="mob-eye">👁</div>
+              <div class="mob-sd n" style="margin-top:6px;">tap to reveal</div>
+            </div>
+            <div class="mob-sc">
+              <div class="mob-sl">Customers</div>
+              <div class="mob-sv">42</div>
+              <div class="mob-sd">↑ 5%</div>
+            </div>
+            <div class="mob-sc">
+              <div class="mob-sl">Active Now</div>
+              <div class="mob-sv">6</div>
+              <div class="mob-sd n">In salon</div>
+            </div>
+            <div class="mob-sc">
+              <div class="mob-sl">Pending</div>
+              <div class="mob-sv">3</div>
+              <div class="mob-sd n">Not billed</div>
+            </div>
+          </div>
+
+          <!-- Active customers: single-col full-width tiles -->
+          <div class="mob-card">
+            <div class="mob-card-hdr">
+              <div class="mob-card-title">Active Customers</div>
+              <div style="background:#1a0f2e;color:#7c3aed;font-size:8px;font-weight:700;padding:2px 6px;border-radius:12px;border:1px solid #2d1f4e;">6</div>
+            </div>
+            <div class="mob-card-body">
+              <div class="mob-ctile">
+                <div class="mob-ct-hdr">
+                  <div class="mob-ct-av">P</div>
+                  <div class="mob-ct-name">Priya Sharma</div>
+                  <div class="mob-ct-time">⏱ 24m</div>
+                </div>
+                <div class="mob-ct-svcs">
+                  <div class="mob-svc-row"><div class="mob-sdot" style="background:#f59e0b;animation:pulse 1.5s infinite;"></div><span class="mob-svc-nm">Haircut</span><span class="mob-svc-st">· Riya</span><div class="mob-act"><span class="mob-chk">✓</span></div></div>
+                  <div class="mob-svc-row"><div class="mob-sdot" style="background:#3b82f6;"></div><span class="mob-svc-nm">Threading</span><span class="mob-svc-st">· Sneha</span><div class="mob-act"><div class="mob-play"></div></div></div>
+                </div>
+                <div class="mob-ct-foot">
+                  <div><div class="mob-total-lbl">Total</div><div class="mob-total">₹650</div></div>
+                  <button class="mob-co-btn dim">Checkout</button>
+                </div>
+              </div>
+              <div class="mob-ctile">
+                <div class="mob-ct-hdr">
+                  <div class="mob-ct-av" style="background:linear-gradient(135deg,#14291a,#1a4a29);">A</div>
+                  <div class="mob-ct-name">Arjun Mehta</div>
+                  <div class="mob-ct-time">⏱ 41m</div>
+                </div>
+                <div class="mob-ct-svcs">
+                  <div class="mob-svc-row"><div class="mob-sdot" style="background:#22c55e;"></div><span class="mob-svc-nm">Facial</span><span class="mob-svc-st">· Sneha</span></div>
+                </div>
+                <div class="mob-ct-foot">
+                  <div><div class="mob-total-lbl">Total</div><div class="mob-total">₹600</div></div>
+                  <button class="mob-co-btn">Checkout</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- Bottom nav -->
+      <div class="mob-bottom-nav">
+        <div class="mob-nav-item active">
+          <div class="mob-nav-ico active"></div>
+          <div class="mob-nav-lbl active">Home</div>
+        </div>
+        <div class="mob-nav-item">
+          <div class="mob-nav-ico"></div>
+          <div class="mob-nav-lbl">POS</div>
+        </div>
+        <div class="mob-nav-item">
+          <div class="mob-nav-ico"></div>
+          <div class="mob-nav-lbl">Bills</div>
+        </div>
+        <div class="mob-nav-item">
+          <div class="mob-nav-ico"></div>
+          <div class="mob-nav-lbl">More</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Phone 2: POS -->
+  <div class="phone-wrap">
+    <div class="phone-label">POS — Service Picker</div>
+    <div class="phone">
+      <div class="phone-notch">
+        <span class="notch-time">9:41</span>
+        <div class="notch-icons"><div class="ni"></div><div class="nb"></div></div>
+      </div>
+      <div class="phone-body" style="position:relative;">
+        <div class="mob-topbar">
+          <div class="mob-hbg"><div class="mob-hl"></div><div class="mob-hl"></div><div class="mob-hl"></div></div>
+          <div class="mob-logo"><div class="mob-logo-inner"></div></div>
+          <div class="mob-title">Point of Sale</div>
+          <div style="width:24px;height:24px;border-radius:6px;background:#1a0f2e;border:1px solid #2d1f4e;display:flex;align-items:center;justify-content:center;font-size:8px;color:#a78bfa;font-weight:700;">P</div>
+        </div>
+        <div class="mob-pos-body">
+          <!-- Customer chip -->
+          <div style="display:flex;align-items:center;gap:7px;background:#141414;border:1px solid #1e1e1e;border-radius:8px;padding:7px 10px;">
+            <div style="width:22px;height:22px;border-radius:6px;background:linear-gradient(135deg,#1a0f2e,#2d1f4e);display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#a78bfa;flex-shrink:0;">P</div>
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:10px;font-weight:600;color:#ccc;">Priya Sharma</div>
+              <div style="font-size:8px;color:#444;">+91 98765 43210</div>
+            </div>
+            <div style="font-size:9px;color:#3a3a3a;">✎</div>
+          </div>
+
+          <!-- Search -->
+          <div class="mob-search-wrap">
+            <div class="mob-search-ico"></div>
+            <input class="mob-search" placeholder="Search services..." style="width:100%;background:#141414;border:1px solid #1e1e1e;border-radius:8px;padding:7px 10px 7px 28px;font-size:11px;color:#555;outline:none;" />
+          </div>
+
+          <!-- Category pills -->
+          <div class="mob-cat-scroll">
+            <div class="mob-cat-pill active">All</div>
+            <div class="mob-cat-pill">Hair</div>
+            <div class="mob-cat-pill">Skin</div>
+            <div class="mob-cat-pill">Nails</div>
+            <div class="mob-cat-pill">Threading</div>
+            <div class="mob-cat-pill">Massage</div>
+          </div>
+
+          <!-- 2-col service grid -->
+          <div class="mob-svc-grid">
+            <div class="mob-svc-card in-cart">
+              <div class="mob-svc-dot" style="background:#7c3aed;"></div>
+              <div class="mob-svc-nm">Haircut</div>
+              <div class="mob-svc-price">₹300</div>
+              <div class="mob-svc-meta"><span class="mob-svc-dur">30 min</span><span class="mob-busy b-avail">2 free</span></div>
+            </div>
+            <div class="mob-svc-card">
+              <div class="mob-svc-dot" style="background:#7c3aed;"></div>
+              <div class="mob-svc-nm">Hair Colour</div>
+              <div class="mob-svc-price">₹800</div>
+              <div class="mob-svc-meta"><span class="mob-svc-dur">90 min</span><span class="mob-busy b-mod">busy</span></div>
+            </div>
+            <div class="mob-svc-card in-cart">
+              <div class="mob-svc-dot" style="background:#ec4899;"></div>
+              <div class="mob-svc-nm">Facial</div>
+              <div class="mob-svc-price">₹600</div>
+              <div class="mob-svc-meta"><span class="mob-svc-dur">45 min</span><span class="mob-busy b-avail">free</span></div>
+            </div>
+            <div class="mob-svc-card">
+              <div class="mob-svc-dot" style="background:#f59e0b;"></div>
+              <div class="mob-svc-nm">Threading</div>
+              <div class="mob-svc-price">₹60</div>
+              <div class="mob-svc-meta"><span class="mob-svc-dur">10 min</span><span class="mob-busy b-avail">free</span></div>
+            </div>
+            <div class="mob-svc-card">
+              <div class="mob-svc-dot" style="background:#06b6d4;"></div>
+              <div class="mob-svc-nm">Manicure</div>
+              <div class="mob-svc-price">₹400</div>
+              <div class="mob-svc-meta"><span class="mob-svc-dur">40 min</span><span class="mob-busy b-mod">busy</span></div>
+            </div>
+            <div class="mob-svc-card">
+              <div class="mob-svc-dot" style="background:#22c55e;"></div>
+              <div class="mob-svc-nm">Head Massage</div>
+              <div class="mob-svc-price">₹350</div>
+              <div class="mob-svc-meta"><span class="mob-svc-dur">30 min</span><span class="mob-busy b-avail">free</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Floating cart FAB -->
+        <div class="mob-fab">
+          <div class="mob-fab-ico"></div>
+          <div class="mob-fab-badge">2</div>
+        </div>
+      </div>
+      <div class="mob-bottom-nav">
+        <div class="mob-nav-item"><div class="mob-nav-ico"></div><div class="mob-nav-lbl">Home</div></div>
+        <div class="mob-nav-item active"><div class="mob-nav-ico active"></div><div class="mob-nav-lbl active">POS</div></div>
+        <div class="mob-nav-item"><div class="mob-nav-ico"></div><div class="mob-nav-lbl">Bills</div></div>
+        <div class="mob-nav-item"><div class="mob-nav-ico"></div><div class="mob-nav-lbl">More</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Phone 3: Bills — table → card pattern -->
+  <div class="phone-wrap">
+    <div class="phone-label">Bills — Card pattern</div>
+    <div class="phone">
+      <div class="phone-notch">
+        <span class="notch-time">9:41</span>
+        <div class="notch-icons"><div class="ni"></div><div class="nb"></div></div>
+      </div>
+      <div class="phone-body">
+        <div class="mob-topbar">
+          <div class="mob-hbg"><div class="mob-hl"></div><div class="mob-hl"></div><div class="mob-hl"></div></div>
+          <div class="mob-logo"><div class="mob-logo-inner"></div></div>
+          <div class="mob-title">Bills</div>
+          <div style="background:#7c3aed;color:#fff;font-size:8px;font-weight:700;padding:4px 8px;border-radius:6px;">+ New</div>
+        </div>
+        <div class="mob-bills-body">
+          <!-- Filter pills -->
+          <div class="mob-filter">
+            <div class="mob-fpill active">All</div>
+            <div class="mob-fpill">Posted</div>
+            <div class="mob-fpill">Pending</div>
+            <div class="mob-fpill">Refunded</div>
+          </div>
+
+          <!-- Bill cards (replaces 6-col table) -->
+          <div class="bill-card">
+            <div class="bill-card-row1">
+              <span class="bill-num">#INV-0042</span>
+              <span class="bill-time">2 min ago</span>
+            </div>
+            <div class="bill-card-row2">
+              <span class="bill-cust">Priya Sharma</span>
+              <span class="bill-amt">₹1,062</span>
+            </div>
+            <div class="bill-card-row3">
+              <span class="bill-svcs">Haircut, Facial (Basic)</span>
+              <span class="bill-status bs-paid">PAID</span>
+            </div>
+          </div>
+
+          <div class="bill-card">
+            <div class="bill-card-row1">
+              <span class="bill-num">#INV-0041</span>
+              <span class="bill-time">18 min ago</span>
+            </div>
+            <div class="bill-card-row2">
+              <span class="bill-cust">Arjun Mehta</span>
+              <span class="bill-amt">₹1,416</span>
+            </div>
+            <div class="bill-card-row3">
+              <span class="bill-svcs">Facial, Head Massage</span>
+              <span class="bill-status bs-pending">PENDING</span>
+            </div>
+          </div>
+
+          <div class="bill-card">
+            <div class="bill-card-row1">
+              <span class="bill-num">#INV-0040</span>
+              <span class="bill-time">34 min ago</span>
+            </div>
+            <div class="bill-card-row2">
+              <span class="bill-cust">Kavya Nair</span>
+              <span class="bill-amt">₹472</span>
+            </div>
+            <div class="bill-card-row3">
+              <span class="bill-svcs">Manicure</span>
+              <span class="bill-status bs-paid">PAID</span>
+            </div>
+          </div>
+
+          <div class="bill-card">
+            <div class="bill-card-row1">
+              <span class="bill-num">#INV-0039</span>
+              <span class="bill-time">51 min ago</span>
+            </div>
+            <div class="bill-card-row2">
+              <span class="bill-cust">Rahul Singh</span>
+              <span class="bill-amt">₹413</span>
+            </div>
+            <div class="bill-card-row3">
+              <span class="bill-svcs">Haircut</span>
+              <span class="bill-status bs-refund">REFUNDED</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+      <div class="mob-bottom-nav">
+        <div class="mob-nav-item"><div class="mob-nav-ico"></div><div class="mob-nav-lbl">Home</div></div>
+        <div class="mob-nav-item"><div class="mob-nav-ico"></div><div class="mob-nav-lbl">POS</div></div>
+        <div class="mob-nav-item active"><div class="mob-nav-ico active"></div><div class="mob-nav-lbl active">Bills</div></div>
+        <div class="mob-nav-item"><div class="mob-nav-ico"></div><div class="mob-nav-lbl">More</div></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Annotations -->
+<div class="annotations">
+  <div class="ann">
+    <h4>Bottom nav (new)</h4>
+    <p><span class="tag">Mobile only</span>Replaces the sidebar on mobile. 4 slots: Home, POS, Bills, More (all other pages). The existing shadcn sidebar becomes a drawer triggered from the hamburger, sliding in over the content — same as today but with dark styling.</p>
+  </div>
+  <div class="ann">
+    <h4>Table → Card pattern</h4>
+    <p><span class="tag">65 fixes</span>Every data table (Bills, Customers, Inventory, Expenses, Attendance, Users) gets a card layout at <code style="color:#555;">md:hidden</code> and the existing table shown at <code style="color:#555;">hidden md:table</code>. Three rows of info per card: ID + time, name + amount, services + status.</p>
+  </div>
+  <div class="ann">
+    <h4>POS on mobile</h4>
+    <p><span class="tag">Cart FAB</span>Service grid switches to 2-col. Cart stays as a bottom sheet (already implemented), triggered by the violet FAB with item count badge. Customer chip moves to above the search bar. No horizontal scroll anywhere.</p>
+  </div>
+</div>
+
+</body>
+</html>

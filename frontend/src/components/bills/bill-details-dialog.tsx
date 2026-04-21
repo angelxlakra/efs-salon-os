@@ -1,9 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Printer, User, FileText, Edit, Trash2, CreditCard, MessageCircle } from 'lucide-react';
+import { Printer, User, UserPlus, FileText, Edit, Trash2, CreditCard, MessageCircle } from 'lucide-react';
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogHeader,
   DialogTitle,
@@ -17,6 +18,9 @@ import { Loader2 } from 'lucide-react';
 import { useSettingsStore } from '@/stores/settings-store';
 import { sendReceiptToWhatsApp } from '@/lib/whatsapp-receipt';
 import { StaffContributionResponse } from '@/types/multi-staff';
+import { titleCase } from '@/lib/utils';
+import { CustomerSearch } from '@/components/pos/customer-search';
+import { useAuthStore } from '@/stores/auth-store';
 
 interface BillItem {
   id: string;
@@ -56,6 +60,8 @@ interface BillDetails {
   total_amount: number; // paise
   rounded_total: number; // paise
   rounding_adjustment: number; // paise
+  write_off_amount: number; // paise — total written off (0 if none)
+  write_off_at: string | null;
   items: BillItem[];
   payments: Payment[];
   created_at: string;
@@ -86,6 +92,39 @@ export function BillDetailsDialog({
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const { hasGST, fetchSettings, settings } = useSettingsStore();
+  const { hasPermission, user } = useAuthStore();
+  const [showAssignCustomer, setShowAssignCustomer] = useState(false);
+  const [isAssigning, setIsAssigning] = useState(false);
+  const canAssignCustomer = hasPermission('billing', 'update');
+  const isOwner = user?.role === 'owner';
+  const canDiscount = hasPermission('billing', 'discount');
+  const canAddPayment = hasPermission('billing', 'create');
+
+  // Edit discount state
+  const [showEditDiscount, setShowEditDiscount] = useState(false);
+  const [discountInput, setDiscountInput] = useState('');
+  const [discountReason, setDiscountReason] = useState('');
+  const [isSavingDiscount, setIsSavingDiscount] = useState(false);
+
+  // Collect pending payment state (posted bills with pending balance)
+  const [showCollectPayment, setShowCollectPayment] = useState(false);
+  const [collectAmount, setCollectAmount] = useState('');
+  const [collectMethod, setCollectMethod] = useState<'cash' | 'upi' | 'card' | 'other'>('cash');
+  const [collectRef, setCollectRef] = useState('');
+  const [isCollecting, setIsCollecting] = useState(false);
+
+  // Write-off state
+  const [showWriteOff, setShowWriteOff] = useState(false);
+  const [writeOffAmount, setWriteOffAmount] = useState('');
+  const [writeOffReason, setWriteOffReason] = useState('');
+  const [isSavingWriteOff, setIsSavingWriteOff] = useState(false);
+
+  // Add payment state
+  const [showAddPayment, setShowAddPayment] = useState(false);
+  const [addPaymentAmount, setAddPaymentAmount] = useState('');
+  const [addPaymentMethod, setAddPaymentMethod] = useState<'cash' | 'upi' | 'card' | 'other'>('cash');
+  const [addPaymentRef, setAddPaymentRef] = useState('');
+  const [isAddingPayment, setIsAddingPayment] = useState(false);
 
   useEffect(() => {
     if (!settings) {
@@ -165,6 +204,121 @@ export function BillDetailsDialog({
     }
   };
 
+  const handleAddPayment = async () => {
+    if (!bill || !billId) return;
+    const amount = parseFloat(addPaymentAmount || '0');
+    if (isNaN(amount) || amount <= 0) {
+      toast.error('Enter a valid payment amount');
+      return;
+    }
+    try {
+      setIsAddingPayment(true);
+      await apiClient.post(`/pos/bills/${billId}/payments`, {
+        method: addPaymentMethod,
+        amount,
+        reference_number: addPaymentRef.trim() || null,
+      });
+      toast.success('Payment added');
+      setShowAddPayment(false);
+      setAddPaymentAmount('');
+      setAddPaymentRef('');
+      setAddPaymentMethod('cash');
+      await fetchBillDetails();
+    } catch (error: any) {
+      toast.error(error.response?.data?.detail || 'Failed to add payment');
+    } finally {
+      setIsAddingPayment(false);
+    }
+  };
+
+  const handleSaveDiscount = async () => {
+    if (!bill || !billId) return;
+    const discountRupees = parseFloat(discountInput || '0');
+    if (isNaN(discountRupees) || discountRupees < 0) {
+      toast.error('Enter a valid discount amount');
+      return;
+    }
+    const discountPaise = Math.round(discountRupees * 100);
+    try {
+      setIsSavingDiscount(true);
+      await apiClient.patch(`/pos/bills/${billId}/discount`, {
+        discount_amount: discountPaise,
+        reason: discountReason.trim() || null,
+      });
+      toast.success('Discount updated');
+      setShowEditDiscount(false);
+      setDiscountInput('');
+      setDiscountReason('');
+      await fetchBillDetails();
+    } catch (error: any) {
+      toast.error(error.response?.data?.detail || 'Failed to update discount');
+    } finally {
+      setIsSavingDiscount(false);
+    }
+  };
+
+  const handleCollectPayment = async () => {
+    if (!bill || !billId) return;
+    const amountRupees = parseFloat(collectAmount || '0');
+    const amountPaise = Math.round(amountRupees * 100);
+    const totalPaid = bill.payments?.reduce((s, p) => s + p.amount, 0) ?? 0;
+    const pending = bill.rounded_total - totalPaid - (bill.write_off_amount ?? 0);
+    if (amountPaise <= 0 || amountPaise > pending) {
+      toast.error(`Amount must be between ₹0.01 and ${formatPrice(pending)}`);
+      return;
+    }
+    try {
+      setIsCollecting(true);
+      await apiClient.post(`/pos/bills/${billId}/collect-pending`, {
+        method: collectMethod,
+        amount: amountRupees,
+        reference_number: collectRef.trim() || null,
+      });
+      toast.success('Payment collected');
+      setShowCollectPayment(false);
+      setCollectAmount('');
+      setCollectRef('');
+      setCollectMethod('cash');
+      await fetchBillDetails();
+    } catch (error: any) {
+      toast.error(error.response?.data?.detail || 'Failed to collect payment');
+    } finally {
+      setIsCollecting(false);
+    }
+  };
+
+  const handleWriteOff = async () => {
+    if (!bill || !billId) return;
+    const amountRupees = parseFloat(writeOffAmount || '0');
+    const amountPaise = Math.round(amountRupees * 100);
+    const totalPaid = bill.payments?.reduce((s, p) => s + p.amount, 0) ?? 0;
+    const pending = bill.rounded_total - totalPaid - (bill.write_off_amount ?? 0);
+    if (amountPaise <= 0 || amountPaise > pending) {
+      toast.error(`Write-off amount must be between ₹0.01 and ${formatPrice(pending)}`);
+      return;
+    }
+    if (!writeOffReason.trim()) {
+      toast.error('Reason is required');
+      return;
+    }
+    try {
+      setIsSavingWriteOff(true);
+      await apiClient.patch(`/pos/bills/${billId}/write-off`, {
+        write_off_amount: amountPaise,
+        reason: writeOffReason.trim(),
+      });
+      toast.success('Pending balance written off');
+      setShowWriteOff(false);
+      setWriteOffAmount('');
+      setWriteOffReason('');
+      await fetchBillDetails();
+    } catch (error: any) {
+      toast.error(error.response?.data?.detail || 'Failed to write off balance');
+    } finally {
+      setIsSavingWriteOff(false);
+    }
+  };
+
   const formatPrice = (paise: number) => {
     return `₹${(paise / 100).toLocaleString('en-IN', {
       minimumFractionDigits: 2,
@@ -217,11 +371,12 @@ export function BillDetailsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] lg:max-w-[800px] max-h-[90vh] overflow-y-auto">
+      <DialogContent size="lg" className="lg:max-w-[768px]">
         <DialogHeader>
           <DialogTitle>Bill Details</DialogTitle>
         </DialogHeader>
 
+        <DialogBody>
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
@@ -241,11 +396,56 @@ export function BillDetailsDialog({
 
             {/* Customer Info */}
             <div className="bg-gray-50 rounded-lg p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <User className="h-4 w-4 text-gray-500" />
-                <span className="font-semibold text-sm">Customer</span>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <User className="h-4 w-4 text-gray-500" />
+                  <span className="font-semibold text-sm">Customer</span>
+                </div>
+                {!bill.customer_phone && canAssignCustomer && !showAssignCustomer && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowAssignCustomer(true)}
+                    disabled={isAssigning}
+                  >
+                    <UserPlus className="h-3 w-3 mr-1" />
+                    Assign Customer
+                  </Button>
+                )}
               </div>
-              <p className="text-base">{bill.customer_name || 'Walk-in Customer'}</p>
+              <p className="text-base">{titleCase(bill.customer_name) || 'Walk-in Customer'}</p>
+              {showAssignCustomer && (
+                <div className="mt-3">
+                  <CustomerSearch
+                    value={{ id: null, name: null }}
+                    onChange={async (id, name, phone) => {
+                      if (!id || !billId) return;
+                      setIsAssigning(true);
+                      try {
+                        await apiClient.patch(`/pos/bills/${billId}/customer`, {
+                          customer_id: id,
+                        });
+                        toast.success(`Customer assigned: ${name}`);
+                        setShowAssignCustomer(false);
+                        await fetchBillDetails();
+                      } catch (error: any) {
+                        toast.error(error.response?.data?.detail || 'Failed to assign customer');
+                      } finally {
+                        setIsAssigning(false);
+                      }
+                    }}
+                  />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowAssignCustomer(false)}
+                    className="mt-2"
+                    disabled={isAssigning}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              )}
             </div>
 
             {/* Services */}
@@ -254,11 +454,11 @@ export function BillDetailsDialog({
                 <FileText className="h-4 w-4" />
                 Services
               </h4>
-              <div className="border rounded-lg overflow-hidden">
+              <div className="border rounded-lg overflow-hidden overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-gray-50 border-b">
                     <tr>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                      <th className="px-3 sm:px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
                         Service
                       </th>
                       <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">
@@ -402,6 +602,12 @@ export function BillDetailsDialog({
                   <span className="text-red-600">-{formatPrice(bill.discount_amount)}</span>
                 </div>
               )}
+              {(bill.write_off_amount ?? 0) > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Write-off</span>
+                  <span className="text-amber-600">-{formatPrice(bill.write_off_amount)}</span>
+                </div>
+              )}
               {hasGST() && (
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Tax (CGST + SGST)</span>
@@ -441,16 +647,16 @@ export function BillDetailsDialog({
             </div>
 
             {/* Actions */}
-            <div className="flex gap-2 pt-4 border-t">
+            <div className="flex flex-wrap gap-2 pt-4 border-t">
               <Button
                 variant="outline"
                 onClick={() => {
                   if (onReprint && bill.id) onReprint(bill.id);
                 }}
-                className="flex-1"
+                className="flex-1 min-w-[120px]"
               >
                 <Printer className="h-4 w-4 mr-2" />
-                Reprint Receipt
+                Reprint
               </Button>
 
               {bill.customer_phone && (
@@ -469,7 +675,269 @@ export function BillDetailsDialog({
                 </Button>
               )}
 
-              {bill.status === 'draft' && onVoid && (
+              {bill.status === 'draft' && canAddPayment && (
+                showAddPayment ? (
+                  <div className="w-full space-y-2 border rounded-lg p-3 bg-gray-50">
+                    <p className="text-sm font-medium">
+                      Add Payment
+                      {bill.rounded_total - (bill.payments?.reduce((s, p) => s + p.amount, 0) ?? 0) - (bill.write_off_amount ?? 0) > 0 && (
+                        <span className="text-xs text-muted-foreground ml-2">
+                          Remaining: {formatPrice(bill.rounded_total - (bill.payments?.reduce((s, p) => s + p.amount, 0) ?? 0) - (bill.write_off_amount ?? 0))}
+                        </span>
+                      )}
+                    </p>
+                    <select
+                      className="w-full px-3 py-2 border rounded-md text-sm"
+                      value={addPaymentMethod}
+                      onChange={(e) => setAddPaymentMethod(e.target.value as any)}
+                    >
+                      <option value="cash">Cash</option>
+                      <option value="upi">UPI</option>
+                      <option value="card">Card</option>
+                      <option value="other">Other</option>
+                    </select>
+                    <input
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      placeholder="Amount in ₹"
+                      className="w-full px-3 py-2 border rounded-md text-sm"
+                      value={addPaymentAmount}
+                      onChange={(e) => setAddPaymentAmount(e.target.value)}
+                    />
+                    {(addPaymentMethod === 'upi' || addPaymentMethod === 'card') && (
+                      <input
+                        type="text"
+                        placeholder="Reference number (optional)"
+                        className="w-full px-3 py-2 border rounded-md text-sm"
+                        value={addPaymentRef}
+                        onChange={(e) => setAddPaymentRef(e.target.value)}
+                      />
+                    )}
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => { setShowAddPayment(false); setAddPaymentAmount(''); setAddPaymentRef(''); }}
+                        disabled={isAddingPayment}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="flex-1"
+                        onClick={handleAddPayment}
+                        disabled={isAddingPayment}
+                      >
+                        {isAddingPayment ? 'Adding…' : 'Confirm'}
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      const remaining = (bill.rounded_total - (bill.payments?.reduce((s, p) => s + p.amount, 0) ?? 0) - (bill.write_off_amount ?? 0)) / 100;
+                      setAddPaymentAmount(remaining > 0 ? remaining.toFixed(2) : '');
+                      setShowAddPayment(true);
+                    }}
+                    className="flex-1"
+                  >
+                    <CreditCard className="h-4 w-4 mr-2" />
+                    Add Payment
+                  </Button>
+                )
+              )}
+
+              {bill.status === 'draft' && canDiscount && (
+                showEditDiscount ? (
+                  <div className="w-full space-y-2 border rounded-lg p-3 bg-gray-50">
+                    <p className="text-sm font-medium">Edit Discount</p>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      placeholder="Discount in ₹"
+                      className="w-full px-3 py-2 border rounded-md text-sm"
+                      value={discountInput}
+                      onChange={(e) => setDiscountInput(e.target.value)}
+                    />
+                    <input
+                      type="text"
+                      placeholder="Reason (optional)"
+                      className="w-full px-3 py-2 border rounded-md text-sm"
+                      value={discountReason}
+                      onChange={(e) => setDiscountReason(e.target.value)}
+                    />
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => { setShowEditDiscount(false); setDiscountInput(''); setDiscountReason(''); }}
+                        disabled={isSavingDiscount}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="flex-1"
+                        onClick={handleSaveDiscount}
+                        disabled={isSavingDiscount}
+                      >
+                        {isSavingDiscount ? 'Saving…' : 'Apply'}
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setDiscountInput(((bill.discount_amount || 0) / 100).toString());
+                      setShowEditDiscount(true);
+                    }}
+                    className="flex-1"
+                  >
+                    Edit Discount
+                  </Button>
+                )
+              )}
+
+              {bill.status === 'posted' && canAddPayment && (bill.rounded_total - (bill.payments?.reduce((s, p) => s + p.amount, 0) ?? 0) - (bill.write_off_amount ?? 0)) > 0 && (
+                showCollectPayment ? (
+                  <div className="w-full space-y-2 border rounded-lg p-3 bg-gray-50">
+                    <p className="text-sm font-medium">
+                      Collect Payment
+                      <span className="text-xs text-muted-foreground ml-2">
+                        Pending: {formatPrice(bill.rounded_total - (bill.payments?.reduce((s, p) => s + p.amount, 0) ?? 0) - (bill.write_off_amount ?? 0))}
+                      </span>
+                    </p>
+                    <select
+                      className="w-full px-3 py-2 border rounded-md text-sm"
+                      value={collectMethod}
+                      onChange={(e) => setCollectMethod(e.target.value as any)}
+                    >
+                      <option value="cash">Cash</option>
+                      <option value="upi">UPI</option>
+                      <option value="card">Card</option>
+                      <option value="other">Other</option>
+                    </select>
+                    <input
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      placeholder="Amount in ₹"
+                      className="w-full px-3 py-2 border rounded-md text-sm"
+                      value={collectAmount}
+                      onChange={(e) => setCollectAmount(e.target.value)}
+                    />
+                    {(collectMethod === 'upi' || collectMethod === 'card') && (
+                      <input
+                        type="text"
+                        placeholder="Reference number (optional)"
+                        className="w-full px-3 py-2 border rounded-md text-sm"
+                        value={collectRef}
+                        onChange={(e) => setCollectRef(e.target.value)}
+                      />
+                    )}
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => { setShowCollectPayment(false); setCollectAmount(''); setCollectRef(''); }}
+                        disabled={isCollecting}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="flex-1"
+                        onClick={handleCollectPayment}
+                        disabled={isCollecting}
+                      >
+                        {isCollecting ? 'Collecting…' : 'Confirm'}
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      const pending = bill.rounded_total - (bill.payments?.reduce((s, p) => s + p.amount, 0) ?? 0) - (bill.write_off_amount ?? 0);
+                      setCollectAmount((pending / 100).toFixed(2));
+                      setShowCollectPayment(true);
+                    }}
+                    className="flex-1"
+                  >
+                    <CreditCard className="h-4 w-4 mr-2" />
+                    Collect Payment
+                  </Button>
+                )
+              )}
+
+              {bill.status === 'posted' && isOwner && (bill.rounded_total - (bill.payments?.reduce((s, p) => s + p.amount, 0) ?? 0) - (bill.write_off_amount ?? 0)) > 0 && (
+                showWriteOff ? (
+                  <div className="w-full space-y-2 border rounded-lg p-3 bg-amber-50 border-amber-200">
+                    <p className="text-sm font-medium text-amber-900">
+                      Write Off Pending Balance
+                      <span className="text-xs text-amber-700 ml-2">
+                        Pending: {formatPrice(bill.rounded_total - (bill.payments?.reduce((s, p) => s + p.amount, 0) ?? 0) - (bill.write_off_amount ?? 0))}
+                      </span>
+                    </p>
+                    <input
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      placeholder="Amount to write off (₹)"
+                      className="w-full px-3 py-2 border rounded-md text-sm"
+                      value={writeOffAmount}
+                      onChange={(e) => setWriteOffAmount(e.target.value)}
+                    />
+                    <input
+                      type="text"
+                      placeholder="Reason (required)"
+                      className="w-full px-3 py-2 border rounded-md text-sm"
+                      value={writeOffReason}
+                      onChange={(e) => setWriteOffReason(e.target.value)}
+                    />
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => { setShowWriteOff(false); setWriteOffAmount(''); setWriteOffReason(''); }}
+                        disabled={isSavingWriteOff}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="flex-1 bg-amber-600 hover:bg-amber-700 text-white"
+                        onClick={handleWriteOff}
+                        disabled={isSavingWriteOff}
+                      >
+                        {isSavingWriteOff ? 'Writing off…' : 'Confirm Write-Off'}
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      const pending = bill.rounded_total - (bill.payments?.reduce((s, p) => s + p.amount, 0) ?? 0) - (bill.write_off_amount ?? 0);
+                      setWriteOffAmount((pending / 100).toFixed(2));
+                      setShowWriteOff(true);
+                    }}
+                    className="flex-1 border-amber-300 text-amber-700 hover:bg-amber-50"
+                  >
+                    Write Off Pending
+                  </Button>
+                )
+              )}
+
+              {(bill.status === 'draft' || (bill.status === 'posted' && isOwner)) && onVoid && (
                 <Button
                   variant="destructive"
                   onClick={() => {
@@ -496,17 +964,18 @@ export function BillDetailsDialog({
             </div>
           </div>
         ) : null}
+        </DialogBody>
       </DialogContent>
 
       {/* Edit Payment Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent size="md">
           <DialogHeader>
             <DialogTitle>Edit Payment</DialogTitle>
           </DialogHeader>
 
           {editingPayment && (
-            <div className="space-y-4">
+            <DialogBody className="space-y-4">
               {/* Payment Method */}
               <div>
                 <label className="text-sm font-medium mb-2 block">Payment Method</label>
@@ -609,7 +1078,7 @@ export function BillDetailsDialog({
                   )}
                 </Button>
               </div>
-            </div>
+            </DialogBody>
           )}
         </DialogContent>
       </Dialog>

@@ -79,7 +79,7 @@ export default function LoginPage() {
             </span>
           </div>
 
-          <h1 className="text-6xl font-extrabold tracking-tight leading-tight max-w-3xl mb-8" style={{ fontFamily: 'var(--font-heading)' }}>
+          <h1 className="text-6xl font-extrabold tracking-tight leading-tight max-w-[768px] mb-8" style={{ fontFamily: 'var(--font-heading)' }}>
             {settings?.salon_tagline || 'The Operating System for Modern Salons.'}
           </h1>
           <p className="text-2xl text-gray-300 font-light leading-relaxed">

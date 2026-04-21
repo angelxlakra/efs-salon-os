@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Users, DollarSign, Scissors, TrendingUp, Clock, CreditCard } from 'lucide-react';
+import { Users, DollarSign, Scissors, TrendingUp, Clock, Cake } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,7 @@ import { DualRadialGoals } from '@/components/dashboard/radial-goal-progress';
 import { HourlyTrendChart } from '@/components/dashboard/hourly-trend-chart';
 import { ServiceDistributionChart } from '@/components/dashboard/service-distribution-chart';
 import { DailyComparisonSparkline } from '@/components/dashboard/daily-comparison-sparkline';
+import { titleCase } from '@/lib/utils';
 
 interface Service {
   id: string;
@@ -127,6 +128,7 @@ export default function DashboardPage() {
     services: TrendDataPoint[];
   }>({ revenue: [], customers: [], services: [] });
   const [isLoading, setIsLoading] = useState(true);
+  const [birthdayUsers, setBirthdayUsers] = useState<{ id: string; full_name: string }[]>([]);
 
   // Redirect staff users to their My Services page
   useEffect(() => {
@@ -156,6 +158,7 @@ export default function DashboardPage() {
         comparisonResponse,
         hourlyResponse,
         trendsResponse,
+        birthdaysResponse,
       ] = await Promise.all([
         apiClient.get('/appointments/walkins/active'),
         apiClient.get('/reports/dashboard'),
@@ -163,6 +166,7 @@ export default function DashboardPage() {
         apiClient.get('/reports/dashboard/comparison'),
         apiClient.get('/reports/dashboard/hourly'),
         apiClient.get('/reports/dashboard/trends?days=7'),
+        apiClient.get('/users/birthdays/today'),
       ]);
 
       // Update active sessions
@@ -201,6 +205,11 @@ export default function DashboardPage() {
       // Update top services
       if (reportsResponse.data?.top_services) {
         setTopServices(reportsResponse.data.top_services);
+      }
+
+      // Update birthday users
+      if (birthdaysResponse.data?.birthdays) {
+        setBirthdayUsers(birthdaysResponse.data.birthdays);
       }
 
       // Update trends data
@@ -290,7 +299,7 @@ export default function DashboardPage() {
       // Set the customer
       setCustomer(
         session.customer_id,
-        session.customer_name,
+        titleCase(session.customer_name),
         session.customer_phone
       );
 
@@ -299,7 +308,7 @@ export default function DashboardPage() {
 
       // Navigate to POS
       router.push('/dashboard/pos');
-      toast.success(`Ready to bill ${session.customer_name}`);
+      toast.success(`Ready to bill ${titleCase(session.customer_name)}`);
     } catch (error) {
       console.error('Error loading checkout:', error);
       toast.error('Failed to load customer for checkout');
@@ -315,8 +324,32 @@ export default function DashboardPage() {
         </p>
       </div>
 
+      {/* Birthday Banner — only shown when there are birthdays today */}
+      {birthdayUsers.length > 0 && (
+        <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-pink-500 via-purple-500 to-yellow-400 p-[2px]">
+          <div className="flex items-center gap-4 rounded-xl bg-gradient-to-r from-pink-50 via-purple-50 to-yellow-50 px-5 py-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-pink-400 to-purple-500 shadow-lg">
+              <Cake className="h-6 w-6 text-white" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-bold text-purple-800">
+                {birthdayUsers.length === 1
+                  ? `Happy Birthday, ${birthdayUsers[0].full_name}!`
+                  : `Happy Birthday to ${birthdayUsers.map(u => u.full_name).join(' & ')}!`}
+              </p>
+              <p className="text-xs text-purple-600 mt-0.5">
+                {birthdayUsers.length === 1
+                  ? 'Wishing them a wonderful day!'
+                  : `${birthdayUsers.length} team members celebrating today!`}
+              </p>
+            </div>
+            <div className="text-2xl select-none">🎉</div>
+          </div>
+        </div>
+      )}
+
       {/* Quick Stats - Ultra Compact Design */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2">
         <Card className="p-2 shadow-sm flex flex-col justify-between relative overflow-hidden">
           <div className="flex items-center justify-between">
             <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Revenue</p>
@@ -406,7 +439,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Active Customers Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {/* Main - Active Customers */}
         <div className="lg:col-span-2">
           <Card>

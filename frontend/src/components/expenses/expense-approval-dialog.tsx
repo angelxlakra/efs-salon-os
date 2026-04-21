@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogBody, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { CheckCircle, XCircle } from 'lucide-react';
@@ -43,7 +43,7 @@ export function ExpenseApprovalDialog({ expense, onClose, onSuccess }: ExpenseAp
           <DialogTitle>Approve/Reject Expense</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <DialogBody className="space-y-4">
           <div className="bg-gray-50 p-4 rounded-lg space-y-2">
             <div className="flex justify-between">
               <span className="text-sm text-gray-600">Category:</span>
@@ -89,7 +89,7 @@ export function ExpenseApprovalDialog({ expense, onClose, onSuccess }: ExpenseAp
               Approve
             </Button>
           </div>
-        </div>
+        </DialogBody>
       </DialogContent>
     </Dialog>
   );

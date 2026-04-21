@@ -2,6 +2,7 @@
  * WhatsApp receipt sharing utilities.
  * Uses wa.me links to open WhatsApp with a pre-filled receipt message.
  */
+import { titleCase } from '@/lib/utils';
 
 interface BillItem {
   item_name: string;
@@ -82,7 +83,7 @@ export function formatReceiptForWhatsApp(bill: BillData, salonName?: string): st
   lines.push(`Date: ${formatDate(dateStr)}`);
 
   if (bill.customer_name) {
-    lines.push(`Customer: ${bill.customer_name}`);
+    lines.push(`Customer: ${titleCase(bill.customer_name)}`);
   }
 
   lines.push('');

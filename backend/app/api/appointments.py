@@ -39,6 +39,7 @@ from app.schemas.appointment import (
     ServiceResponseBase,
     StaffResponseBase,
     SessionCustomerUpdate,
+    WalkInStaffUpdate,
 )
 from app.auth.dependencies import get_current_user, require_owner_or_receptionist
 from app.auth.permissions import PermissionChecker
@@ -1054,7 +1055,8 @@ def get_active_walkins_v2(
             completed_at=walkin.completed_at,
             service_notes=walkin.service_notes,
             duration_minutes=walkin.duration_minutes,
-            session_id=walkin.session_id
+            session_id=walkin.session_id,
+            staff_contributions_data=walkin.staff_contributions_data
         )
         sessions_dict[session_id]["walkins"].append(walkin_detail)
 
@@ -1142,6 +1144,69 @@ def update_session_customer(
     db.commit()
 
     return {"updated_count": len(walkins), "session_id": session_id}
+
+
+@router.patch("/walkins/{walkin_id}/staff")
+def update_walkin_staff(
+    walkin_id: str,
+    data: WalkInStaffUpdate,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_owner_or_receptionist)
+):
+    """Update staff assignment on a walk-in.
+
+    Updates the assigned staff member and optionally stores multi-staff
+    contribution data for the ad-hoc team editor.
+
+    **Permissions**: Receptionist or Owner
+
+    Args:
+        walkin_id: The walk-in ID to update
+        data: New staff assignment data
+        db: Database session
+        current_user: Authenticated user
+
+    Returns:
+        dict with walkin_id and updated fields
+
+    Raises:
+        404: Walk-in not found
+        400: Walk-in already billed or cancelled
+        404: Staff member not found
+    """
+    walkin = db.query(WalkIn).filter(WalkIn.id == walkin_id).first()
+    if not walkin:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Walk-in not found: {walkin_id}"
+        )
+
+    # Don't allow updates on cancelled or fully-billed walk-ins
+    if walkin.status == AppointmentStatus.CANCELLED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot update staff on a cancelled walk-in"
+        )
+
+    # Validate the new staff member exists
+    staff = db.query(Staff).filter(Staff.id == data.assigned_staff_id).first()
+    if not staff:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Staff member not found: {data.assigned_staff_id}"
+        )
+
+    walkin.assigned_staff_id = data.assigned_staff_id
+    walkin.staff_contributions_data = data.staff_contributions_data
+
+    db.commit()
+    db.refresh(walkin)
+
+    return {
+        "walkin_id": walkin.id,
+        "assigned_staff_id": walkin.assigned_staff_id,
+        "staff_contributions_data": walkin.staff_contributions_data,
+    }
 
 
 @router.get("/walkins/my-services", response_model=MyServicesResponse)

@@ -21,13 +21,14 @@ Customer records with contact information and analytics.
 | `id` | String(26) | No | Yes | PK | ULID primary key |
 | `first_name` | String | No | - | - | Customer's first name |
 | `last_name` | String | Yes | - | - | Customer's last name |
-| `phone` | String | No | Yes | Yes | Phone number (encrypted in production) |
+| `phone` | String | Yes | - | Yes | Phone number (encrypted in production, nullable for walk-ins) |
 | `email` | String | Yes | - | - | Email address (encrypted in production) |
 | `date_of_birth` | Date | Yes | - | - | Birthday (for promotions) |
 | `gender` | String | Yes | - | - | Gender |
 | `notes` | Text | Yes | - | - | Internal notes about customer |
 | `total_visits` | Integer | No | - | - | Total visit count (default: 0) |
 | `total_spent` | Integer | No | - | - | Total amount spent in paise (default: 0) |
+| `pending_balance` | Integer | No | - | - | Outstanding amount owed in paise (default: 0) |
 | `last_visit_at` | DateTime(tz) | Yes | - | Yes | Timestamp of last visit |
 | `deleted_at` | DateTime(tz) | Yes | - | - | Soft delete timestamp |
 | `created_at` | DateTime(tz) | No | - | - | Creation timestamp |
@@ -39,6 +40,7 @@ Customer records with contact information and analytics.
 |----------|-------------|-------------|
 | `full_name` | str | Combined first and last name |
 | `total_spent_rupees` | float | Total spent in rupees |
+| `pending_balance_rupees` | float | Pending balance in rupees |
 
 ---
 
@@ -74,7 +76,7 @@ customer.total_spent -= refund_bill.rounded_total
 Set to current timestamp when bill is posted:
 
 ```python
-customer.last_visit_at = datetime.utcnow()
+customer.last_visit_at = datetime.now(IST)
 ```
 
 ---
@@ -87,7 +89,7 @@ These fields contain Personally Identifiable Information:
 
 | Field | Encryption | Notes |
 |-------|------------|-------|
-| `phone` | Required | Primary identifier, must be unique |
+| `phone` | Required | Primary identifier (nullable for walk-ins) |
 | `email` | Required | Optional field |
 | `date_of_birth` | Optional | Used for birthday promotions |
 
@@ -157,20 +159,21 @@ db.commit()
 │ id (PK)         │
 │ first_name      │
 │ last_name       │
-│ phone (unique)  │
+│ phone           │
 │ email           │
 │ total_visits    │
 │ total_spent     │
+│ pending_balance │
 │ last_visit_at   │
 └────────┬────────┘
          │
          │ Referenced by:
          │
-    ┌────┴────┬──────────────┐
-    ▼         ▼              ▼
-┌───────┐ ┌───────────┐ ┌─────────┐
-│ Bill  │ │Appointment│ │ WalkIn  │
-└───────┘ └───────────┘ └─────────┘
+    ┌────┴────┬──────────────┬────────────────────┐
+    ▼         ▼              ▼                    ▼
+┌───────┐ ┌───────────┐ ┌─────────┐ ┌─────────────────────┐
+│ Bill  │ │Appointment│ │ WalkIn  │ │PendingPaymentCollect.│
+└───────┘ └───────────┘ └─────────┘ └─────────────────────┘
 ```
 
 ---

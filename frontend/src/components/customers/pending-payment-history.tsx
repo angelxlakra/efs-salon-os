@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Loader2, ArrowDownCircle } from 'lucide-react';
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogHeader,
   DialogTitle,
@@ -93,13 +94,13 @@ export function PendingPaymentHistory({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-h-[80vh] overflow-y-auto" style={{ maxWidth: 'min(42rem, calc(100vw - 2rem))' }}>
+      <DialogContent size="lg">
         <DialogHeader>
           <DialogTitle>Pending Payment Collection History</DialogTitle>
           <p className="text-sm text-muted-foreground">{customerName}</p>
         </DialogHeader>
 
-        <div className="space-y-4 max-h-[500px] overflow-y-auto">
+        <DialogBody className="space-y-4">
           {isLoading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
@@ -166,7 +167,7 @@ export function PendingPaymentHistory({
               ))}
             </div>
           )}
-        </div>
+        </DialogBody>
       </DialogContent>
     </Dialog>
   );

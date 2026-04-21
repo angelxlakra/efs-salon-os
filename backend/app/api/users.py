@@ -1,9 +1,10 @@
 from app.auth.dependencies import require_owner_or_receptionist, get_current_user, require_owner
 from app.auth.password import PasswordHandler
-from typing import Optional
+from datetime import date
+from typing import Optional, List
 from fastapi import Depends, APIRouter, status, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import or_
+from sqlalchemy import extract, or_
 
 from app.schemas.user import (
     UserListResponse,
@@ -11,7 +12,9 @@ from app.schemas.user import (
     UserCreate,
     UserUpdate,
     UserPasswordChange,
-    UserPasswordReset
+    UserPasswordReset,
+    BirthdayUserResponse,
+    TodayBirthdaysResponse,
 )
 from app.models.user import User, Role, RoleEnum, Staff
 from app.database import get_db
@@ -106,6 +109,27 @@ def create_user(
     db.commit()
 
     return user
+
+@router.get("/birthdays/today", response_model=TodayBirthdaysResponse)
+def get_today_birthdays(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Return active users whose birthday (month+day) matches today."""
+    today = date.today()
+    users = (
+        db.query(User)
+        .filter(
+            User.deleted_at.is_(None),
+            User.is_active == True,
+            User.date_of_birth.isnot(None),
+            extract("month", User.date_of_birth) == today.month,
+            extract("day", User.date_of_birth) == today.day,
+        )
+        .all()
+    )
+    return {"birthdays": [{"id": u.id, "full_name": u.full_name} for u in users]}
+
 
 @router.get("/{id}", response_model=UserResponse)
 def get_user(

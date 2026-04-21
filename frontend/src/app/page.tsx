@@ -36,7 +36,7 @@ export default function HomePage() {
   // Show loading while determining where to redirect
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/10 to-secondary/10">
-      <div className="card-salon max-w-md w-full text-center space-y-6">
+      <div className="card-salon max-w-[448px] w-full text-center space-y-6">
         <div className="flex justify-center mb-4">
           <Image
             src="/logo-black.svg"

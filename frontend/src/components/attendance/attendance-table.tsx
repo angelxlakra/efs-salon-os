@@ -71,16 +71,56 @@ export function AttendanceTable({ records, onEdit, canEdit }: AttendanceTablePro
 
   return (
     <div className="rounded-md border overflow-hidden">
-      <div className="overflow-x-auto">
+      {/* Mobile Card View */}
+      <div className="block md:hidden divide-y">
+        {records.map((record) => {
+          const StatusIcon = statusConfig[record.status].icon;
+          return (
+            <div key={record.id} className="p-3 space-y-2">
+              <div className="flex justify-between items-start">
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium truncate">{record.staff.display_name}</p>
+                  <p className="text-sm text-muted-foreground truncate">{record.staff.full_name}</p>
+                </div>
+                <div className="flex items-center gap-2 ml-2">
+                  <Badge variant="outline" className={statusConfig[record.status].color}>
+                    <StatusIcon className="h-3 w-3 mr-1" />
+                    {statusConfig[record.status].label}
+                  </Badge>
+                  {canEdit && (
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => onEdit(record.staff)}>
+                      <Edit className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+              <div className="flex gap-4 text-sm">
+                <span className="text-muted-foreground">
+                  In: <span className="text-foreground">{record.signed_in_at ? format(new Date(record.signed_in_at), 'h:mm a') : '-'}</span>
+                </span>
+                <span className="text-muted-foreground">
+                  Out: <span className="text-foreground">{record.signed_out_at ? format(new Date(record.signed_out_at), 'h:mm a') : '-'}</span>
+                </span>
+              </div>
+              {record.notes && (
+                <p className="text-sm text-muted-foreground line-clamp-2 break-words">{record.notes}</p>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Desktop Table View */}
+      <div className="hidden md:block overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[200px]">Staff Member</TableHead>
-              <TableHead className="w-[140px]">Status</TableHead>
-              <TableHead className="w-[100px]">Sign In</TableHead>
-              <TableHead className="w-[100px]">Sign Out</TableHead>
-              <TableHead className="w-[250px]">Notes</TableHead>
-              {canEdit && <TableHead className="w-[80px] text-right">Actions</TableHead>}
+              <TableHead>Staff Member</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Sign In</TableHead>
+              <TableHead>Sign Out</TableHead>
+              <TableHead>Notes</TableHead>
+              {canEdit && <TableHead className="text-right">Actions</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>

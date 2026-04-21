@@ -61,6 +61,9 @@ services:
       - SALON_ADDRESS=${SALON_ADDRESS}
       - GSTIN=${GSTIN}
       - TZ=${TZ:-Asia/Kolkata}
+      - CENTRAL_SYNC_ENABLED=${CENTRAL_SYNC_ENABLED:-false}
+      - CENTRAL_API_URL=${CENTRAL_API_URL:-}
+      - CENTRAL_API_KEY=${CENTRAL_API_KEY:-}
     volumes:
       # Development only - comment out for production
       - ./backend:/app
@@ -103,6 +106,12 @@ services:
       - BACKUP_S3_REGION=${BACKUP_S3_REGION:-us-west-004}
       - BACKUP_CLOUD_RETENTION_DAYS=${BACKUP_CLOUD_RETENTION_DAYS:-90}
       - BACKUP_RETENTION_DAYS=${BACKUP_RETENTION_DAYS:-7}
+      - CENTRAL_SYNC_ENABLED=${CENTRAL_SYNC_ENABLED:-false}
+      - CENTRAL_API_URL=${CENTRAL_API_URL:-}
+      - CENTRAL_API_KEY=${CENTRAL_API_KEY:-}
+      - CENTRAL_SYNC_PUSH_INTERVAL_MINUTES=${CENTRAL_SYNC_PUSH_INTERVAL_MINUTES:-1}
+      - CENTRAL_SYNC_PULL_INTERVAL_MINUTES=${CENTRAL_SYNC_PULL_INTERVAL_MINUTES:-10}
+      - CENTRAL_SYNC_METRICS_PUSH_INTERVAL_MINUTES=${CENTRAL_SYNC_METRICS_PUSH_INTERVAL_MINUTES:-5}
     volumes:
       # Development only - comment out for production
       - ./backend:/app

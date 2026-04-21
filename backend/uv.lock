@@ -1234,6 +1234,7 @@ dependencies = [
     { name = "bcrypt" },
     { name = "boto3" },
     { name = "fastapi" },
+    { name = "httpx" },
     { name = "passlib" },
     { name = "psycopg", extra = ["binary"] },
     { name = "pydantic", extra = ["email"] },
@@ -1253,15 +1254,9 @@ dependencies = [
 [package.optional-dependencies]
 dev = [
     { name = "black" },
-    { name = "httpx" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "ruff" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "httpx" },
 ]
 
 [package.metadata]
@@ -1272,7 +1267,7 @@ requires-dist = [
     { name = "black", marker = "extra == 'dev'", specifier = "==23.11.0" },
     { name = "boto3", specifier = ">=1.42.51" },
     { name = "fastapi", specifier = "==0.104.1" },
-    { name = "httpx", marker = "extra == 'dev'", specifier = "==0.25.1" },
+    { name = "httpx", specifier = ">=0.25.1" },
     { name = "passlib", specifier = "==1.7.4" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.1.0" },
     { name = "pydantic", extras = ["email"], specifier = "==2.5.0" },
@@ -1294,7 +1289,7 @@ requires-dist = [
 provides-extras = ["dev"]
 
 [package.metadata.requires-dev]
-dev = [{ name = "httpx", specifier = ">=0.25.1" }]
+dev = []
 
 [[package]]
 name = "six"

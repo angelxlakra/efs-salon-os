@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { CreditCard, Wallet, Banknote, Loader2, CheckCircle2, Printer, MessageCircle } from 'lucide-react';
+import { CreditCard, Wallet, Banknote, Loader2, CheckCircle2, Printer, MessageCircle, AlertTriangle, UserPlus, X } from 'lucide-react';
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogHeader,
   DialogTitle,
@@ -14,6 +15,7 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useCartStore } from '@/stores/cart-store';
+import { CustomerSearch } from '@/components/pos/customer-search';
 import { apiClient } from '@/lib/api-client';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
@@ -40,6 +42,7 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
     sessionId,
     getTotal,
     clearCart,
+    setCustomer,
   } = useCartStore();
 
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
@@ -54,9 +57,12 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
   const [customerPendingBalance, setCustomerPendingBalance] = useState<number>(0);
   const [completionNotes, setCompletionNotes] = useState('');
   const [showCollectPending, setShowCollectPending] = useState(false);
+  const [showAssignCustomer, setShowAssignCustomer] = useState(false);
+  const isWalkin = !customerPhone;
 
   // Track payments and remaining amount
-  const [payments, setPayments] = useState<any[]>([]);
+  const [payments, setPayments] = useState<{ id: string; method: string; amount: number; reference?: string }[]>([]);
+  const [isDeletingPayment, setIsDeletingPayment] = useState<string | null>(null);
   const total = getTotal(); // Total bill amount in paise
   const totalPaid = payments.reduce((sum, p) => sum + (p.amount * 100), 0);
   const remainingPaise = Math.max(0, total - totalPaid);
@@ -138,10 +144,10 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
       return;
     }
 
-    // Validation - allow zero for free services
+    // Validation - zero amounts should use "Complete (₹0)" flow, not payment
     const amount = parseFloat(amountToPay);
-    if (isNaN(amount) || amount < 0) {
-      toast.error('Please enter a valid amount');
+    if (isNaN(amount) || amount <= 0) {
+      toast.error('Please enter a valid amount greater than zero');
       return;
     }
 
@@ -228,6 +234,7 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
 
       // 3. Update state
       const newPayment = {
+          id: paymentResponse.id,
           method: paymentMethod,
           amount: paymentPayload.amount,
           reference: paymentPayload.reference
@@ -392,6 +399,23 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
     }
   };
 
+  const handleRemovePayment = async (paymentId: string) => {
+    if (!billId) return;
+    try {
+      setIsDeletingPayment(paymentId);
+      await apiClient.delete(`/pos/bills/${billId}/payments/${paymentId}`);
+      const updated = payments.filter(p => p.id !== paymentId);
+      setPayments(updated);
+      const newTotalPaid = updated.reduce((sum, p) => sum + (p.amount * 100), 0);
+      setAmountToPay(((total - newTotalPaid) / 100).toFixed(2));
+      toast.success('Payment removed');
+    } catch (error: any) {
+      toast.error(error.response?.data?.detail || 'Failed to remove payment');
+    } finally {
+      setIsDeletingPayment(null);
+    }
+  };
+
   const [isSendingWhatsApp, setIsSendingWhatsApp] = useState(false);
 
   const handlePrintReceipt = async () => {
@@ -433,6 +457,7 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
     setCardReference('');
     setBillId(null);
     setPayments([]);
+    setIsDeletingPayment(null);
     setStatus('idle');
     setSuccessData(null);
   };
@@ -452,7 +477,7 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto" style={{ maxWidth: 'min(32rem, calc(100vw - 2rem))' }}>
+      <DialogContent size="md">
         <DialogHeader>
           <DialogTitle>
             {status === 'success' ? 'Payment Successful' : 'Process Payment'}
@@ -460,7 +485,7 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
         </DialogHeader>
 
         {status === 'success' ? (
-          <div className="flex flex-col items-center py-4 sm:py-8 mt-4">
+          <DialogBody className="flex flex-col items-center py-4 sm:py-8">
             <div className="rounded-full bg-green-100 p-3 mb-3">
               <CheckCircle2 className="h-10 w-10 sm:h-12 sm:w-12 text-green-600" />
             </div>
@@ -501,9 +526,9 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
                 </Button>
               )}
             </div>
-          </div>
+          </DialogBody>
         ) : (
-          <div className="space-y-3 sm:space-y-5 mt-4">
+          <DialogBody className="space-y-3 sm:space-y-5">
             {/* Incomplete Services Warning */}
             {incompleteServices.length > 0 && (
               <Alert variant="destructive">
@@ -613,10 +638,25 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
 
               {payments.length > 0 && (
                   <div className="space-y-1 mb-2 pt-2 border-t border-gray-200">
-                      {payments.map((p, i) => (
-                          <div key={i} className="flex justify-between text-sm">
+                      {payments.map((p) => (
+                          <div key={p.id} className="flex items-center justify-between text-sm">
                               <span className="text-gray-500 capitalize">{p.method}</span>
-                              <span className="text-green-600 font-medium">-{formatPrice(p.amount * 100)}</span>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-green-600 font-medium">-{formatPrice(p.amount * 100)}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemovePayment(p.id)}
+                                  disabled={isDeletingPayment === p.id || status === 'processing'}
+                                  className="text-gray-400 hover:text-red-500 transition-colors disabled:opacity-50 p-0.5 rounded"
+                                  title="Remove payment"
+                                >
+                                  {isDeletingPayment === p.id ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                  ) : (
+                                    <X className="h-3.5 w-3.5" />
+                                  )}
+                                </button>
+                              </div>
                           </div>
                       ))}
                   </div>
@@ -635,7 +675,7 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
                 <RadioGroup
                   value={paymentMethod}
                   onValueChange={(value) => setPaymentMethod(value as PaymentMethod)}
-                  className="grid grid-cols-3 gap-2 sm:gap-3"
+                  className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3"
                 >
                   {[
                     { id: 'cash', label: 'Cash', icon: Banknote, color: 'text-green-600' },
@@ -722,6 +762,40 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
               </div>
             )}
 
+            {/* Walk-in pending balance warning */}
+            {isWalkin && remainingPaise > 0 && (
+              <Alert variant="destructive" className="border-orange-300 bg-orange-50 text-orange-900">
+                <AlertTriangle className="h-4 w-4 !text-orange-600" />
+                <AlertDescription className="space-y-2">
+                  <p className="text-sm font-medium">
+                    Walk-in customers must pay in full or be assigned a customer profile.
+                  </p>
+                  {showAssignCustomer ? (
+                    <CustomerSearch
+                      value={{ id: null, name: null }}
+                      onChange={(id, name, phone) => {
+                        if (id && name) {
+                          setCustomer(id, name, phone);
+                          setShowAssignCustomer(false);
+                          toast.success(`Customer assigned: ${name}`);
+                        }
+                      }}
+                    />
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowAssignCustomer(true)}
+                      className="border-orange-400 text-orange-800 hover:bg-orange-100"
+                    >
+                      <UserPlus className="h-3 w-3 mr-1" />
+                      Assign Customer
+                    </Button>
+                  )}
+                </AlertDescription>
+              </Alert>
+            )}
+
             {/* Action Buttons */}
             <div className="grid grid-cols-2 gap-2 pt-1">
               <Button
@@ -755,7 +829,7 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
               {(total === 0 || (remainingPaise > 0 && payments.length === 0)) && (
                 <Button
                   onClick={handleCompleteBill}
-                  disabled={status === 'processing' || incompleteServices.length > 0}
+                  disabled={status === 'processing' || incompleteServices.length > 0 || (isWalkin && remainingPaise > 0)}
                   variant={total === 0 ? "default" : "secondary"}
                 >
                   {status === 'processing' ? (
@@ -776,7 +850,7 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
             {remainingPaise > 0 && payments.length > 0 && (
               <Button
                 onClick={handleCompleteBill}
-                disabled={status === 'processing' || incompleteServices.length > 0}
+                disabled={status === 'processing' || incompleteServices.length > 0 || isWalkin}
                 variant="outline"
                 className="w-full"
               >
@@ -790,7 +864,7 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
                 )}
               </Button>
             )}
-          </div>
+          </DialogBody>
         )}
       </DialogContent>
     </Dialog>

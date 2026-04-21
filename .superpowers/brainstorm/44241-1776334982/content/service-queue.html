@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Service Queue Widget</title>
+<style>
+  * { margin:0;padding:0;box-sizing:border-box; }
+  body { background:#0d0d0d;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#fff;padding:24px; }
+  .page-title { font-size:13px;color:#666;text-transform:uppercase;letter-spacing:2px;margin-bottom:6px; }
+  .page-sub { font-size:11px;color:#444;margin-bottom:24px;line-height:1.6; }
+
+  /* App shell fragment — right column only */
+  .shell { display:grid;grid-template-columns:220px 1fr;gap:0;background:#111;border-radius:14px;overflow:hidden;border:1px solid #1f1f1f;box-shadow:0 24px 60px rgba(0,0,0,0.7); }
+
+  /* Left: stat cards + active customers (dimmed, reference) */
+  .left-col { padding:16px;display:flex;flex-direction:column;gap:12px;border-right:1px solid #1a1a1a; }
+  .dim { opacity:0.35; }
+  .stat-mini { background:#161616;border:1px solid #1f1f1f;border-radius:8px;padding:10px 12px; }
+  .stat-mini .sl { font-size:8px;text-transform:uppercase;letter-spacing:1.5px;color:#444;font-weight:600; }
+  .stat-mini .sv { font-size:14px;font-weight:800;color:#333;letter-spacing:3px;margin-top:3px; }
+  .stat-mini .sv.reveal { color:#fff; }
+  .eye-row { display:flex;align-items:center;gap:6px; }
+  .eye-btn { width:18px;height:18px;border-radius:5px;background:#222;border:1px solid #2a2a2a;display:flex;align-items:center;justify-content:center;font-size:9px;cursor:default;margin-left:auto; }
+
+  .label { font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:#444;margin-bottom:6px; }
+
+  /* Right: the queue widget — full focus */
+  .right-col { padding:16px;display:flex;flex-direction:column;gap:12px; }
+
+  /* Queue card */
+  .queue-card { background:#161616;border:1px solid #1f1f1f;border-radius:12px;overflow:hidden; }
+  .queue-hdr { padding:10px 14px;border-bottom:1px solid #1a1a1a;display:flex;align-items:center;justify-content:space-between; }
+  .queue-title { font-size:11px;font-weight:700;color:#bbb; }
+  .queue-meta { font-size:9px;color:#444; }
+
+  /* Staff lane */
+  .staff-lane { border-bottom:1px solid #181818;padding:10px 12px;display:flex;gap:10px;align-items:flex-start; }
+  .staff-lane:last-child { border-bottom:none; }
+
+  /* Staff identity */
+  .staff-id { display:flex;flex-direction:column;align-items:center;gap:4px;width:38px;flex-shrink:0; }
+  .s-av { width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;flex-shrink:0; }
+  .s-nm { font-size:8px;font-weight:600;color:#666;text-align:center;white-space:nowrap; }
+  .s-badge { font-size:7px;font-weight:700;padding:1px 5px;border-radius:20px;white-space:nowrap; }
+  .b-free { background:#052e16;color:#4ade80;border:1px solid #166534; }
+  .b-busy { background:#1c1000;color:#fbbf24;border:1px solid #854d0e; }
+  .b-break { background:#1a1a1a;color:#555;border:1px solid #2a2a2a; }
+
+  /* Service slots */
+  .slots { flex:1;display:flex;flex-direction:column;gap:5px;min-width:0; }
+
+  /* Current / in-progress slot */
+  .slot { border-radius:7px;padding:6px 9px;display:flex;align-items:center;gap:6px;position:relative;overflow:hidden; }
+  .slot.active { background:#1a1a1a;border:1px solid #222; }
+  .slot.active::before { content:'';position:absolute;left:0;top:0;bottom:0;width:2.5px;background:#f59e0b; }
+  .slot.checkin { background:#1a1a1a;border:1px solid #222; }
+  .slot.checkin::before { content:'';position:absolute;left:0;top:0;bottom:0;width:2.5px;background:#3b82f6; }
+  .slot.queued { background:#131313;border:1px dashed #222; }
+  .slot.done { background:#111;border:1px solid #1a1a1a;opacity:0.5; }
+  .slot.free { background:#0a1a0a;border:1px dashed #166534;justify-content:center; }
+
+  .slot-dot { width:7px;height:7px;border-radius:50%;flex-shrink:0; }
+  .dot-active { background:#f59e0b; animation:pulse 1.5s infinite; }
+  .dot-checkin { background:#3b82f6; }
+  .dot-queued { background:#333; }
+  .dot-done { background:#22c55e; }
+  @keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.4} }
+
+  .slot-svc { font-size:10px;font-weight:600;color:#ccc;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+  .slot-svc.dim-svc { color:#444; }
+  .slot-time { font-size:8px;color:#555;white-space:nowrap;flex-shrink:0; }
+  .slot-order { font-size:8px;font-weight:700;color:#333;background:#1a1a1a;border:1px solid #222;border-radius:4px;width:16px;height:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0; }
+  .slot-order.hot { color:#a78bfa;border-color:#2d1f4e;background:#1a0f2e; }
+  .slot-free-txt { font-size:9px;color:#4ade80;font-weight:600; }
+
+  /* Action btn inline */
+  .slot-action { width:18px;height:18px;border-radius:5px;border:1px solid #2a2a2a;background:#222;display:flex;align-items:center;justify-content:center;cursor:default;flex-shrink:0; }
+  .play-ico { width:0;height:0;border-style:solid;border-width:3px 0 3px 6px;border-color:transparent transparent transparent #a78bfa;margin-left:1px; }
+  .check-ico { font-size:8px;color:#4ade80;font-weight:900; }
+
+  /* Queue order header row */
+  .queue-order-hdr { padding:6px 12px;background:#0f0f0f;border-bottom:1px solid #181818;display:flex;align-items:center;gap:6px; }
+  .qoh-label { font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:#333; }
+  .qoh-dot { width:5px;height:5px;border-radius:50%;flex-shrink:0; }
+
+  /* Goals mini at bottom */
+  .goals-mini { background:#161616;border:1px solid #1f1f1f;border-radius:10px;padding:12px 14px; }
+  .goals-row { display:flex;align-items:center;gap:8px;margin-bottom:6px; }
+  .goals-row:last-child { margin-bottom:0; }
+  .goals-label { font-size:9px;color:#555;flex:1; }
+  .goals-pct { font-size:9px;font-weight:700;color:#a78bfa; }
+  .goals-track { width:60px;height:3px;background:#1f1f1f;border-radius:2px;overflow:hidden; }
+  .goals-fill { height:100%;border-radius:2px;background:linear-gradient(90deg,#7c3aed,#a78bfa); }
+
+  /* Annotation strip */
+  .annotations { margin-top:20px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px; }
+  .ann { background:#141414;border:1px solid #222;border-radius:10px;padding:12px 14px; }
+  .ann h4 { font-size:11px;font-weight:700;color:#bbb;margin-bottom:5px; }
+  .ann p { font-size:10px;color:#555;line-height:1.55; }
+  .tag { display:inline-block;background:#1a0f2e;color:#a78bfa;font-size:8px;font-weight:700;padding:2px 5px;border-radius:3px;margin-right:3px; }
+</style>
+</head>
+<body>
+
+<p class="page-title">Service Queue Widget — Right Column</p>
+<p class="page-sub">Each staff member has a lane. Services are listed in arrival order (oldest at top = highest priority). Status dots show live state. ▶ Start and ✓ Complete inline.</p>
+
+<div class="shell">
+  <!-- Left: dimmed reference -->
+  <div class="left-col">
+    <div class="dim">
+      <div class="label">Stats</div>
+      <div class="stat-mini" style="margin-bottom:8px;">
+        <div class="sl">Revenue</div>
+        <div class="eye-row">
+          <div class="sv">● ● ● ●</div>
+          <div class="eye-btn">👁</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px;">
+        <div class="stat-mini"><div class="sl">Customers</div><div class="sv reveal" style="font-size:18px;letter-spacing:0;">42</div></div>
+        <div class="stat-mini"><div class="sl">Active</div><div class="sv reveal" style="font-size:18px;letter-spacing:0;">6</div></div>
+      </div>
+    </div>
+
+    <div class="dim">
+      <div class="label">Active Customers</div>
+      <div style="background:#161616;border:1px solid #1f1f1f;border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:6px;">
+        <div style="background:#1a1a1a;border-radius:8px;padding:8px;border:1px solid #222;">
+          <div style="font-size:10px;font-weight:600;color:#888;">Priya Sharma</div>
+          <div style="font-size:9px;color:#444;margin-top:2px;">Haircut · Threading · 24m</div>
+        </div>
+        <div style="background:#1a1a1a;border-radius:8px;padding:8px;border:1px solid #222;">
+          <div style="font-size:10px;font-weight:600;color:#888;">Arjun Mehta</div>
+          <div style="font-size:9px;color:#444;margin-top:2px;">Facial · Head Massage · 41m</div>
+        </div>
+        <div style="background:#1a1a1a;border-radius:8px;padding:8px;border:1px solid #222;">
+          <div style="font-size:10px;font-weight:600;color:#888;">Kavya Nair</div>
+          <div style="font-size:9px;color:#444;margin-top:2px;">Manicure · 8m</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: the queue in focus -->
+  <div class="right-col">
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+      <div>
+        <div style="font-size:14px;font-weight:800;color:#fff;letter-spacing:-0.3px;">Service Queue</div>
+        <div style="font-size:10px;color:#444;margin-top:2px;">By staff · oldest first · live</div>
+      </div>
+      <div style="background:#1a0f2e;color:#a78bfa;font-size:9px;font-weight:700;padding:3px 9px;border-radius:20px;border:1px solid #2d1f4e;">5 active</div>
+    </div>
+
+    <div class="queue-card">
+      <!-- Legend row -->
+      <div class="queue-order-hdr">
+        <div class="qoh-dot" style="background:#f59e0b;"></div><span class="qoh-label">In progress</span>
+        <div class="qoh-dot" style="background:#3b82f6;margin-left:10px;"></div><span class="qoh-label">Waiting · not started</span>
+        <div class="qoh-dot" style="background:#333;margin-left:10px;"></div><span class="qoh-label">Queued next</span>
+      </div>
+
+      <!-- Riya — busy: 1 in-progress, 1 queued -->
+      <div class="staff-lane">
+        <div class="staff-id">
+          <div class="s-av" style="background:linear-gradient(135deg,#14291a,#1a4a29);">R</div>
+          <div class="s-nm">Riya</div>
+          <div class="s-badge b-busy">BUSY</div>
+        </div>
+        <div class="slots">
+          <div class="slot active">
+            <div class="slot-dot dot-active"></div>
+            <span class="slot-svc">Priya — Haircut</span>
+            <span class="slot-time">12m</span>
+            <div class="slot-action"><span class="check-ico">✓</span></div>
+          </div>
+          <div class="slot queued">
+            <div class="slot-dot dot-queued"></div>
+            <span class="slot-svc dim-svc">Rahul — Hair Colour</span>
+            <span class="slot-time" style="color:#333;">next</span>
+            <div class="slot-order hot">2</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sneha — in-progress, about to be free -->
+      <div class="staff-lane">
+        <div class="staff-id">
+          <div class="s-av" style="background:linear-gradient(135deg,#1a0f2e,#2d1f4e);">S</div>
+          <div class="s-nm">Sneha</div>
+          <div class="s-badge b-busy">BUSY</div>
+        </div>
+        <div class="slots">
+          <div class="slot active">
+            <div class="slot-dot dot-active"></div>
+            <span class="slot-svc">Arjun — Facial</span>
+            <span class="slot-time">41m</span>
+            <div class="slot-action"><span class="check-ico">✓</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Kavita — free, next walkin waiting (checked_in, not started) -->
+      <div class="staff-lane">
+        <div class="staff-id">
+          <div class="s-av" style="background:linear-gradient(135deg,#1c0820,#4a1942);">K</div>
+          <div class="s-nm">Kavita</div>
+          <div class="s-badge b-free">FREE</div>
+        </div>
+        <div class="slots">
+          <div class="slot checkin">
+            <div class="slot-dot dot-checkin"></div>
+            <span class="slot-svc">Kavya — Manicure</span>
+            <span class="slot-time" style="color:#f59e0b;">waiting 8m</span>
+            <div class="slot-action"><div class="play-ico"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Meena — break, nothing queued -->
+      <div class="staff-lane">
+        <div class="staff-id">
+          <div class="s-av" style="background:linear-gradient(135deg,#1c1000,#451a03);">M</div>
+          <div class="s-nm">Meena</div>
+          <div class="s-badge b-break">BREAK</div>
+        </div>
+        <div class="slots">
+          <div class="slot free">
+            <span class="slot-free-txt">— Available after break —</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Preethi — free, nothing assigned -->
+      <div class="staff-lane">
+        <div class="staff-id">
+          <div class="s-av" style="background:linear-gradient(135deg,#0a1628,#1a3060);">P</div>
+          <div class="s-nm">Preethi</div>
+          <div class="s-badge b-free">FREE</div>
+        </div>
+        <div class="slots">
+          <div class="slot free">
+            <span class="slot-free-txt">— Ready for next customer —</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Goals compact -->
+    <div class="goals-mini">
+      <div class="goals-row">
+        <span class="goals-label">Revenue · ₹18,420 / ₹20,000</span>
+        <div class="goals-track"><div class="goals-fill" style="width:92%;"></div></div>
+        <span class="goals-pct">92%</span>
+      </div>
+      <div class="goals-row">
+        <span class="goals-label">Services · 21 / 25</span>
+        <div class="goals-track"><div class="goals-fill" style="width:84%;"></div></div>
+        <span class="goals-pct">84%</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="annotations">
+  <div class="ann">
+    <h4>Queue ordering logic</h4>
+    <p><span class="tag">Auto</span>Services sorted by <code style="color:#666;">checked_in_at</code> timestamp within each staff lane. Oldest waiting service rises to the top. No manual reordering needed — it's just chronological. Data already exists on the walkins endpoint.</p>
+  </div>
+  <div class="ann">
+    <h4>What "auto-adjusts" means</h4>
+    <p><span class="tag">Live</span>Dashboard refreshes every 10s. When a staff member completes a service, their lane clears and the next queued slot promotes to the top. Staff who become FREE turn green. No separate backend logic needed.</p>
+  </div>
+  <div class="ann">
+    <h4>Implementation note</h4>
+    <p><span class="tag">Easy</span>This is a pure frontend transform of the existing <code style="color:#666;">/appointments/walkins/active</code> response. Group walkins by <code style="color:#666;">assigned_staff.id</code>, sort each group by <code style="color:#666;">checked_in_at</code>. No new API endpoint required.</p>
+  </div>
+</div>
+
+</body>
+</html>

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Play, Check, Clock, Calendar, User, FileText, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { titleCase } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import {
   Card,
@@ -124,7 +125,7 @@ export function ServiceCard({
           <div className="flex items-center gap-2">
             <User className="h-3.5 w-3.5 text-gray-500 flex-shrink-0" />
             <div className="min-w-0 flex-1">
-              <p className="font-medium text-sm truncate">{service.customer_name}</p>
+              <p className="font-medium text-sm truncate">{titleCase(service.customer_name)}</p>
               <p className="text-xs text-muted-foreground">{service.customer_phone}</p>
             </div>
           </div>

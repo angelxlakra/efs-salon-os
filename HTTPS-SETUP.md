@@ -11,7 +11,7 @@ Modern mobile browsers (Chrome, Safari) **require HTTPS** to access device camer
 Run the setup script:
 
 ```bash
-./setup-https.sh
+./scripts/setup-https.sh
 ```
 
 **For IP-based access (192.168.x.x):**
@@ -31,7 +31,7 @@ If you haven't already, update your `.env` file:
 
 ```bash
 # Update CORS_ORIGINS to include HTTPS
-CORS_ORIGINS=http://salon.local,https://salon.local,http://localhost,https://localhost
+CORS_ORIGINS=http://localhost,https://localhost
 ```
 
 ### Step 3: Restart Services
@@ -94,7 +94,7 @@ The self-signed certificate needs to be trusted on each device that will access 
 
 You can now access the app via HTTPS:
 
-- **By domain:** `https://salon.local`
+- **By hostname:** `https://localhost`
 - **By IP:** `https://192.168.1.x` (replace with your server's actual IP)
 
 **For IP-based access (most common for mobile):**
@@ -139,7 +139,7 @@ If you use the app on different networks (e.g., home and salon):
 
 1. **Generate certificate with multiple IPs:**
    ```bash
-   ./setup-https.sh
+   ./scripts/setup-https.sh
    # When prompted, enter: 192.168.1.50,192.168.0.50,10.0.0.50
    ```
 
@@ -153,7 +153,7 @@ If your server IP changes and you get certificate warnings:
 
 ```bash
 # Regenerate certificate with new IP
-./setup-https.sh
+./scripts/setup-https.sh
 
 # Restart nginx
 docker compose restart nginx
@@ -205,7 +205,7 @@ ports:
   - "8443:443"  # Use port 8443 instead
 ```
 
-Then access via `https://salon.local:8443`
+Then access via `https://localhost:8443`
 
 ### Certificate Expired
 
@@ -216,7 +216,7 @@ Certificates are valid for 365 days. To renew:
 mv ./nginx/ssl ./nginx/ssl.backup
 
 # Generate new certificate
-./setup-https.sh
+./scripts/setup-https.sh
 
 # Restart nginx
 docker compose restart nginx
@@ -270,4 +270,4 @@ If you encounter issues:
 
 **Certificate Location:** `./nginx/ssl/salon.crt` and `./nginx/ssl/salon.key`
 **Valid For:** 365 days from generation
-**Renewal:** Run `./setup-https.sh` again
+**Renewal:** Run `./scripts/setup-https.sh` again

@@ -7,6 +7,7 @@ import { Clock, CheckCircle, Circle, Loader, Play, Check } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import { toast } from 'sonner';
 import { useAuthStore } from '@/stores/auth-store';
+import { titleCase } from '@/lib/utils';
 
 interface Service {
   id: string;
@@ -107,7 +108,7 @@ export function ActiveCustomerCard({
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <h3 className="font-semibold text-base truncate leading-none">
-                {session.customer_name}
+                {titleCase(session.customer_name)}
               </h3>
               <Badge variant="secondary" className="h-5 px-1.5 text-[10px] font-normal">
                 <Clock className="h-3 w-3 mr-1" />

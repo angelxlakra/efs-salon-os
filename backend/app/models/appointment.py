@@ -1,7 +1,7 @@
 """Appointment and WalkIn models for scheduling."""
 
 import enum
-from sqlalchemy import Column, DateTime, Enum, ForeignKey, Integer, String, Text
+from sqlalchemy import Column, DateTime, Enum, ForeignKey, Integer, JSON, String, Text
 from sqlalchemy.orm import relationship
 from app.database import Base
 from app.models.base import TimestampMixin, ULIDMixin
@@ -104,6 +104,9 @@ class WalkIn(Base, ULIDMixin, TimestampMixin):
     customer_phone = Column(String, nullable=True)  # Nullable for walk-ins without phone
     service_notes = Column(Text)
     service_notes_updated_at = Column(DateTime(timezone=True))
+
+    # Multi-staff contributions (JSON array, persists ad-hoc team editor data)
+    staff_contributions_data = Column(JSON, nullable=True)
 
     # Billing integration
     bill_id = Column(String(26), ForeignKey("bills.id"), nullable=True, index=True)

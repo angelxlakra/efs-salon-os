@@ -181,6 +181,15 @@ class StaffResponseBase(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class WalkInStaffUpdate(BaseModel):
+    """Schema for updating staff assignment on a walk-in."""
+    assigned_staff_id: str = Field(..., description="New primary staff member ID")
+    staff_contributions_data: Optional[List[dict]] = Field(
+        None,
+        description="Multi-staff contributions (JSON array from ad-hoc team editor)"
+    )
+
+
 class WalkInWithDetails(BaseModel):
     """Walk-in with related service and staff details."""
     id: str
@@ -197,6 +206,7 @@ class WalkInWithDetails(BaseModel):
     service_notes: Optional[str]
     duration_minutes: int
     session_id: Optional[str]
+    staff_contributions_data: Optional[List[dict]] = None
 
 
 class MyServicesResponse(BaseModel):

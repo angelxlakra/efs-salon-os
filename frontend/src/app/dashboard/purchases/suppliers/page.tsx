@@ -157,7 +157,7 @@ export default function SuppliersPage() {
           </div>
         </div>
 
-        <div className="max-w-3xl">
+        <div className="max-w-[768px]">
           <Card>
             <CardHeader>
               <CardTitle>Supplier Information</CardTitle>

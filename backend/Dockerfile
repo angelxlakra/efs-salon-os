@@ -17,13 +17,13 @@ COPY pyproject.toml .
 RUN uv pip install --system .
 
 # Runtime stage
-FROM python:3.11-alpine
+FROM python:3.11-alpine3.21
 
 WORKDIR /app
 
 # Install runtime dependencies only
 RUN apk add --no-cache \
-    postgresql-client \
+    postgresql15-client \
     curl \
     libffi \
     ttf-dejavu \

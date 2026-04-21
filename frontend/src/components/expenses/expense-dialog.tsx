@@ -1,4 +1,4 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogBody, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ExpenseForm } from './expense-form';
 import type { Expense } from '@/types/expense';
 
@@ -12,16 +12,18 @@ interface ExpenseDialogProps {
 export function ExpenseDialog({ isOpen, expense, onClose, onSuccess }: ExpenseDialogProps) {
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent size="lg">
         <DialogHeader>
           <DialogTitle>{expense ? 'Edit Expense' : 'Create New Expense'}</DialogTitle>
         </DialogHeader>
 
-        <ExpenseForm 
-          expense={expense} 
-          onCancel={onClose} 
-          onSuccess={onSuccess} 
-        />
+        <DialogBody>
+          <ExpenseForm
+            expense={expense}
+            onCancel={onClose}
+            onSuccess={onSuccess}
+          />
+        </DialogBody>
       </DialogContent>
     </Dialog>
   );

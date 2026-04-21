@@ -223,14 +223,14 @@ EOF
 
     # Copy Windows/WSL2 networking scripts
     log_info "Copying Windows/WSL2 networking scripts..."
-    if [ -f "wsl-port-forward.ps1" ]; then
-        cp wsl-port-forward.ps1 "${PACKAGE_DIR}/scripts/"
+    if [ -f "scripts/wsl-port-forward.ps1" ]; then
+        cp scripts/wsl-port-forward.ps1 "${PACKAGE_DIR}/scripts/"
     fi
-    if [ -f "setup-auto-forward.ps1" ]; then
-        cp setup-auto-forward.ps1 "${PACKAGE_DIR}/scripts/"
+    if [ -f "scripts/setup-auto-forward.ps1" ]; then
+        cp scripts/setup-auto-forward.ps1 "${PACKAGE_DIR}/scripts/"
     fi
-    if [ -f "diagnose-network.ps1" ]; then
-        cp diagnose-network.ps1 "${PACKAGE_DIR}/scripts/"
+    if [ -f "scripts/diagnose-network.ps1" ]; then
+        cp scripts/diagnose-network.ps1 "${PACKAGE_DIR}/scripts/"
     fi
 
     log_success "Scripts copied"

@@ -53,7 +53,7 @@ def get_eod_summary(
     else:
         target_date = datetime.now(IST).date()
 
-    # Get all bills for the date
+    # Get all bills for the date (filtered by bill creation date)
     bills = db.query(Bill).filter(
         func.date(Bill.created_at) == target_date
     ).all()
@@ -63,6 +63,15 @@ def get_eod_summary(
     total_revenue = sum(bill.rounded_total for bill in bills if bill.status == BillStatus.POSTED)
     total_tax = sum(bill.tax_amount for bill in bills if bill.status == BillStatus.POSTED)
     total_discount = sum(bill.discount_amount for bill in bills if bill.status == BillStatus.POSTED)
+
+    # Write-offs are filtered by write_off_at (the date the write-off was recorded),
+    # not by the bill's created_at, so a write-off can show up on a different day
+    # than the original bill.
+    write_off_bills = db.query(Bill).filter(
+        func.date(Bill.write_off_at) == target_date,
+        Bill.write_off_amount > 0,
+    ).all()
+    total_write_offs = sum(b.write_off_amount for b in write_off_bills)
 
     # Payment breakdown
     payment_breakdown = PaymentMethodBreakdown()
@@ -93,6 +102,7 @@ def get_eod_summary(
         total_revenue=total_revenue,
         total_tax=total_tax,
         total_discount=total_discount,
+        total_write_offs=total_write_offs,
         payment_breakdown=payment_breakdown,
         bills_by_status=bills_by_status
     )

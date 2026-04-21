@@ -20,6 +20,7 @@ class EODSummary(BaseModel):
     total_revenue: int  # paise
     total_tax: int  # paise
     total_discount: int  # paise
+    total_write_offs: int = 0  # paise — write-offs recorded on this date (by write_off_at)
     payment_breakdown: PaymentMethodBreakdown
     bills_by_status: Dict[str, int]  # status -> count
 

@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { Loader2 } from 'lucide-react';
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -150,7 +151,8 @@ export function ServiceDialog({ open, service, categories, onClose, onSuccess }:
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent size="md">
+        <form onSubmit={handleSubmit(onSubmit)} className="contents">
         <DialogHeader>
           <DialogTitle>{isEdit ? 'Edit Service' : 'Create New Service'}</DialogTitle>
           <DialogDescription>
@@ -158,7 +160,7 @@ export function ServiceDialog({ open, service, categories, onClose, onSuccess }:
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <DialogBody className="space-y-4">
           {/* Name */}
           <div className="space-y-2">
             <Label htmlFor="name">Service Name *</Label>
@@ -213,7 +215,7 @@ export function ServiceDialog({ open, service, categories, onClose, onSuccess }:
           </div>
 
           {/* Price and Duration */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="base_price">Price (₹) *</Label>
               <Input
@@ -261,6 +263,7 @@ export function ServiceDialog({ open, service, categories, onClose, onSuccess }:
               disabled={isSubmitting}
             />
           </div>
+        </DialogBody>
 
           <DialogFooter>
             <Button

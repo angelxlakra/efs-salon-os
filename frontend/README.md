@@ -172,7 +172,7 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 Update `NEXT_PUBLIC_API_URL` to match your deployment:
 
 ```bash
-NEXT_PUBLIC_API_URL=http://salon.local/api
+NEXT_PUBLIC_API_URL=http://localhost/api
 ```
 
 ## Role-Based Permissions

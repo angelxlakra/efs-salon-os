@@ -77,6 +77,11 @@ export interface PurchaseItem {
   unit_cost: number;
   discount_amount: number;
   total_cost: number;
+  rate_incl_tax?: number;
+  tax_rate_percent: number;
+  discount_percent?: number;
+  cgst_amount: number;
+  sgst_amount: number;
   created_at: string;
 }
 
@@ -88,6 +93,11 @@ export interface PurchaseItemCreate {
   quantity: number;
   unit_cost: number;
   discount_amount?: number;
+  rate_incl_tax?: number;
+  tax_rate_percent?: number;
+  discount_percent?: number;
+  cgst_amount?: number;
+  sgst_amount?: number;
 }
 
 export interface PurchaseInvoice {
@@ -99,6 +109,7 @@ export interface PurchaseInvoice {
   due_date?: string;
   subtotal: number;
   invoice_discount_amount: number;
+  round_off_amount: number;
   total_amount: number;
   paid_amount: number;
   balance_due: number;
@@ -144,6 +155,7 @@ export interface PurchaseInvoiceCreate {
   invoice_file_url?: string;
   items: PurchaseItemCreate[];
   invoice_discount_amount?: number;
+  round_off_amount?: number;
 }
 
 export interface PurchaseInvoiceUpdate {
@@ -158,6 +170,7 @@ export interface PurchaseInvoiceUpdate {
 export interface PurchaseInvoiceEditRequest {
   items: PurchaseItemCreate[];
   invoice_discount_amount?: number;
+  round_off_amount?: number;
   notes?: string;
 }
 

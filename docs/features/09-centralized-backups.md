@@ -37,6 +37,7 @@ Each branch runs independently. The worker container handles all backup jobs via
 | `_weekly_cloud_cleanup` | Sunday 02:00 IST | Deletes cloud backups older than retention period |
 | `catchup_missing_summaries` | On startup | Fills missing DaySummary records |
 | `catchup_missing_metrics` | On startup | Pushes metrics for last 14 days if missing from cloud |
+| `catchup_missing_backup` | On startup | Checks yesterday's backup; runs pg_dump now if missing |
 
 ---
 
@@ -188,3 +189,4 @@ All monetary values are in **paise** (1/100 of INR). Divide by 100 for rupees.
 - [ ] Retention: After 7+ days, verify old local files are cleaned up
 - [ ] Cloud retention: After 90+ days, verify Sunday cleanup removes old cloud backups
 - [ ] Restore: Download a `.dump` from B2 and restore to a test database
+- [ ] Catchup backup: Stop worker before 22:00, restart next morning — check that a new `.dump` appears within ~60 seconds of startup

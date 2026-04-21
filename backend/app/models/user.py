@@ -1,7 +1,7 @@
 """User, Role, and Staff models for authentication and access control."""
 
 import enum
-from sqlalchemy import Boolean, Column, DateTime, Enum, ForeignKey, String, Text, ARRAY
+from sqlalchemy import Boolean, Column, Date, DateTime, Enum, ForeignKey, String, Text, ARRAY
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from app.database import Base
@@ -53,6 +53,7 @@ class User(Base, ULIDMixin, TimestampMixin, SoftDeleteMixin):
     password_history = Column(ARRAY(String), default=list)  # Store last N password hashes
     full_name = Column(String, nullable=False)
     phone = Column(String)  # Encrypted in production
+    date_of_birth = Column(Date, nullable=True)  # Only month+day are meaningful; year stored as 1900
     is_active = Column(Boolean, nullable=False, default=True)
     last_login_at = Column(DateTime(timezone=True))
 

@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard — Full Shell</title>
+<style>
+* { margin:0;padding:0;box-sizing:border-box; }
+body { background:#070707;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#fff;padding:20px;min-height:100vh; }
+
+/* ─── App Frame ─── */
+.app { display:flex;height:780px;border-radius:16px;overflow:hidden;border:1px solid #1e1e1e;box-shadow:0 40px 100px rgba(0,0,0,0.85); }
+
+/* ─── Sidebar ─── */
+.sidebar { width:210px;background:#0a0a0a;border-right:1px solid #161616;display:flex;flex-direction:column;flex-shrink:0; }
+
+.sb-header { padding:18px 14px 16px;border-bottom:1px solid #161616;display:flex;align-items:center;gap:10px; }
+.sb-logo { width:30px;height:30px;background:#fff;border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden; }
+.sb-logo-inner { width:18px;height:18px;background:#000;border-radius:3px; }
+.sb-name { font-size:12px;font-weight:700;color:#e2e8f0;letter-spacing:-0.2px; }
+.sb-tag  { font-size:9px;color:#3a3a3a;margin-top:1px; }
+
+.sb-nav { flex:1;padding:8px 6px;overflow-y:auto;display:flex;flex-direction:column;gap:1px; }
+.sb-nav::-webkit-scrollbar { width:0; }
+
+.ni { display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:7px;font-size:11.5px;font-weight:500;color:#4a4a4a;cursor:default;transition:all .12s;position:relative; }
+.ni:hover { background:#111;color:#888; }
+.ni.active { background:#160d2b;color:#ddd6fe;font-weight:600; }
+.ni.active::before { content:'';position:absolute;left:0;top:3px;bottom:3px;width:2px;background:#7c3aed;border-radius:0 2px 2px 0; }
+.ni-ico { width:14px;height:14px;border-radius:3px;flex-shrink:0;opacity:0.4; }
+.ni.active .ni-ico { opacity:1; }
+
+.sb-footer { padding:10px 6px;border-top:1px solid #161616; }
+.user-btn { display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:8px;cursor:default; }
+.user-btn:hover { background:#111; }
+.u-av { width:28px;height:28px;border-radius:7px;background:linear-gradient(135deg,#4c1d95,#6d28d9);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#e9d5ff;flex-shrink:0; }
+.u-name { font-size:11px;font-weight:600;color:#999; }
+.u-role { font-size:9px;color:#3a3a3a;margin-top:1px; }
+.theme-ring { display:flex;gap:4px;margin-left:auto; }
+.tr { width:7px;height:7px;border-radius:50%;cursor:default; }
+
+/* ─── Main ─── */
+.main { flex:1;display:flex;flex-direction:column;background:#0f0f0f;min-width:0;overflow:hidden; }
+
+/* Topbar */
+.topbar { height:46px;background:#0a0a0a;border-bottom:1px solid #161616;display:flex;align-items:center;justify-content:space-between;padding:0 20px;flex-shrink:0; }
+.tb-left { display:flex;align-items:center;gap:10px; }
+.hbg { display:flex;flex-direction:column;gap:3.5px;cursor:default; }
+.hl { width:15px;height:1.5px;background:#3a3a3a;border-radius:2px; }
+.breadcrumb { font-size:11px;color:#2e2e2e;font-weight:500; }
+.breadcrumb span { color:#555; }
+.tb-right { display:flex;align-items:center;gap:8px; }
+.date-pill { background:#141414;color:#484848;font-size:10px;font-weight:600;padding:4px 10px;border-radius:20px;border:1px solid #1e1e1e; }
+
+/* Content area */
+.content { flex:1;padding:18px 20px;overflow-y:auto;display:flex;flex-direction:column;gap:14px; }
+.content::-webkit-scrollbar { width:4px; }
+.content::-webkit-scrollbar-track { background:#0f0f0f; }
+.content::-webkit-scrollbar-thumb { background:#222;border-radius:2px; }
+
+/* Page header */
+.pg-hdr { display:flex;align-items:flex-start;justify-content:space-between; }
+.pg-h { font-size:17px;font-weight:800;color:#f1f5f9;letter-spacing:-0.4px;line-height:1; }
+.pg-s { font-size:10px;color:#3a3a3a;margin-top:4px; }
+.primary-btn { background:#7c3aed;color:#fff;border:none;padding:7px 14px;border-radius:8px;font-size:10px;font-weight:700;letter-spacing:0.3px;cursor:default;box-shadow:0 4px 14px rgba(124,58,237,0.28);white-space:nowrap; }
+
+/* Birthday banner */
+.bday { display:flex;align-items:center;gap:12px;padding:10px 14px;background:linear-gradient(90deg,#1a0f2e,#0f1a0a);border:1px solid #2d1f4e;border-radius:10px; }
+.bday-ico { width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,#7c3aed,#4f46e5);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0; }
+.bday-text { flex:1;min-width:0; }
+.bday-title { font-size:11px;font-weight:700;color:#ddd6fe; }
+.bday-sub { font-size:10px;color:#553d8e;margin-top:1px; }
+
+/* Stats row */
+.stats { display:grid;grid-template-columns:repeat(5,1fr);gap:8px; }
+.sc { background:#141414;border:1px solid #1c1c1c;border-radius:10px;padding:11px 12px;position:relative;overflow:hidden; }
+.sc:first-child { border-top:2px solid #7c3aed; }
+.sc-label { font-size:8px;text-transform:uppercase;letter-spacing:1.5px;color:#3a3a3a;font-weight:700; }
+.sc-val { font-size:18px;font-weight:800;color:#e2e8f0;margin-top:5px;letter-spacing:-0.5px;line-height:1; }
+.sc-val.hidden { color:#222;letter-spacing:3px;font-size:14px; }
+.sc-meta { font-size:9px;color:#22c55e;margin-top:4px; }
+.sc-meta.neutral { color:#333; }
+.sc-eye { position:absolute;top:10px;right:10px;width:18px;height:18px;border-radius:5px;background:#1e1e1e;border:1px solid #282828;display:flex;align-items:center;justify-content:center;cursor:default; }
+.eye-ico { font-size:9px;opacity:0.5; }
+
+/* Main body — two columns */
+.body-grid { display:grid;grid-template-columns:1fr 280px;gap:14px;flex:1;min-height:0; }
+
+/* Active customers */
+.card { background:#141414;border:1px solid #1c1c1c;border-radius:12px;overflow:hidden;display:flex;flex-direction:column; }
+.card-hdr { padding:11px 14px;border-bottom:1px solid #181818;display:flex;align-items:center;justify-content:space-between;flex-shrink:0; }
+.card-title { font-size:11px;font-weight:700;color:#888; }
+.cnt-badge { background:#1a1a1a;color:#444;font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;border:1px solid #222; }
+.card-body { padding:10px;display:grid;grid-template-columns:1fr 1fr;gap:8px;overflow-y:auto;flex:1; }
+.card-body::-webkit-scrollbar { width:0; }
+
+/* Customer tile */
+.cust-tile { background:#1a1a1a;border:1px solid #202020;border-radius:10px;overflow:hidden; }
+.ct-hdr { padding:9px 11px 8px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #1e1e1e; }
+.ct-av { width:26px;height:26px;border-radius:7px;background:#1e1e1e;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#a78bfa;flex-shrink:0; }
+.ct-name { font-size:10px;font-weight:700;color:#d4d4d8;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+.ct-time { font-size:8px;color:#555;background:#111;padding:2px 6px;border-radius:20px;border:1px solid #1e1e1e;flex-shrink:0; }
+.ct-svcs { padding:7px 11px;display:flex;flex-direction:column;gap:4px; }
+.ct-svc-row { display:flex;align-items:center;gap:6px; }
+.sdot { width:6px;height:6px;border-radius:50%;flex-shrink:0; }
+.sdot-in { background:#3b82f6; }
+.sdot-prog { background:#f59e0b;animation:pulse 1.5s infinite; }
+.sdot-done { background:#22c55e; }
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.svc-nm { font-size:9px;font-weight:600;color:#aaa;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+.svc-staff { font-size:8px;color:#404040; }
+.act-btn { width:18px;height:18px;border-radius:4px;border:1px solid #2a2a2a;background:#222;display:flex;align-items:center;justify-content:center;cursor:default;flex-shrink:0; }
+.play { width:0;height:0;border-style:solid;border-width:3px 0 3px 5px;border-color:transparent transparent transparent #a78bfa;margin-left:1px; }
+.chk { font-size:8px;color:#4ade80;font-weight:900; }
+
+.ct-footer { padding:7px 11px;border-top:1px solid #1e1e1e;display:flex;align-items:center;justify-content:space-between;gap:6px; }
+.ct-total { font-size:10px;font-weight:700;color:#ccc; }
+.ct-total-label { font-size:8px;color:#3a3a3a; }
+.co-btn { background:#7c3aed;color:#fff;border:none;border-radius:6px;font-size:8px;font-weight:700;padding:4px 9px;letter-spacing:0.3px;cursor:default;white-space:nowrap; }
+.co-btn.dim { background:#1e1e1e;color:#404040;border:1px solid #252525; }
+
+/* Right column */
+.right-col { display:flex;flex-direction:column;gap:10px;min-height:0;overflow:hidden; }
+
+/* Queue card */
+.queue-card { background:#141414;border:1px solid #1c1c1c;border-radius:12px;overflow:hidden;flex:1;display:flex;flex-direction:column;min-height:0; }
+.q-hdr { padding:10px 14px;border-bottom:1px solid #181818;display:flex;align-items:center;justify-content:space-between;flex-shrink:0; }
+.q-title { font-size:11px;font-weight:700;color:#888; }
+.q-badge { background:#1a0f2e;color:#7c3aed;font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;border:1px solid #2d1f4e; }
+
+.q-legend { padding:5px 12px;background:#0d0d0d;border-bottom:1px solid #161616;display:flex;align-items:center;gap:10px;flex-shrink:0; }
+.ql-item { display:flex;align-items:center;gap:4px; }
+.ql-dot { width:5px;height:5px;border-radius:50%; }
+.ql-label { font-size:8px;color:#333;font-weight:600;text-transform:uppercase;letter-spacing:0.5px; }
+
+.q-lanes { flex:1;overflow-y:auto;display:flex;flex-direction:column; }
+.q-lanes::-webkit-scrollbar { width:0; }
+
+/* Staff lane */
+.lane { border-bottom:1px solid #161616;padding:8px 10px;display:flex;gap:8px;align-items:flex-start; }
+.lane:last-child { border-bottom:none; }
+.lane-id { display:flex;flex-direction:column;align-items:center;gap:3px;width:34px;flex-shrink:0; }
+.l-av { width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#fff;flex-shrink:0; }
+.l-nm { font-size:8px;font-weight:600;color:#3a3a3a;text-align:center; }
+.l-st { font-size:7px;font-weight:700;padding:1px 4px;border-radius:10px; }
+.st-free { background:#052e16;color:#4ade80;border:1px solid #166534; }
+.st-busy { background:#1c1000;color:#f59e0b;border:1px solid #78350f; }
+.st-break { background:#1a1a1a;color:#3a3a3a;border:1px solid #222; }
+
+.lane-slots { flex:1;display:flex;flex-direction:column;gap:4px;min-width:0; }
+.slot { border-radius:6px;padding:5px 8px;display:flex;align-items:center;gap:5px;position:relative;overflow:hidden; }
+.slot.prog { background:#191208;border:1px solid #2a1e0a; }
+.slot.prog::before { content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:#f59e0b; }
+.slot.wait { background:#0a0f1a;border:1px solid #151f30; }
+.slot.wait::before { content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:#3b82f6; }
+.slot.next { background:#0f0f0f;border:1px dashed #1e1e1e; }
+.slot.avail { background:#050f05;border:1px dashed #166534;justify-content:center; }
+.sl-dot { width:6px;height:6px;border-radius:50%;flex-shrink:0; }
+.sl-prog { background:#f59e0b;animation:pulse 1.5s infinite; }
+.sl-wait { background:#3b82f6; }
+.sl-next { background:#2a2a2a; }
+.sl-svc { font-size:9px;font-weight:600;color:#bbb;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+.sl-svc.dim { color:#383838; }
+.sl-tm { font-size:8px;color:#404040;flex-shrink:0; }
+.sl-tm.warn { color:#f59e0b; }
+.sl-act { width:16px;height:16px;border-radius:4px;border:1px solid #282828;background:#1e1e1e;display:flex;align-items:center;justify-content:center;cursor:default;flex-shrink:0; }
+.sl-play { width:0;height:0;border-style:solid;border-width:2.5px 0 2.5px 5px;border-color:transparent transparent transparent #7c3aed;margin-left:1px; }
+.sl-chk { font-size:7px;color:#22c55e;font-weight:900; }
+.sl-avail-txt { font-size:8px;color:#22c55e;font-weight:600; }
+.sl-order { font-size:7px;font-weight:700;width:14px;height:14px;border-radius:3px;display:flex;align-items:center;justify-content:center;background:#1e1e1e;border:1px solid #252525;color:#404040;flex-shrink:0; }
+
+/* Goals compact */
+.goals { background:#141414;border:1px solid #1c1c1c;border-radius:10px;padding:11px 13px;flex-shrink:0; }
+.g-row { display:flex;align-items:center;gap:8px;margin-bottom:5px; }
+.g-row:last-child { margin-bottom:0; }
+.g-label { font-size:9px;color:#3a3a3a;flex:1;white-space:nowrap; }
+.g-track { width:50px;height:3px;background:#1e1e1e;border-radius:2px;overflow:hidden;flex-shrink:0; }
+.g-fill { height:100%;border-radius:2px;background:linear-gradient(90deg,#7c3aed,#8b5cf6); }
+.g-pct { font-size:9px;font-weight:700;color:#7c3aed;width:24px;text-align:right;flex-shrink:0; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ── Sidebar ── -->
+  <div class="sidebar">
+    <div class="sb-header">
+      <div class="sb-logo"><div class="sb-logo-inner"></div></div>
+      <div>
+        <div class="sb-name">EFS Salon</div>
+        <div class="sb-tag">Management System</div>
+      </div>
+    </div>
+
+    <div class="sb-nav">
+      <div class="ni active"><div class="ni-ico" style="background:#7c3aed;"></div>Dashboard</div>
+      <div class="ni"><div class="ni-ico" style="background:#444;"></div>Point of Sale</div>
+      <div class="ni"><div class="ni-ico" style="background:#444;"></div>Bills</div>
+      <div class="ni"><div class="ni-ico" style="background:#444;"></div>Cash Drawer</div>
+      <div class="ni"><div class="ni-ico" style="background:#444;"></div>EOD Reconciliation</div>
+      <div class="ni"><div class="ni-ico" style="background:#444;"></div>Inventory</div>
+      <div class="ni"><div class="ni-ico" style="background:#444;"></div>Purchases</div>
+      <div class="ni"><div class="ni-ico" style="background:#444;"></div>Services</div>
+      <div class="ni"><div class="ni-ico" style="background:#444;"></div>Customers</div>
+      <div class="ni"><div class="ni-ico" style="background:#444;"></div>Attendance</div>
+      <div class="ni"><div class="ni-ico" style="background:#444;"></div>Expenses</div>
+      <div class="ni"><div class="ni-ico" style="background:#444;"></div>Reports</div>
+      <div class="ni"><div class="ni-ico" style="background:#444;"></div>Profit &amp; Loss</div>
+      <div class="ni"><div class="ni-ico" style="background:#444;"></div>Users &amp; Staff</div>
+      <div class="ni"><div class="ni-ico" style="background:#444;"></div>Settings</div>
+    </div>
+
+    <div class="sb-footer">
+      <div class="user-btn">
+        <div class="u-av">A</div>
+        <div>
+          <div class="u-name">Angel Lakra</div>
+          <div class="u-role">Owner</div>
+        </div>
+        <div class="theme-ring">
+          <div class="tr" style="background:#7c3aed;box-shadow:0 0 0 1.5px #0a0a0a,0 0 0 2.5px #7c3aed;"></div>
+          <div class="tr" style="background:#e11d48;"></div>
+          <div class="tr" style="background:#d97706;"></div>
+          <div class="tr" style="background:#0d9488;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Main ── -->
+  <div class="main">
+
+    <!-- Topbar -->
+    <div class="topbar">
+      <div class="tb-left">
+        <div class="hbg"><div class="hl"></div><div class="hl"></div><div class="hl"></div></div>
+        <div class="breadcrumb"><span>Dashboard</span></div>
+      </div>
+      <div class="tb-right">
+        <div class="date-pill">Wednesday, 16 Apr 2026</div>
+      </div>
+    </div>
+
+    <!-- Content -->
+    <div class="content">
+
+      <!-- Page header -->
+      <div class="pg-hdr">
+        <div>
+          <div class="pg-h">Dashboard</div>
+          <div class="pg-s">Live overview · auto-refreshes every 10s</div>
+        </div>
+        <button class="primary-btn">+ New Bill</button>
+      </div>
+
+      <!-- Birthday banner -->
+      <div class="bday">
+        <div class="bday-ico">🎂</div>
+        <div class="bday-text">
+          <div class="bday-title">Happy Birthday, Kavita!</div>
+          <div class="bday-sub">Wishing her a wonderful day 🎉</div>
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div class="stats">
+        <div class="sc">
+          <div class="sc-label">Revenue</div>
+          <div class="sc-val hidden">● ● ● ●</div>
+          <div class="sc-meta neutral">tap 👁 to reveal</div>
+          <div class="sc-eye"><span class="eye-ico">👁</span></div>
+        </div>
+        <div class="sc">
+          <div class="sc-label">Customers</div>
+          <div class="sc-val">42</div>
+          <div class="sc-meta">↑ 5% vs yesterday</div>
+        </div>
+        <div class="sc">
+          <div class="sc-label">Active Now</div>
+          <div class="sc-val">6</div>
+          <div class="sc-meta neutral">In salon</div>
+        </div>
+        <div class="sc">
+          <div class="sc-label">Pending Bills</div>
+          <div class="sc-val">3</div>
+          <div class="sc-meta neutral">Not billed yet</div>
+        </div>
+        <div class="sc">
+          <div class="sc-label">Avg. Service</div>
+          <div class="sc-val">34m</div>
+          <div class="sc-meta neutral">Per service</div>
+        </div>
+      </div>
+
+      <!-- Body grid -->
+      <div class="body-grid">
+
+        <!-- Active Customers -->
+        <div class="card">
+          <div class="card-hdr">
+            <div class="card-title">Active Customers</div>
+            <div class="cnt-badge">6 Active</div>
+          </div>
+          <div class="card-body">
+
+            <!-- Tile 1: Priya — mixed status -->
+            <div class="cust-tile">
+              <div class="ct-hdr">
+                <div class="ct-av" style="background:linear-gradient(135deg,#1a0f2e,#2d1f4e);">P</div>
+                <div class="ct-name">Priya Sharma</div>
+                <div class="ct-time">⏱ 24m</div>
+              </div>
+              <div class="ct-svcs">
+                <div class="ct-svc-row"><div class="sdot sdot-prog"></div><span class="svc-nm">Haircut</span><span class="svc-staff">· Riya</span><div class="act-btn"><span class="chk">✓</span></div></div>
+                <div class="ct-svc-row"><div class="sdot sdot-in"></div><span class="svc-nm">Threading</span><span class="svc-staff">· Sneha</span><div class="act-btn"><div class="play"></div></div></div>
+              </div>
+              <div class="ct-footer">
+                <div><div class="ct-total-label">Total</div><div class="ct-total">₹650</div></div>
+                <button class="co-btn dim">Go to Checkout</button>
+              </div>
+            </div>
+
+            <!-- Tile 2: Arjun — all done -->
+            <div class="cust-tile">
+              <div class="ct-hdr">
+                <div class="ct-av" style="background:linear-gradient(135deg,#14291a,#1a4a29);">A</div>
+                <div class="ct-name">Arjun Mehta</div>
+                <div class="ct-time">⏱ 41m</div>
+              </div>
+              <div class="ct-svcs">
+                <div class="ct-svc-row"><div class="sdot sdot-done"></div><span class="svc-nm">Facial</span><span class="svc-staff">· Sneha</span></div>
+                <div class="ct-svc-row"><div class="sdot sdot-done"></div><span class="svc-nm">Head Massage</span><span class="svc-staff">· Preethi</span></div>
+              </div>
+              <div class="ct-footer">
+                <div><div class="ct-total-label">Total</div><div class="ct-total">₹1,200</div></div>
+                <button class="co-btn">Checkout</button>
+              </div>
+            </div>
+
+            <!-- Tile 3: Kavya -->
+            <div class="cust-tile">
+              <div class="ct-hdr">
+                <div class="ct-av" style="background:linear-gradient(135deg,#1c0820,#4a1942);">K</div>
+                <div class="ct-name">Kavya Nair</div>
+                <div class="ct-time">⏱ 8m</div>
+              </div>
+              <div class="ct-svcs">
+                <div class="ct-svc-row"><div class="sdot sdot-in"></div><span class="svc-nm">Manicure</span><span class="svc-staff">· Kavita</span><div class="act-btn"><span class="chk">✓</span></div></div>
+              </div>
+              <div class="ct-footer">
+                <div><div class="ct-total-label">Total</div><div class="ct-total">₹400</div></div>
+                <button class="co-btn dim">Go to Checkout</button>
+              </div>
+            </div>
+
+            <!-- Tile 4: Rahul -->
+            <div class="cust-tile">
+              <div class="ct-hdr">
+                <div class="ct-av" style="background:linear-gradient(135deg,#1c1000,#451a03);">R</div>
+                <div class="ct-name">Rahul Singh</div>
+                <div class="ct-time">⏱ 3m</div>
+              </div>
+              <div class="ct-svcs">
+                <div class="ct-svc-row"><div class="sdot sdot-in"></div><span class="svc-nm">Haircut</span><span class="svc-staff">· Riya</span><div class="act-btn"><span class="chk">✓</span></div></div>
+                <div class="ct-svc-row"><div class="sdot sdot-in"></div><span class="svc-nm">Hair Colour</span><span class="svc-staff">· Meena</span><div class="act-btn"><div class="play"></div></div></div>
+              </div>
+              <div class="ct-footer">
+                <div><div class="ct-total-label">Total</div><div class="ct-total">₹850</div></div>
+                <button class="co-btn dim">Go to Checkout</button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Right column -->
+        <div class="right-col">
+
+          <!-- Service Queue -->
+          <div class="queue-card">
+            <div class="q-hdr">
+              <div class="q-title">Service Queue</div>
+              <div class="q-badge">5 staff</div>
+            </div>
+            <div class="q-legend">
+              <div class="ql-item"><div class="ql-dot" style="background:#f59e0b;"></div><span class="ql-label">In progress</span></div>
+              <div class="ql-item"><div class="ql-dot" style="background:#3b82f6;margin-left:6px;"></div><span class="ql-label">Waiting</span></div>
+              <div class="ql-item"><div class="ql-dot" style="background:#2a2a2a;margin-left:6px;"></div><span class="ql-label">Queued</span></div>
+            </div>
+            <div class="q-lanes">
+
+              <!-- Riya -->
+              <div class="lane">
+                <div class="lane-id">
+                  <div class="l-av" style="background:linear-gradient(135deg,#14291a,#1a4a29);">R</div>
+                  <div class="l-nm">Riya</div>
+                  <div class="l-st st-busy">BUSY</div>
+                </div>
+                <div class="lane-slots">
+                  <div class="slot prog"><div class="sl-dot sl-prog"></div><span class="sl-svc">Priya — Haircut</span><span class="sl-tm">12m</span><div class="sl-act"><span class="sl-chk">✓</span></div></div>
+                  <div class="slot next"><div class="sl-dot sl-next"></div><span class="sl-svc dim">Rahul — Hair Colour</span><span class="sl-tm">next</span><div class="sl-order">2</div></div>
+                </div>
+              </div>
+
+              <!-- Sneha -->
+              <div class="lane">
+                <div class="lane-id">
+                  <div class="l-av" style="background:linear-gradient(135deg,#1a0f2e,#2d1f4e);">S</div>
+                  <div class="l-nm">Sneha</div>
+                  <div class="l-st st-busy">BUSY</div>
+                </div>
+                <div class="lane-slots">
+                  <div class="slot prog"><div class="sl-dot sl-prog"></div><span class="sl-svc">Arjun — Facial</span><span class="sl-tm">41m</span><div class="sl-act"><span class="sl-chk">✓</span></div></div>
+                </div>
+              </div>
+
+              <!-- Kavita -->
+              <div class="lane">
+                <div class="lane-id">
+                  <div class="l-av" style="background:linear-gradient(135deg,#1c0820,#4a1942);">K</div>
+                  <div class="l-nm">Kavita</div>
+                  <div class="l-st st-busy">BUSY</div>
+                </div>
+                <div class="lane-slots">
+                  <div class="slot wait"><div class="sl-dot sl-wait"></div><span class="sl-svc">Kavya — Manicure</span><span class="sl-tm warn">8m wait</span><div class="sl-act"><div class="sl-play"></div></div></div>
+                </div>
+              </div>
+
+              <!-- Meena -->
+              <div class="lane">
+                <div class="lane-id">
+                  <div class="l-av" style="background:linear-gradient(135deg,#1c1000,#451a03);">M</div>
+                  <div class="l-nm">Meena</div>
+                  <div class="l-st st-break">BREAK</div>
+                </div>
+                <div class="lane-slots">
+                  <div class="slot avail"><span class="sl-avail-txt">— After break —</span></div>
+                </div>
+              </div>
+
+              <!-- Preethi -->
+              <div class="lane">
+                <div class="lane-id">
+                  <div class="l-av" style="background:linear-gradient(135deg,#0a1628,#1a3060);">P</div>
+                  <div class="l-nm">Preethi</div>
+                  <div class="l-st st-free">FREE</div>
+                </div>
+                <div class="lane-slots">
+                  <div class="slot avail"><span class="sl-avail-txt">— Ready —</span></div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- Goals -->
+          <div class="goals">
+            <div class="g-row">
+              <span class="g-label">Revenue · ₹?? / ₹20,000</span>
+              <div class="g-track"><div class="g-fill" style="width:92%;"></div></div>
+              <span class="g-pct">92%</span>
+            </div>
+            <div class="g-row">
+              <span class="g-label">Services · 21 / 25</span>
+              <div class="g-track"><div class="g-fill" style="width:84%;"></div></div>
+              <span class="g-pct">84%</span>
+            </div>
+          </div>
+
+        </div><!-- /right-col -->
+      </div><!-- /body-grid -->
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /app -->
+</body>
+</html>

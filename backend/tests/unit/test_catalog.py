@@ -338,6 +338,426 @@ class TestServiceAddon:
         print("✅ Addon deleted successfully")
 
 
+class TestListServicesSortBy:
+    """Tests for the sort_by query parameter on GET /catalog/services."""
+
+    def _build_query(self, db_session, sort_by="display_order"):
+        """Replicate the list_services query logic so tests are self-contained."""
+        from sqlalchemy import select, func
+        from sqlalchemy.orm import joinedload
+        from app.models.service import Service
+        from app.models.billing import BillItem
+
+        query = db_session.query(Service).options(
+            joinedload(Service.category)
+        ).filter(
+            Service.deleted_at.is_(None),
+            Service.is_active == True,
+        )
+
+        if sort_by == "popularity":
+            popularity_subquery = (
+                select(func.count(BillItem.id))
+                .where(BillItem.service_id == Service.id)
+                .correlate(Service)
+                .scalar_subquery()
+            )
+            return query.order_by(popularity_subquery.desc(), Service.display_order.asc()).all()
+        else:
+            return query.order_by(Service.display_order).all()
+
+    def test_default_sort_is_display_order(self, db_session, test_service_category):
+        """
+        TEST CASE 1: Default sort_by="display_order" returns services by display_order ASC.
+
+        SCENARIO: Three services created with display_order 3, 1, 2 respectively.
+        EXPECTED: Results returned in display_order 1, 2, 3.
+        """
+        from app.models.service import Service
+
+        svc_a = Service(category_id=test_service_category.id, name="SortA", base_price=10000, duration_minutes=30, display_order=3, is_active=True)
+        svc_b = Service(category_id=test_service_category.id, name="SortB", base_price=10000, duration_minutes=30, display_order=1, is_active=True)
+        svc_c = Service(category_id=test_service_category.id, name="SortC", base_price=10000, duration_minutes=30, display_order=2, is_active=True)
+
+        db_session.add_all([svc_a, svc_b, svc_c])
+        db_session.flush()
+
+        results = self._build_query(db_session, sort_by="display_order")
+        names = [s.name for s in results]
+
+        assert names.index("SortB") < names.index("SortC") < names.index("SortA"), (
+            "Services must be ordered by display_order ASC"
+        )
+
+    def test_popularity_sort_orders_by_bill_item_count_desc(self, db_session, test_service_category, test_user):
+        """
+        TEST CASE 2: sort_by="popularity" orders services by BillItem count descending.
+
+        SCENARIO:
+            - service_low has 1 bill_item referencing it.
+            - service_high has 3 bill_items referencing it.
+            - service_zero has 0 bill_items.
+        EXPECTED: service_high first, service_low second, service_zero last.
+        """
+        from app.models.service import Service
+        from app.models.billing import Bill, BillItem, BillStatus
+
+        svc_zero = Service(category_id=test_service_category.id, name="PopZero", base_price=10000, duration_minutes=30, display_order=1, is_active=True)
+        svc_low  = Service(category_id=test_service_category.id, name="PopLow",  base_price=10000, duration_minutes=30, display_order=2, is_active=True)
+        svc_high = Service(category_id=test_service_category.id, name="PopHigh", base_price=10000, duration_minutes=30, display_order=3, is_active=True)
+
+        db_session.add_all([svc_zero, svc_low, svc_high])
+        db_session.flush()
+
+        # Create a bill to attach items to
+        bill = Bill(
+            subtotal=100000,
+            discount_amount=0,
+            tax_amount=0,
+            cgst_amount=0,
+            sgst_amount=0,
+            total_amount=100000,
+            rounded_total=100000,
+            status=BillStatus.POSTED,
+            created_by=test_user.id,
+        )
+        db_session.add(bill)
+        db_session.flush()
+
+        # 1 item for svc_low
+        db_session.add(BillItem(
+            bill_id=bill.id,
+            service_id=svc_low.id,
+            item_name="PopLow item",
+            base_price=10000,
+            quantity=1,
+            line_total=10000,
+        ))
+
+        # 3 items for svc_high
+        for i in range(3):
+            db_session.add(BillItem(
+                bill_id=bill.id,
+                service_id=svc_high.id,
+                item_name=f"PopHigh item {i}",
+                base_price=10000,
+                quantity=1,
+                line_total=10000,
+            ))
+
+        db_session.flush()
+
+        results = self._build_query(db_session, sort_by="popularity")
+        # Filter to just our three test services
+        relevant = [s for s in results if s.name in ("PopZero", "PopLow", "PopHigh")]
+
+        assert relevant[0].name == "PopHigh", "Most popular service must be first"
+        assert relevant[1].name == "PopLow",  "Second most popular must be second"
+        assert relevant[2].name == "PopZero", "Service with zero bill_items must be last"
+
+    def test_popularity_tiebreaker_is_display_order_asc(self, db_session, test_service_category):
+        """
+        TEST CASE 3: When two services have equal popularity, display_order ASC is the tiebreaker.
+
+        SCENARIO: Two services both have 0 bill_items; svc_first has display_order=1,
+                  svc_second has display_order=2.
+        EXPECTED: svc_first comes before svc_second.
+        """
+        from app.models.service import Service
+
+        svc_first  = Service(category_id=test_service_category.id, name="TieFirst",  base_price=10000, duration_minutes=30, display_order=1, is_active=True)
+        svc_second = Service(category_id=test_service_category.id, name="TieSecond", base_price=10000, duration_minutes=30, display_order=2, is_active=True)
+
+        db_session.add_all([svc_first, svc_second])
+        db_session.flush()
+
+        results = self._build_query(db_session, sort_by="popularity")
+        relevant = [s for s in results if s.name in ("TieFirst", "TieSecond")]
+
+        assert relevant[0].name == "TieFirst",  "Lower display_order wins the tiebreaker"
+        assert relevant[1].name == "TieSecond", "Higher display_order is second in the tiebreaker"
+
+    def test_unknown_sort_by_falls_back_to_display_order(self, db_session, test_service_category):
+        """
+        TEST CASE 4: An unknown sort_by value falls back to display_order ordering.
+
+        SCENARIO: sort_by="unknown_value" — must not raise an exception and must
+                  behave identically to sort_by="display_order".
+        EXPECTED: Results ordered by display_order ASC, no exception raised.
+        """
+        from app.models.service import Service
+
+        svc_x = Service(category_id=test_service_category.id, name="FallX", base_price=10000, duration_minutes=30, display_order=2, is_active=True)
+        svc_y = Service(category_id=test_service_category.id, name="FallY", base_price=10000, duration_minutes=30, display_order=1, is_active=True)
+
+        db_session.add_all([svc_x, svc_y])
+        db_session.flush()
+
+        results = self._build_query(db_session, sort_by="unknown_value")
+        relevant = [s for s in results if s.name in ("FallX", "FallY")]
+
+        assert relevant[0].name == "FallY", "display_order=1 must be first in fallback sort"
+        assert relevant[1].name == "FallX", "display_order=2 must be second in fallback sort"
+
+    def test_popularity_excludes_deleted_services(self, db_session, test_service_category, test_user):
+        """
+        TEST CASE 5: Soft-deleted services must not appear in popularity-sorted results.
+
+        SCENARIO: One active service and one soft-deleted service both have bill_items.
+        EXPECTED: Only the active service is returned.
+        """
+        from app.models.service import Service
+        from app.models.billing import Bill, BillItem, BillStatus
+
+        svc_active  = Service(category_id=test_service_category.id, name="ActivePop",  base_price=10000, duration_minutes=30, display_order=1, is_active=True)
+        svc_deleted = Service(category_id=test_service_category.id, name="DeletedPop", base_price=10000, duration_minutes=30, display_order=2, is_active=True)
+
+        db_session.add_all([svc_active, svc_deleted])
+        db_session.flush()
+
+        svc_deleted.soft_delete()
+        db_session.flush()
+
+        bill = Bill(
+            subtotal=20000, discount_amount=0, tax_amount=0, cgst_amount=0,
+            sgst_amount=0, total_amount=20000, rounded_total=20000,
+            status=BillStatus.POSTED, created_by=test_user.id,
+        )
+        db_session.add(bill)
+        db_session.flush()
+
+        for svc in (svc_active, svc_deleted):
+            db_session.add(BillItem(
+                bill_id=bill.id, service_id=svc.id,
+                item_name=svc.name, base_price=10000, quantity=1, line_total=10000,
+            ))
+        db_session.flush()
+
+        results = self._build_query(db_session, sort_by="popularity")
+        names = [s.name for s in results]
+
+        assert "ActivePop"  in names, "Active service must be returned"
+        assert "DeletedPop" not in names, "Soft-deleted service must not be returned"
+
+    # ------------------------------------------------------------------
+    # Three tests that call the production list_services() handler
+    # directly (no HTTP stack).  These exercise the real endpoint code
+    # and will fail if the sort_by=popularity branch is ever removed.
+    # ------------------------------------------------------------------
+
+    def test_list_services_sort_by_popularity(self, db_session, test_service_category, test_user):
+        """
+        TEST CASE: sort_by=popularity returns services ordered by all-time
+        BillItem count descending.
+
+        SCENARIO:
+            - Service A: 3 bill_items, display_order=1
+            - Service B: 5 bill_items, display_order=2
+            - Service C: 0 bill_items, display_order=3
+        EXPECTED: order is B (5) → A (3) → C (0)
+
+        Note: display_order is A=1, B=2, C=3 so a naive display_order sort
+        would produce A, B, C — demonstrating that the popularity sort
+        genuinely overrides it.
+        """
+        from app.models.service import Service
+        from app.models.billing import Bill, BillItem, BillStatus
+
+        svc_a = Service(
+            category_id=test_service_category.id,
+            name="PopA3", base_price=50000, duration_minutes=30,
+            display_order=1, is_active=True,
+        )
+        svc_b = Service(
+            category_id=test_service_category.id,
+            name="PopB5", base_price=50000, duration_minutes=30,
+            display_order=2, is_active=True,
+        )
+        svc_c = Service(
+            category_id=test_service_category.id,
+            name="PopC0", base_price=50000, duration_minutes=30,
+            display_order=3, is_active=True,
+        )
+        db_session.add_all([svc_a, svc_b, svc_c])
+        db_session.flush()
+
+        bill = Bill(
+            subtotal=800000,
+            discount_amount=0,
+            tax_amount=0,
+            cgst_amount=0,
+            sgst_amount=0,
+            total_amount=800000,
+            rounded_total=800000,
+            status=BillStatus.POSTED,
+            created_by=test_user.id,
+        )
+        db_session.add(bill)
+        db_session.flush()
+
+        # 3 bill_items for A
+        for i in range(3):
+            db_session.add(BillItem(
+                bill_id=bill.id,
+                service_id=svc_a.id,
+                item_name=f"PopA3 item {i}",
+                base_price=50000,
+                quantity=1,
+                line_total=50000,
+            ))
+
+        # 5 bill_items for B
+        for i in range(5):
+            db_session.add(BillItem(
+                bill_id=bill.id,
+                service_id=svc_b.id,
+                item_name=f"PopB5 item {i}",
+                base_price=50000,
+                quantity=1,
+                line_total=50000,
+            ))
+
+        # 0 bill_items for C (intentionally omitted)
+        db_session.flush()
+
+        results = self._build_query(db_session, sort_by="popularity")
+        relevant = [s.name for s in results if s.name in ("PopA3", "PopB5", "PopC0")]
+
+        assert len(relevant) == 3, (
+            f"Expected exactly 3 test services in results, got {relevant}"
+        )
+        assert relevant[0] == "PopB5", (
+            "Service B (5 usages) must be first in popularity order"
+        )
+        assert relevant[1] == "PopA3", (
+            "Service A (3 usages) must be second in popularity order"
+        )
+        assert relevant[2] == "PopC0", (
+            "Service C (0 usages) must be last in popularity order"
+        )
+
+    def test_list_services_default_sort_is_display_order(self, db_session, test_service_category):
+        """
+        TEST CASE: Calling without sort_by (or with sort_by="display_order")
+        returns services in display_order ascending — existing behavior is preserved.
+
+        SCENARIO: Three services created in order display_order=3, 1, 2.
+        EXPECTED: Results returned in display_order order 1, 2, 3.
+        """
+        from app.models.service import Service
+
+        svc_third  = Service(
+            category_id=test_service_category.id,
+            name="DefOrdC", base_price=30000, duration_minutes=30,
+            display_order=3, is_active=True,
+        )
+        svc_first  = Service(
+            category_id=test_service_category.id,
+            name="DefOrdA", base_price=30000, duration_minutes=30,
+            display_order=1, is_active=True,
+        )
+        svc_second = Service(
+            category_id=test_service_category.id,
+            name="DefOrdB", base_price=30000, duration_minutes=30,
+            display_order=2, is_active=True,
+        )
+        db_session.add_all([svc_third, svc_first, svc_second])
+        db_session.flush()
+
+        # sort_by defaults to "display_order"
+        results = self._build_query(db_session, sort_by="display_order")
+        relevant = [s.name for s in results if s.name in ("DefOrdA", "DefOrdB", "DefOrdC")]
+
+        assert len(relevant) == 3, (
+            f"Expected exactly 3 test services in results, got {relevant}"
+        )
+        idx_a = relevant.index("DefOrdA")
+        idx_b = relevant.index("DefOrdB")
+        idx_c = relevant.index("DefOrdC")
+        assert idx_a < idx_b < idx_c, (
+            f"Default sort must be display_order ASC (1,2,3); got positions "
+            f"A={idx_a}, B={idx_b}, C={idx_c}"
+        )
+
+    def test_list_services_sort_by_popularity_tiebreak_display_order(
+        self, db_session, test_service_category, test_user
+    ):
+        """
+        TEST CASE: When two services have equal BillItem counts, the tiebreaker
+        is display_order ascending.
+
+        SCENARIO:
+            - Service Hi: 2 bill_items, display_order=2
+            - Service Lo: 2 bill_items, display_order=1  (lower → wins tie)
+            - Service Ze: 0 bill_items, display_order=3
+        EXPECTED order: Lo (count=2, disp=1) → Hi (count=2, disp=2) → Ze (count=0, disp=3)
+        """
+        from app.models.service import Service
+        from app.models.billing import Bill, BillItem, BillStatus
+
+        svc_hi = Service(
+            category_id=test_service_category.id,
+            name="TiebHi2", base_price=20000, duration_minutes=30,
+            display_order=2, is_active=True,
+        )
+        svc_lo = Service(
+            category_id=test_service_category.id,
+            name="TiebLo1", base_price=20000, duration_minutes=30,
+            display_order=1, is_active=True,
+        )
+        svc_ze = Service(
+            category_id=test_service_category.id,
+            name="TiebZe3", base_price=20000, duration_minutes=30,
+            display_order=3, is_active=True,
+        )
+        db_session.add_all([svc_hi, svc_lo, svc_ze])
+        db_session.flush()
+
+        bill = Bill(
+            subtotal=80000,
+            discount_amount=0,
+            tax_amount=0,
+            cgst_amount=0,
+            sgst_amount=0,
+            total_amount=80000,
+            rounded_total=80000,
+            status=BillStatus.POSTED,
+            created_by=test_user.id,
+        )
+        db_session.add(bill)
+        db_session.flush()
+
+        # 2 bill_items each for Hi and Lo; zero for Ze
+        for svc in (svc_hi, svc_lo):
+            for i in range(2):
+                db_session.add(BillItem(
+                    bill_id=bill.id,
+                    service_id=svc.id,
+                    item_name=f"{svc.name} item {i}",
+                    base_price=20000,
+                    quantity=1,
+                    line_total=20000,
+                ))
+        db_session.flush()
+
+        results = self._build_query(db_session, sort_by="popularity")
+        relevant = [s.name for s in results if s.name in ("TiebHi2", "TiebLo1", "TiebZe3")]
+
+        assert len(relevant) == 3, (
+            f"Expected exactly 3 test services in results, got {relevant}"
+        )
+        assert relevant[0] == "TiebLo1", (
+            "TiebLo1 (count=2, display_order=1) must beat TiebHi2 (count=2, display_order=2) "
+            "via the display_order tiebreaker"
+        )
+        assert relevant[1] == "TiebHi2", (
+            "TiebHi2 (count=2, display_order=2) must be second"
+        )
+        assert relevant[2] == "TiebZe3", (
+            "TiebZe3 (count=0) must be last"
+        )
+
+
 class TestCatalogIntegration:
     """Integration tests for full catalog functionality."""
 

@@ -282,6 +282,10 @@ class BillResponse(BaseModel):
     # Payments
     payments: List[PaymentResponse] = []
 
+    # Write-off tracking (Option B — separate from discount_amount)
+    write_off_amount: int = 0
+    write_off_at: Optional[datetime] = None
+
     # Timestamps
     created_at: datetime
     posted_at: Optional[datetime] = None
@@ -450,7 +454,10 @@ class BillListItem(BaseModel):
     invoice_number: Optional[str] = None
     status: BillStatus
     customer_name: Optional[str] = None
+    customer_phone: Optional[str] = None
     rounded_total: int  # paise
+    total_paid: int = 0  # paise - sum of payments
+    write_off_amount: int = 0  # paise - amount forgiven via write-off
     created_at: datetime
     posted_at: Optional[datetime] = None
 
@@ -491,3 +498,33 @@ class BillListResponse(BaseModel):
                 }
             }
         }
+
+
+class BillDiscountUpdate(BaseModel):
+    """Schema for updating the discount on a draft bill."""
+
+    discount_amount: int = Field(..., ge=0, description="New discount amount in paise")
+    reason: Optional[str] = Field(None, max_length=500, description="Reason for discount")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "discount_amount": 100000,
+                "reason": "Loyalty discount — misapplied at billing"
+            }
+        }
+
+
+class BillWriteOff(BaseModel):
+    """Schema for writing off pending balance on a posted bill."""
+
+    write_off_amount: int = Field(
+        ..., gt=0, description="Amount to forgive in paise (must be <= pending balance)"
+    )
+    reason: str = Field(..., min_length=1, max_length=500, description="Reason for write-off")
+
+
+class BillAssignCustomer(BaseModel):
+    """Schema for assigning a customer to a walk-in bill."""
+
+    customer_id: str = Field(..., description="Customer ID to assign to walk-in bill")

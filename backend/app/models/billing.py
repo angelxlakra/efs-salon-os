@@ -72,6 +72,12 @@ class Bill(Base, ULIDMixin, TimestampMixin):
     discount_reason = Column(Text)
     discount_approved_by = Column(String(26), ForeignKey("users.id"))
 
+    # Write-off tracking (Option B — does NOT mutate discount_amount or rounded_total)
+    write_off_amount = Column(Integer, nullable=False, default=0)
+    write_off_at = Column(DateTime(timezone=True), nullable=True)
+    write_off_reason = Column(Text, nullable=True)
+    write_off_approved_by = Column(String(26), ForeignKey("users.id"), nullable=True)
+
     # Refund tracking
     refunded_at = Column(DateTime(timezone=True))
     refund_reason = Column(Text)
@@ -87,6 +93,7 @@ class Bill(Base, ULIDMixin, TimestampMixin):
     payments = relationship("Payment", back_populates="bill")
     created_by_user = relationship("User", foreign_keys=[created_by])
     discount_approver = relationship("User", foreign_keys=[discount_approved_by])
+    write_off_approver = relationship("User", foreign_keys=[write_off_approved_by])
     refund_approver = relationship("User", foreign_keys=[refund_approved_by])
     original_bill = relationship("Bill", remote_side="Bill.id", foreign_keys=[original_bill_id])
     tip_recipient = relationship("Staff", foreign_keys=[tip_staff_id])

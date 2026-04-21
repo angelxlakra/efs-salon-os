@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -188,7 +189,7 @@ export function StaffDialog({ open, staff, onClose, onSuccess }: StaffDialogProp
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent size="sm">
         <DialogHeader>
           <div className="mx-auto bg-purple-100 p-3 rounded-full w-fit mb-2">
             {staff ? <User className="h-6 w-6 text-purple-600" /> : <UserPlus className="h-6 w-6 text-purple-600" />}
@@ -200,7 +201,8 @@ export function StaffDialog({ open, staff, onClose, onSuccess }: StaffDialogProp
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="contents">
+          <DialogBody className="space-y-4">
             
             {!staff && (
                  <FormField
@@ -307,8 +309,9 @@ export function StaffDialog({ open, staff, onClose, onSuccess }: StaffDialogProp
                 </FormItem>
               )}
             />
+          </DialogBody>
 
-            <DialogFooter className="pt-4">
+            <DialogFooter>
               <Button type="button" variant="outline" onClick={onClose}>
                 Cancel
               </Button>

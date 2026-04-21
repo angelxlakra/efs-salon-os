@@ -299,7 +299,8 @@ class PLRevenue(BaseModel):
     gross_revenue: int = Field(..., description="Total revenue before discounts (paise)")
     discount_amount: int = Field(..., description="Total discounts (paise)")
     refund_amount: int = Field(..., description="Total refunds (paise)")
-    net_revenue: int = Field(..., description="Revenue after discounts and refunds (paise)")
+    write_off_amount: int = Field(0, description="Total write-offs forgiven in period (paise)")
+    net_revenue: int = Field(..., description="Revenue after discounts, refunds, and write-offs (paise)")
 
     @property
     def net_revenue_rupees(self) -> float:

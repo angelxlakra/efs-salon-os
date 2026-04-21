@@ -7,6 +7,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -141,23 +142,29 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
         });
 
         if (customerSession) {
-          // Convert walk-ins to cart items
+          // Convert walk-ins to cart items, restoring multi-staff data if present
           const cartItems = customerSession.walkins
             .filter((walkin: any) => walkin.status !== 'cancelled')
-            .map((walkin: any) => ({
-            isProduct: false,
-            serviceId: walkin.service.id,
-            serviceName: walkin.service.name,
-            quantity: 1,
-            unitPrice: walkin.service.base_price,
-            discount: 0,
-            taxRate: 18, // Default GST rate
-            staffId: walkin.assigned_staff.id,
-            staffName: walkin.assigned_staff.display_name,
-            duration: walkin.service.duration_minutes,
-            walkinId: walkin.id,
-            walkinStatus: walkin.status,
-          }));
+            .map((walkin: any) => {
+            const hasMultiStaff = walkin.staff_contributions_data && walkin.staff_contributions_data.length > 0;
+            return {
+              isProduct: false,
+              serviceId: walkin.service.id,
+              serviceName: walkin.service.name,
+              quantity: 1,
+              unitPrice: walkin.service.base_price,
+              discount: 0,
+              taxRate: 18, // Default GST rate
+              staffId: walkin.assigned_staff.id,
+              staffName: walkin.assigned_staff.display_name,
+              duration: walkin.service.duration_minutes,
+              walkinId: walkin.id,
+              walkinStatus: walkin.status,
+              // Restore multi-staff contributions if saved on the walk-in
+              isMultiStaff: hasMultiStaff,
+              staffContributions: hasMultiStaff ? walkin.staff_contributions_data : undefined,
+            };
+          });
 
           // Populate cart with booked items
           populateFromSession(customerSession.session_id, cartItems);
@@ -254,13 +261,30 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
     setShowStaffDialog(true);
   };
 
-  const handleStaffChange = () => {
+  const handleStaffChange = async () => {
     if (!editingItemId || !newStaffId || !newStaffName) {
       toast.error('Please select a staff member');
       return;
     }
 
+    const item = items.find((i) => i.id === editingItemId);
+
+    // Update local state immediately
     setItemStaff(editingItemId, newStaffId, newStaffName);
+
+    // Persist to backend for booked items
+    if (item?.isBooked && item?.walkinId) {
+      try {
+        await apiClient.patch(`/appointments/walkins/${item.walkinId}/staff`, {
+          assigned_staff_id: newStaffId,
+          staff_contributions_data: null,
+        });
+      } catch (error: any) {
+        console.error('Failed to persist staff change:', error);
+        toast.error('Staff updated locally but failed to save to server');
+      }
+    }
+
     toast.success('Staff assignment updated');
     setShowStaffDialog(false);
     setEditingItemId(null);
@@ -365,10 +389,29 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
     }
   };
 
-  const handleSaveTeam = (contributions: StaffContributionCreate[]) => {
+  const handleSaveTeam = async (contributions: StaffContributionCreate[]) => {
     if (!teamEditorItemId) return;
 
+    const item = items.find((i) => i.id === teamEditorItemId);
+
+    // Update local state immediately
     setItemStaffContributions(teamEditorItemId, contributions);
+
+    // Persist to backend for booked items
+    if (item?.isBooked && item?.walkinId && contributions.length > 0) {
+      try {
+        // Use the first contributor as the primary staff on the walk-in record
+        const primaryStaffId = contributions[0].staff_id;
+        await apiClient.patch(`/appointments/walkins/${item.walkinId}/staff`, {
+          assigned_staff_id: primaryStaffId,
+          staff_contributions_data: contributions,
+        });
+      } catch (error: any) {
+        console.error('Failed to persist team change:', error);
+        toast.error('Team updated locally but failed to save to server');
+      }
+    }
+
     toast.success('Staff team updated');
     setShowTeamEditor(false);
     setTeamEditorItemId(null);
@@ -714,7 +757,7 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
               </Button>
             </div>
             {/* Preset Percentage Discounts */}
-            <div className="flex gap-2">
+            <div className="grid grid-cols-4 gap-2">
               {[5, 10, 15, 20].map((percentage) => {
                 const isActive = isPercentageActive(percentage);
                 return (
@@ -807,7 +850,7 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
 
       {/* Staff Change Dialog */}
       <Dialog open={showStaffDialog} onOpenChange={setShowStaffDialog}>
-        <DialogContent className="sm:max-w-[400px]">
+        <DialogContent size="sm">
           <DialogHeader>
             <DialogTitle>Change Staff Assignment</DialogTitle>
             <DialogDescription>
@@ -815,7 +858,7 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
             </DialogDescription>
           </DialogHeader>
 
-          <div className="py-4">
+          <DialogBody>
             <StaffSelector
               value={newStaffId}
               onChange={(staffId, staffName) => {
@@ -824,7 +867,7 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
               }}
               placeholder="Choose staff..."
             />
-          </div>
+          </DialogBody>
 
           <DialogFooter>
             <Button
@@ -847,7 +890,7 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
 
       {/* Quantity Increase Staff Selection Dialog */}
       <Dialog open={showQuantityStaffDialog} onOpenChange={setShowQuantityStaffDialog}>
-        <DialogContent className="sm:max-w-[400px]">
+        <DialogContent size="sm">
           <DialogHeader>
             <DialogTitle>Select Staff for Additional Service</DialogTitle>
             <DialogDescription>
@@ -855,7 +898,7 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
             </DialogDescription>
           </DialogHeader>
 
-          <div className="py-4">
+          <DialogBody>
             <StaffSelector
               value={quantityStaffId}
               onChange={(staffId, staffName) => {
@@ -864,7 +907,7 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
               }}
               placeholder="Choose staff..."
             />
-          </div>
+          </DialogBody>
 
           <DialogFooter>
             <Button
@@ -887,24 +930,24 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
 
       {/* Update Session Customer Dialog */}
       <Dialog open={showUpdateCustomerDialog} onOpenChange={setShowUpdateCustomerDialog}>
-        <DialogContent className="sm:max-w-[400px]">
+        <DialogContent size="sm">
           <DialogHeader>
             <DialogTitle>Update Session Customer</DialogTitle>
             <DialogDescription>
               Reassign all booked services in this session to a different customer.
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4">
+          <DialogBody>
             <CustomerSearch
               value={{ id: null, name: null }}
               onChange={(id, name, phone) => {
                 handleUpdateSessionCustomer(id, name, phone);
               }}
             />
-          </div>
-          {isUpdatingSessionCustomer && (
-            <p className="text-sm text-center text-gray-500">Updating...</p>
-          )}
+            {isUpdatingSessionCustomer && (
+              <p className="text-sm text-center text-gray-500 mt-4">Updating...</p>
+            )}
+          </DialogBody>
         </DialogContent>
       </Dialog>
 

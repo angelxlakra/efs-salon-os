@@ -1,28 +1,30 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, Loader2, Edit2, Trash2, Search, User, Wallet, History } from 'lucide-react';
+import { Plus, Loader2, Edit2, Trash2, Search, User, Wallet, History, UserX, Receipt } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useAuthStore } from '@/stores/auth-store';
+import { titleCase } from '@/lib/utils';
 import { apiClient } from '@/lib/api-client';
 import { toast } from 'sonner';
 import { CustomerDialog } from '@/components/customers/customer-dialog';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { CollectPendingPaymentDialog } from '@/components/customers/collect-pending-payment-dialog';
 import { PendingPaymentHistory } from '@/components/customers/pending-payment-history';
+import { CustomerHistoryDialog } from '@/components/customers/customer-history-dialog';
 
 interface Customer {
   id: string;
   first_name: string;
   last_name: string;
-  phone: string;
-  email: string;
+  phone: string | null;
+  email: string | null;
   date_of_birth: string | null;
   gender: string | null;
-  notes: string;
+  notes: string | null;
   total_visits: number;
   total_spent: number; // in paise
   pending_balance: number; // in paise
@@ -37,11 +39,21 @@ export default function CustomersPage() {
 
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [excludeWalkins, setExcludeWalkins] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCustomers, setTotalCustomers] = useState(0);
   const pageSize = 20;
+
+  const [stats, setStats] = useState({
+    total_customers: 0,
+    active_this_month: 0,
+    total_visits: 0,
+    total_revenue: 0,
+    total_pending: 0,
+  });
 
   // Dialog states
   const [customerDialog, setCustomerDialog] = useState<{ open: boolean; customer: Customer | null }>(
@@ -58,10 +70,30 @@ export default function CustomersPage() {
     open: boolean;
     customer: Customer | null;
   }>({ open: false, customer: null });
+  const [visitHistoryDialog, setVisitHistoryDialog] = useState<{
+    open: boolean;
+    customer: Customer | null;
+  }>({ open: false, customer: null });
 
   useEffect(() => {
     fetchCustomers();
-  }, [currentPage, searchQuery]);
+  }, [currentPage, searchQuery, excludeWalkins]);
+
+  // Refresh stats whenever the walkins filter changes (stats are filter-aware)
+  useEffect(() => {
+    fetchStats();
+  }, [excludeWalkins]);
+
+  const fetchStats = async () => {
+    try {
+      const params = new URLSearchParams();
+      if (excludeWalkins) params.append('exclude_walkins', 'true');
+      const { data } = await apiClient.get(`/customers/stats?${params}`);
+      setStats(data);
+    } catch (error: any) {
+      console.error('Failed to load customer stats', error);
+    }
+  };
 
   const fetchCustomers = async () => {
     try {
@@ -75,6 +107,10 @@ export default function CustomersPage() {
         params.append('search', searchQuery);
       }
 
+      if (excludeWalkins) {
+        params.append('exclude_walkins', 'true');
+      }
+
       const { data } = await apiClient.get(`/customers?${params}`);
       setCustomers(data.items || []);
       setTotalPages(data.pages || 1);
@@ -84,6 +120,7 @@ export default function CustomersPage() {
       console.error(error);
     } finally {
       setIsLoading(false);
+      setIsInitialLoad(false);
     }
   };
 
@@ -94,6 +131,7 @@ export default function CustomersPage() {
       await apiClient.delete(`/customers/${deleteDialog.id}`);
       toast.success('Customer deleted successfully');
       fetchCustomers();
+      fetchStats();
       setDeleteDialog({ open: false, id: null });
     } catch (error: any) {
       toast.error(error.response?.data?.detail || 'Failed to delete customer');
@@ -128,7 +166,12 @@ export default function CustomersPage() {
     setCurrentPage(1);
   };
 
-  if (isLoading) {
+  const handleToggleWalkins = () => {
+    setExcludeWalkins((prev) => !prev);
+    setCurrentPage(1);
+  };
+
+  if (isInitialLoad && isLoading) {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="text-center">
@@ -142,9 +185,9 @@ export default function CustomersPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Customers</h1>
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Customers</h1>
           <p className="text-sm text-gray-500 mt-1">
             Manage customer database and track visit history
           </p>
@@ -161,46 +204,32 @@ export default function CustomersPage() {
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <Card>
           <CardHeader className="pb-3">
-            <CardDescription>Total Customers</CardDescription>
-            <CardTitle className="text-3xl">{totalCustomers}</CardTitle>
+            <CardDescription>{excludeWalkins ? 'Registered Customers' : 'Total Customers'}</CardDescription>
+            <CardTitle className="text-3xl">{stats.total_customers}</CardTitle>
           </CardHeader>
         </Card>
         <Card>
           <CardHeader className="pb-3">
             <CardDescription>Active This Month</CardDescription>
-            <CardTitle className="text-3xl">
-              {customers.filter((c) => {
-                if (!c.last_visit_at) return false;
-                const lastVisit = new Date(c.last_visit_at);
-                const now = new Date();
-                const monthAgo = new Date(now.getFullYear(), now.getMonth(), 1);
-                return lastVisit >= monthAgo;
-              }).length}
-            </CardTitle>
+            <CardTitle className="text-3xl">{stats.active_this_month}</CardTitle>
           </CardHeader>
         </Card>
         <Card>
           <CardHeader className="pb-3">
             <CardDescription>Total Visits</CardDescription>
-            <CardTitle className="text-3xl">
-              {customers.reduce((sum, c) => sum + c.total_visits, 0)}
-            </CardTitle>
+            <CardTitle className="text-3xl">{stats.total_visits}</CardTitle>
           </CardHeader>
         </Card>
         <Card>
           <CardHeader className="pb-3">
             <CardDescription>Total Revenue</CardDescription>
-            <CardTitle className="text-3xl">
-              {formatPrice(customers.reduce((sum, c) => sum + c.total_spent, 0))}
-            </CardTitle>
+            <CardTitle className="text-3xl">{formatPrice(stats.total_revenue)}</CardTitle>
           </CardHeader>
         </Card>
         <Card>
           <CardHeader className="pb-3">
             <CardDescription>Pending Balance</CardDescription>
-            <CardTitle className="text-3xl text-red-600">
-              {formatPrice(customers.reduce((sum, c) => sum + (c.pending_balance || 0), 0))}
-            </CardTitle>
+            <CardTitle className="text-3xl text-red-600">{formatPrice(stats.total_pending)}</CardTitle>
           </CardHeader>
         </Card>
       </div>
@@ -208,14 +237,27 @@ export default function CustomersPage() {
       {/* Search */}
       <Card>
         <CardContent className="pt-6">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
-              placeholder="Search by name, phone, or email..."
-              value={searchQuery}
-              onChange={(e) => handleSearchChange(e.target.value)}
-              className="pl-10"
-            />
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Search by name, phone, or email..."
+                value={searchQuery}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <Button
+              variant={excludeWalkins ? 'default' : 'outline'}
+              onClick={handleToggleWalkins}
+              className="shrink-0"
+              title={excludeWalkins ? 'Showing registered customers only' : 'Showing all customers'}
+            >
+              <UserX className="h-4 w-4 mr-2" />
+              <span className="hidden sm:inline">
+                {excludeWalkins ? 'Walk-ins hidden' : 'Hide walk-ins'}
+              </span>
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -226,11 +268,13 @@ export default function CustomersPage() {
           <CardContent className="flex flex-col items-center justify-center py-16">
             <User className="h-12 w-12 text-gray-300 mb-4" />
             <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              {searchQuery ? 'No customers found' : 'No customers yet'}
+              {searchQuery ? 'No customers found' : excludeWalkins ? 'No registered customers found' : 'No customers yet'}
             </h3>
             <p className="text-gray-500 text-center mb-4">
               {searchQuery
                 ? 'Try adjusting your search'
+                : excludeWalkins
+                ? 'All customers in the system are walk-ins'
                 : 'Add your first customer to get started'}
             </p>
             {canEdit && !searchQuery && (
@@ -244,7 +288,82 @@ export default function CustomersPage() {
       ) : (
         <Card>
           <CardContent className="p-0">
-            <div className="overflow-x-auto">
+            {/* Mobile Card View */}
+            <div className="block md:hidden divide-y divide-gray-200">
+              {customers.map((customer) => (
+                <div key={customer.id} className="p-4 space-y-2">
+                  <div className="flex justify-between items-start">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-gray-900 truncate">
+                        {titleCase(customer.first_name)} {titleCase(customer.last_name || '')}
+                      </p>
+                      <p className="text-sm text-gray-500">{formatPhone(customer.phone)}</p>
+                    </div>
+                    <div className="flex items-center gap-1 ml-2">
+                      <Badge variant="secondary" className="text-xs">{customer.total_visits} visits</Badge>
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-gray-500">Spent: <span className="text-gray-900 font-medium">{formatPrice(customer.total_spent)}</span></span>
+                    {customer.pending_balance > 0 ? (
+                      <span className="text-red-600 font-medium">Pending: {formatPrice(customer.pending_balance)}</span>
+                    ) : (
+                      <span className="text-gray-400 text-xs">Last: {formatDate(customer.last_visit_at)}</span>
+                    )}
+                  </div>
+                  {canEdit && (
+                    <div className="flex gap-2 pt-1">
+                      {customer.pending_balance > 0 && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCollectPaymentDialog({ open: true, customer })}
+                          className="text-green-600 border-green-600 hover:bg-green-50 flex-1"
+                        >
+                          <Wallet className="h-3.5 w-3.5 mr-1" />
+                          Collect
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setPaymentHistoryDialog({ open: true, customer })}
+                        title="Payment history"
+                      >
+                        <History className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setVisitHistoryDialog({ open: true, customer })}
+                        title="Visit history"
+                      >
+                        <Receipt className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setCustomerDialog({ open: true, customer })}
+                      >
+                        <Edit2 className="h-3.5 w-3.5" />
+                      </Button>
+                      {isOwner && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setDeleteDialog({ open: true, id: customer.id })}
+                        >
+                          <Trash2 className="h-3.5 w-3.5 text-red-600" />
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop Table View */}
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-gray-50 border-b">
                   <tr>
@@ -279,7 +398,7 @@ export default function CustomersPage() {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div>
                           <div className="text-sm font-medium text-gray-900">
-                            {customer.first_name} {customer.last_name}
+                            {titleCase(customer.first_name)} {titleCase(customer.last_name || '')}
                           </div>
                           {customer.gender && (
                             <div className="text-sm text-gray-500 capitalize">
@@ -318,7 +437,7 @@ export default function CustomersPage() {
                             size="sm"
                             onClick={() => setPaymentHistoryDialog({ open: true, customer })}
                             className="h-6 w-6 p-0"
-                            title="View payment history"
+                            title="Payment history"
                           >
                             <History className="h-3 w-3 text-gray-400" />
                           </Button>
@@ -343,6 +462,16 @@ export default function CustomersPage() {
                                 Collect
                               </Button>
                             )}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() =>
+                                setVisitHistoryDialog({ open: true, customer })
+                              }
+                              title="Visit history"
+                            >
+                              <Receipt className="h-4 w-4" />
+                            </Button>
                             <Button
                               variant="ghost"
                               size="sm"
@@ -374,9 +503,9 @@ export default function CustomersPage() {
 
             {/* Pagination */}
             {totalPages > 1 && (
-              <div className="px-6 py-4 border-t flex items-center justify-between">
+              <div className="px-4 py-3 border-t flex flex-col sm:flex-row items-center justify-between gap-2">
                 <div className="text-sm text-gray-500">
-                  Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, totalCustomers)} of {totalCustomers} customers
+                  Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, totalCustomers)} of {totalCustomers}
                 </div>
                 <div className="flex gap-2">
                   <Button
@@ -387,11 +516,9 @@ export default function CustomersPage() {
                   >
                     Previous
                   </Button>
-                  <div className="flex items-center gap-2 px-3">
-                    <span className="text-sm text-gray-700">
-                      Page {currentPage} of {totalPages}
-                    </span>
-                  </div>
+                  <span className="flex items-center text-sm text-gray-700 px-2">
+                    {currentPage} / {totalPages}
+                  </span>
                   <Button
                     variant="outline"
                     size="sm"
@@ -414,6 +541,7 @@ export default function CustomersPage() {
         onClose={() => setCustomerDialog({ open: false, customer: null })}
         onSuccess={() => {
           fetchCustomers();
+          fetchStats();
           setCustomerDialog({ open: false, customer: null });
         }}
       />
@@ -423,7 +551,7 @@ export default function CustomersPage() {
           open={collectPaymentDialog.open}
           onClose={() => setCollectPaymentDialog({ open: false, customer: null })}
           customerId={collectPaymentDialog.customer.id}
-          customerName={`${collectPaymentDialog.customer.first_name} ${collectPaymentDialog.customer.last_name || ''}`}
+          customerName={`${titleCase(collectPaymentDialog.customer.first_name)} ${titleCase(collectPaymentDialog.customer.last_name || '')}`.trim()}
           pendingBalance={collectPaymentDialog.customer.pending_balance}
           onSuccess={() => {
             fetchCustomers();
@@ -437,7 +565,16 @@ export default function CustomersPage() {
           open={paymentHistoryDialog.open}
           onClose={() => setPaymentHistoryDialog({ open: false, customer: null })}
           customerId={paymentHistoryDialog.customer.id}
-          customerName={`${paymentHistoryDialog.customer.first_name} ${paymentHistoryDialog.customer.last_name || ''}`}
+          customerName={`${titleCase(paymentHistoryDialog.customer.first_name)} ${titleCase(paymentHistoryDialog.customer.last_name || '')}`.trim()}
+        />
+      )}
+
+      {visitHistoryDialog.customer && (
+        <CustomerHistoryDialog
+          open={visitHistoryDialog.open}
+          onClose={() => setVisitHistoryDialog({ open: false, customer: null })}
+          customerId={visitHistoryDialog.customer.id}
+          customerName={`${titleCase(visitHistoryDialog.customer.first_name)} ${titleCase(visitHistoryDialog.customer.last_name || '')}`.trim()}
         />
       )}
 

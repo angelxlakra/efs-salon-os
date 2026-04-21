@@ -238,6 +238,7 @@ def list_purchase_invoices(
     status_filter: Optional[PurchaseStatus] = Query(None, alias="status"),
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
+    search: Optional[str] = None,
     current_user: User = Depends(require_permission("purchases", "read")),
     db: Session = Depends(get_db)
 ):
@@ -252,6 +253,15 @@ def list_purchase_invoices(
         query = query.filter(PurchaseInvoice.invoice_date >= start_date)
     if end_date:
         query = query.filter(PurchaseInvoice.invoice_date <= end_date)
+
+    if search:
+        query = query.join(Supplier, PurchaseInvoice.supplier_id == Supplier.id, isouter=True)
+        query = query.filter(
+            or_(
+                PurchaseInvoice.invoice_number.ilike(f"%{search}%"),
+                Supplier.name.ilike(f"%{search}%"),
+            )
+        )
 
     total = query.count()
     offset = (page - 1) * size

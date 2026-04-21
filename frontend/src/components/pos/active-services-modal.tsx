@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { XCircle, Loader2, User, Clock } from 'lucide-react';
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogHeader,
   DialogTitle,
@@ -138,11 +139,12 @@ export function ActiveServicesModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
+      <DialogContent size="lg">
         <DialogHeader>
           <DialogTitle>Active Services - {customerName}</DialogTitle>
         </DialogHeader>
 
+        <DialogBody>
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
@@ -203,6 +205,7 @@ export function ActiveServicesModal({
             ))}
           </div>
         )}
+        </DialogBody>
       </DialogContent>
     </Dialog>
   );

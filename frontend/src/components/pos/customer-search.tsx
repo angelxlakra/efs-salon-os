@@ -17,7 +17,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { apiClient } from '@/lib/api-client';
-import { cn } from '@/lib/utils';
+import { cn, titleCase } from '@/lib/utils';
 import { CustomerDialog } from '@/components/customers/customer-dialog';
 
 interface Customer {
@@ -78,11 +78,8 @@ export function CustomerSearch({ value, onChange, isOpen, onOpenChange }: Custom
   };
 
   const handleSelect = (customer: Customer) => {
-    console.log('Customer selected:', customer);
-    const fullName = `${customer.first_name} ${customer.last_name}`;
-    console.log('Calling onChange with:', customer.id, fullName, customer.phone);
+    const fullName = `${titleCase(customer.first_name)} ${titleCase(customer.last_name || '')}`.trim();
     onChange(customer.id, fullName, customer.phone);
-    console.log('Setting popover open to false');
     setOpen(false);
   };
 
@@ -163,7 +160,7 @@ export function CustomerSearch({ value, onChange, isOpen, onOpenChange }: Custom
                         />
                         <div className="flex-1 min-w-0">
                           <div className="font-medium truncate">
-                            {customer.first_name} {customer.last_name}
+                            {titleCase(customer.first_name)} {titleCase(customer.last_name || '')}
                           </div>
                           <div className="text-xs text-gray-500">
                             {formatPhone(customer.phone)} • {customer.total_visits} visits
@@ -242,7 +239,7 @@ export function CustomerSearch({ value, onChange, isOpen, onOpenChange }: Custom
         onSuccess={(created) => {
           setShowDialog(false);
           if (created) {
-            const fullName = `${created.first_name} ${created.last_name}`.trim();
+            const fullName = `${titleCase(created.first_name)} ${titleCase(created.last_name || '')}`.trim();
             onChange(created.id, fullName, created.phone);
           } else {
             fetchCustomers(search);

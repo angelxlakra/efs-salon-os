@@ -1,12 +1,19 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { expenseApi } from '@/lib/api/expenses';
+import { apiClient } from '@/lib/api-client';
 import { ExpenseCategory, RecurrenceType, type Expense, type ExpenseCreate } from '@/types/expense';
 import { toast } from 'sonner';
 import { useAuthStore } from '@/stores/auth-store';
+
+interface StaffMember {
+  id: string;
+  display_name: string;
+  is_active: boolean;
+}
 
 interface ExpenseFormProps {
   expense?: Expense | null;
@@ -17,6 +24,11 @@ interface ExpenseFormProps {
 export function ExpenseForm({ expense, onCancel, onSuccess }: ExpenseFormProps) {
   const { user } = useAuthStore();
   const [loading, setLoading] = useState(false);
+  const [staffList, setStaffList] = useState<StaffMember[]>([]);
+  // useRef guard prevents double-submission from rapid Enter presses before
+  // React's async re-render has a chance to disable the submit button.
+  const isSubmitting = useRef(false);
+
   const [formData, setFormData] = useState<Partial<ExpenseCreate>>({
     category: ExpenseCategory.OTHER,
     amount: 0,
@@ -35,6 +47,19 @@ export function ExpenseForm({ expense, onCancel, onSuccess }: ExpenseFormProps) 
     return true;
   });
 
+  // Load staff list for the salary expense staff selector
+  useEffect(() => {
+    const loadStaff = async () => {
+      try {
+        const { data } = await apiClient.get('/staff', { params: { is_active: true, size: 100 } });
+        setStaffList(data.items || data);
+      } catch {
+        // non-fatal: staff list just won't populate
+      }
+    };
+    loadStaff();
+  }, []);
+
   useEffect(() => {
     if (expense) {
       setFormData({
@@ -48,12 +73,16 @@ export function ExpenseForm({ expense, onCancel, onSuccess }: ExpenseFormProps) 
         is_recurring: expense.is_recurring,
         recurrence_type: expense.recurrence_type,
         requires_approval: expense.requires_approval,
+        staff_id: expense.staff_id,
       });
     }
   }, [expense]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Synchronous guard: blocks re-entry before React re-renders with loading=true
+    if (isSubmitting.current) return;
+    isSubmitting.current = true;
     setLoading(true);
 
     try {
@@ -65,13 +94,25 @@ export function ExpenseForm({ expense, onCancel, onSuccess }: ExpenseFormProps) 
         toast.success('Expense created');
       }
       onSuccess();
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Failed to save expense:', error);
-      toast.error('Failed to save expense');
+      // Show the server's validation message when available (e.g. missing staff_id)
+      const axiosError = error as { response?: { data?: { detail?: string | Array<{ msg: string }> } } };
+      const detail = axiosError?.response?.data?.detail;
+      const message =
+        typeof detail === 'string'
+          ? detail
+          : Array.isArray(detail)
+          ? detail.map((d) => d.msg).join('; ')
+          : 'Failed to save expense';
+      toast.error(message);
     } finally {
+      isSubmitting.current = false;
       setLoading(false);
     }
   };
+
+  const isSalary = formData.category === ExpenseCategory.SALARIES;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -80,7 +121,14 @@ export function ExpenseForm({ expense, onCancel, onSuccess }: ExpenseFormProps) 
           <label className="text-sm font-medium block mb-2">Category *</label>
           <Select
             value={formData.category}
-            onValueChange={(value) => setFormData({ ...formData, category: value as ExpenseCategory })}
+            onValueChange={(value) =>
+              setFormData({
+                ...formData,
+                category: value as ExpenseCategory,
+                // Clear staff_id when leaving Salaries category
+                staff_id: value === ExpenseCategory.SALARIES ? formData.staff_id : undefined,
+              })
+            }
           >
             <SelectTrigger>
               <SelectValue />
@@ -106,6 +154,28 @@ export function ExpenseForm({ expense, onCancel, onSuccess }: ExpenseFormProps) 
             required
           />
         </div>
+
+        {/* Staff selector — only shown for Salary expenses */}
+        {isSalary && (
+          <div className="md:col-span-2">
+            <label className="text-sm font-medium block mb-2">Staff Member *</label>
+            <Select
+              value={formData.staff_id ?? ''}
+              onValueChange={(value) => setFormData({ ...formData, staff_id: value })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select staff member" />
+              </SelectTrigger>
+              <SelectContent>
+                {staffList.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>
+                    {s.display_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
 
         <div>
           <label className="text-sm font-medium block mb-2">Date *</label>

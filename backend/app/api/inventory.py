@@ -1,7 +1,9 @@
 from datetime import datetime
 from typing import List, Optional
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 
@@ -11,6 +13,7 @@ from app.models.inventory import (
     SKU, Supplier, InventoryCategory, InventoryChangeRequest, StockLedger,
     ChangeType, ChangeStatus, UOMEnum
 )
+from app.models.inventory_transfer import InventoryTransfer
 from app.models.user import User
 from app.schemas.inventory import (
     SKUCreate, SKUUpdate, SKUResponse, SKUListResponse,
@@ -21,15 +24,46 @@ from app.schemas.inventory import (
 )
 from app.utils import generate_ulid, IST
 
-# Fix for import if dependencies was placed in app/auth
-# The previous step created it in app/auth/dependencies.py
-# But I am importing from app.api.dependencies in the line above. 
-# I should fix the import to point to app.auth.dependencies OR move the file.
-# Given the user context "app/api/catalog.py", they might expect "app/api/dependencies.py".
-# But I created "app/auth/dependencies.py".
-# I will adjust the import below.
-
 from app.auth.dependencies import get_current_user, require_owner, require_owner_or_receptionist
+
+
+# ---------------------------------------------------------------------------
+# Transfer schemas (inline — only used by these 2 endpoints)
+# ---------------------------------------------------------------------------
+
+class TransferInitiateRequest(BaseModel):
+    sku_id: str
+    destination_store_id: str
+    destination_store_name: str
+    quantity: int
+    notes: Optional[str] = None
+
+class TransferResponse(BaseModel):
+    id: str
+    central_transfer_id: Optional[str]
+    direction: str
+    other_store_name: str
+    sku_id: Optional[str]
+    product_name: str
+    product_sku: Optional[str]
+    quantity: int
+    unit_cost_paise: int
+    total_cost_paise: int
+    expense_id: Optional[str]
+    status: str
+    initiated_at: Optional[datetime]
+    applied_at: Optional[datetime]
+    cancelled_at: Optional[datetime]
+    notes: Optional[str]
+
+    class Config:
+        from_attributes = True
+
+class TransferListResponse(BaseModel):
+    transfers: List[TransferResponse]
+    total: int
+    page: int
+    size: int
 
 router = APIRouter(prefix="/inventory", tags=["Inventory"])
 
@@ -396,5 +430,138 @@ def get_sku_ledger(
     ).order_by(
         desc(StockLedger.created_at)
     ).offset(skip).limit(limit).all()
-    
+
     return entries
+
+
+# --- Inventory Transfers ---
+
+@router.get("/transfers/available-stores")
+def get_available_stores(current_user: User = Depends(get_current_user)):
+    """Return list of other stores this store can transfer inventory to.
+
+    When CENTRAL_SYNC_ENABLED=true, fetches live from central API so no
+    manual CENTRAL_OTHER_STORES_JSON config is needed. Falls back to that
+    env var on any error.
+    """
+    import json
+    from app.config import settings
+
+    if settings.central_sync_enabled and settings.central_api_url:
+        try:
+            with httpx.Client(
+                base_url=settings.central_api_url,
+                headers={"X-Store-API-Key": settings.central_api_key},
+                timeout=5.0,
+            ) as client:
+                resp = client.get("/v1/stores/peers")
+                resp.raise_for_status()
+                return resp.json()
+        except Exception:
+            pass  # fall through to env var fallback
+
+    try:
+        return json.loads(settings.central_other_stores_json)
+    except Exception:
+        return []
+
+
+@router.post("/transfers", response_model=TransferResponse, status_code=201)
+def initiate_transfer(
+    request: TransferInitiateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_owner_or_receptionist),
+):
+    """Initiate an outgoing transfer to another store.
+
+    Requires CENTRAL_SYNC_ENABLED=true. Atomically decrements stock,
+    creates a TRANSFER_OUT expense, and posts the transfer to central.
+    """
+    from app.config import settings
+    if not settings.central_sync_enabled:
+        raise HTTPException(
+            status_code=503,
+            detail="Inventory transfers require CENTRAL_SYNC_ENABLED=true",
+        )
+
+    from app.services.inventory_transfer_service import InventoryTransferService
+    service = InventoryTransferService(db)
+    try:
+        transfer = service.initiate_transfer(
+            sku_id=request.sku_id,
+            destination_store_id=request.destination_store_id,
+            destination_store_name=request.destination_store_name,
+            quantity=request.quantity,
+            user_id=current_user.id,
+            notes=request.notes,
+        )
+        return transfer
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Central API error: {exc.response.status_code}",
+        )
+    finally:
+        service.close()
+
+
+@router.get("/transfers", response_model=TransferListResponse)
+def list_transfers(
+    page: int = 1,
+    size: int = 20,
+    direction: Optional[str] = None,  # 'IN' or 'OUT'
+    transfer_status: Optional[str] = Query(None, alias="status"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """List this store's transfer history (both IN and OUT)."""
+    query = db.query(InventoryTransfer)
+
+    if direction:
+        query = query.filter(InventoryTransfer.direction == direction.upper())
+    if transfer_status:
+        query = query.filter(InventoryTransfer.status == transfer_status.upper())
+
+    total = query.count()
+    transfers = (
+        query.order_by(desc(InventoryTransfer.initiated_at))
+        .offset((page - 1) * size)
+        .limit(size)
+        .all()
+    )
+    return TransferListResponse(transfers=transfers, total=total, page=page, size=size)
+
+
+@router.patch("/transfers/{transfer_id}/cancel", response_model=TransferResponse)
+def cancel_transfer(
+    transfer_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_owner_or_receptionist),
+):
+    """Cancel a pending outgoing transfer."""
+    from app.config import settings
+    if not settings.central_sync_enabled:
+        raise HTTPException(
+            status_code=503,
+            detail="Inventory transfers require CENTRAL_SYNC_ENABLED=true",
+        )
+
+    from app.services.inventory_transfer_service import InventoryTransferService
+    service = InventoryTransferService(db)
+    try:
+        transfer = service.cancel_transfer(
+            local_transfer_id=transfer_id,
+            user_id=current_user.id,
+        )
+        return transfer
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Central API error: {exc.response.status_code}",
+        )
+    finally:
+        service.close()

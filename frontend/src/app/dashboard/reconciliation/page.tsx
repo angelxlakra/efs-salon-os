@@ -172,8 +172,8 @@ export default function ReconciliationPage() {
       {/* Date Selector */}
       <Card>
         <CardContent className="p-4">
-          <div className="flex items-center gap-3">
-            <Calendar className="h-5 w-5 text-gray-500" />
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            <Calendar className="h-5 w-5 text-gray-500 hidden sm:block" />
             <div className="flex-1">
               <Label htmlFor="date" className="text-sm font-medium">
                 Reconciliation Date

@@ -459,6 +459,72 @@ def catchup_missing_metrics():
         db.close()
 
 
+def catchup_missing_backup():
+    """Ensure yesterday's backup exists locally and in cloud.
+
+    Runs once on worker startup. Decision matrix:
+      - Local ✅ + Cloud ✅ → nothing to do
+      - Local ✅ + Cloud ❌ → upload existing local file to cloud
+      - Local ❌ + Cloud ✅ → nothing to do (already safe)
+      - Local ❌ + Cloud ❌ → run full pg_dump now
+
+    Note: pg_dump always captures current DB state, not a historical
+    snapshot — but a current-state backup is still far better than none.
+    """
+    from app.services.backup_service import BackupService
+
+    BACKUP_DIR = Path("/backups")
+    now = datetime.now(IST)
+    yesterday = (now - timedelta(days=1)).date()
+    yesterday_str = yesterday.strftime("%Y%m%d")
+    file_prefix = f"{settings.branch_id}_{yesterday_str}_"
+
+    # 1. Find local backup file (may be None)
+    local_file: Path | None = None
+    if BACKUP_DIR.exists():
+        matches = list(BACKUP_DIR.glob(f"{file_prefix}*.dump"))
+        if matches:
+            local_file = matches[0]
+
+    backup_service = BackupService()
+
+    # 2. Check cloud if configured
+    cloud_found = False
+    if backup_service.cloud_enabled:
+        try:
+            s3 = backup_service._get_s3_client()
+            cloud_prefix = f"{settings.branch_id}/backups/{file_prefix}"
+            response = s3.list_objects_v2(
+                Bucket=settings.backup_s3_bucket,
+                Prefix=cloud_prefix,
+            )
+            cloud_found = bool(response.get("Contents"))
+        except Exception as e:
+            logger.warning(f"Could not check cloud for missing backup: {e}")
+
+    # 3. Act based on what we found
+    if local_file and cloud_found:
+        logger.info("✅ Backup catchup: yesterday's backup present locally and in cloud, skipping")
+        return
+
+    if local_file and not cloud_found:
+        logger.warning(
+            f"⚠️ Backup catchup: local backup found but missing from cloud. Uploading {local_file.name}..."
+        )
+        backup_service.upload_to_cloud(local_file)
+        return
+
+    if not local_file and cloud_found:
+        logger.info("✅ Backup catchup: yesterday's backup found in cloud (local missing but safe), skipping")
+        return
+
+    # Neither local nor cloud — run a full backup now
+    logger.warning(
+        f"⚠️ Backup catchup: no backup found for {yesterday}. Running backup now..."
+    )
+    nightly_backup_job()
+
+
 def test_job():
     """Simple test job for development.
 
@@ -468,3 +534,99 @@ def test_job():
     """
     now = datetime.now(IST)
     logger.info(f"🔔 Test job executed at {now.strftime('%H:%M:%S')}")
+
+
+def customer_sync_push_job():
+    """Push pending customers to central. Skip if central sync is disabled."""
+    if not settings.central_sync_enabled:
+        return
+    db = SessionLocal()
+    try:
+        from app.services.central_sync_service import CentralSyncService
+        service = CentralSyncService(db)
+        try:
+            result = service.push_pending_customers()
+            logger.info(f"Customer sync push: {result}")
+        finally:
+            service.close()
+    except Exception as e:
+        logger.error(f"Customer sync push failed: {e}", exc_info=True)
+    finally:
+        db.close()
+
+
+def customer_sync_pull_job():
+    """Pull customer delta from central. Skip if central sync is disabled."""
+    if not settings.central_sync_enabled:
+        return
+    db = SessionLocal()
+    try:
+        from app.services.central_sync_service import CentralSyncService
+        service = CentralSyncService(db)
+        try:
+            result = service.pull_customer_delta()
+            logger.info(f"Customer sync pull: {result}")
+        finally:
+            service.close()
+    except Exception as e:
+        logger.error(f"Customer sync pull failed: {e}", exc_info=True)
+    finally:
+        db.close()
+
+
+def central_heartbeat_job():
+    """Send heartbeat to central every 30 min. Skip if central sync is disabled."""
+    if not settings.central_sync_enabled:
+        return
+    try:
+        from app.services.central_sync_service import CentralSyncService
+        service = CentralSyncService()  # No db session needed for heartbeat
+        try:
+            service.send_heartbeat()
+            logger.info("Heartbeat sent to central")
+        finally:
+            service.close()
+    except Exception as e:
+        logger.error(f"Heartbeat failed: {e}", exc_info=True)
+
+
+def metrics_push_job():
+    """Push today's metrics snapshot to central. Skip if central sync is disabled."""
+    if not settings.central_sync_enabled:
+        return
+    db = SessionLocal()
+    try:
+        from app.services.central_sync_service import CentralSyncService
+        today = datetime.now(IST).date()
+        service = CentralSyncService(db)
+        try:
+            service.push_metrics_snapshot(today)
+            logger.info("Metrics push to central succeeded")
+        finally:
+            service.close()
+    except Exception as e:
+        logger.error(f"Metrics push job failed: {e}", exc_info=True)
+    finally:
+        db.close()
+
+
+def transfer_poll_job():
+    """Poll central for incoming transfers and apply them. Skip if central sync is disabled."""
+    if not settings.central_sync_enabled:
+        return
+    db = SessionLocal()
+    try:
+        from app.services.inventory_transfer_service import InventoryTransferService
+        service = InventoryTransferService(db)
+        try:
+            applied = service.poll_and_apply_incoming()
+            if applied:
+                logger.info(f"Transfer poll: applied {len(applied)} incoming transfer(s)")
+            else:
+                logger.debug("Transfer poll: no new incoming transfers")
+        finally:
+            service.close()
+    except Exception as e:
+        logger.error(f"Transfer poll job failed: {e}", exc_info=True)
+    finally:
+        db.close()

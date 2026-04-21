@@ -2,7 +2,7 @@
 
 from datetime import date, datetime
 from typing import Optional
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, model_validator
 
 from app.models.expense import ExpenseCategory, RecurrenceType, ExpenseStatus
 
@@ -21,23 +21,21 @@ class ExpenseBase(BaseModel):
     staff_id: Optional[str] = None
     requires_approval: bool = False
 
-    @field_validator("recurrence_type")
-    @classmethod
-    def validate_recurrence(cls, v, info):
-        """Validate that recurrence_type is set if is_recurring is True."""
-        if info.data.get("is_recurring") and not v:
-            raise ValueError("recurrence_type required when is_recurring=True")
-        if not info.data.get("is_recurring") and v:
-            raise ValueError("recurrence_type should not be set when is_recurring=False")
-        return v
+    @model_validator(mode="after")
+    def validate_expense_rules(self) -> "ExpenseBase":
+        """Validate cross-field business rules.
 
-    @field_validator("staff_id")
-    @classmethod
-    def validate_staff(cls, v, info):
-        """Validate that staff_id is set for salary expenses."""
-        if info.data.get("category") == ExpenseCategory.SALARIES and not v:
+        Uses model_validator (not field_validator) because Pydantic v2
+        field_validator does NOT run for fields that use their default
+        value — model_validator always runs after all fields are resolved.
+        """
+        if self.category == ExpenseCategory.SALARIES and not self.staff_id:
             raise ValueError("staff_id required for salary expenses")
-        return v
+        if self.is_recurring and not self.recurrence_type:
+            raise ValueError("recurrence_type required when is_recurring=True")
+        if not self.is_recurring and self.recurrence_type:
+            raise ValueError("recurrence_type should not be set when is_recurring=False")
+        return self
 
 
 class ExpenseCreate(ExpenseBase):

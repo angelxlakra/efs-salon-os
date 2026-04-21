@@ -199,7 +199,7 @@ export default function UsersPage() {
                             <UserCog className="h-8 w-8 text-muted-foreground" />
                         </div>
                         <h3 className="text-lg font-semibold text-gray-900">No users found</h3>
-                        <p className="text-muted-foreground max-w-sm mt-2">
+                        <p className="text-muted-foreground max-w-[384px] mt-2">
                             {searchQuery ? `No users matching "${searchQuery}"` : "Get started by adding a new system user."}
                         </p>
                         {!searchQuery && isOwner && (
@@ -210,7 +210,57 @@ export default function UsersPage() {
                         )}
                     </div>
                 ) : (
-                    <div className="overflow-x-auto">
+                    <>
+                    {/* Mobile Card View */}
+                    <div className="block md:hidden divide-y divide-gray-100">
+                        {filteredData.map((u) => (
+                            <div key={u.id} className="p-4 space-y-2">
+                                <div className="flex items-start justify-between gap-2">
+                                    <div className="flex items-center gap-3 min-w-0">
+                                        <Avatar className="h-9 w-9 border border-gray-200 shrink-0">
+                                            <AvatarFallback className="bg-primary/5 text-primary text-xs font-medium">
+                                                {getInitials(u.full_name)}
+                                            </AvatarFallback>
+                                        </Avatar>
+                                        <div className="min-w-0">
+                                            <div className="font-medium text-gray-900 truncate">{u.full_name}</div>
+                                            <div className="text-xs text-muted-foreground">@{u.username}</div>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-1 shrink-0">
+                                        <Badge variant="outline" className="capitalize font-normal text-xs">
+                                            {u.role?.name?.toLowerCase().replace('_', ' ')}
+                                        </Badge>
+                                        <Badge
+                                            variant={u.is_active ? 'default' : 'destructive'}
+                                            className={`font-normal text-xs ${u.is_active ? 'bg-green-50 text-green-700 border-green-200' : ''}`}
+                                        >
+                                            {u.is_active ? 'Active' : 'Inactive'}
+                                        </Badge>
+                                    </div>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <div className="text-sm text-gray-600 flex items-center gap-1.5">
+                                        <Phone className="h-3 w-3 text-gray-400" />
+                                        {u.phone}
+                                    </div>
+                                    {isOwner && (
+                                        <div className="flex gap-1">
+                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-500" onClick={() => setUserDialog({ open: true, user: u })}>
+                                                <Edit2 className="h-3.5 w-3.5" />
+                                            </Button>
+                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-500" onClick={() => setPasswordDialog({ open: true, user: u })}>
+                                                <KeyRound className="h-3.5 w-3.5" />
+                                            </Button>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Desktop Table View */}
+                    <div className="hidden md:block overflow-x-auto">
                         <table className="w-full">
                             <thead className="bg-gray-50/50 border-b">
                                 <tr>
@@ -255,8 +305,8 @@ export default function UsersPage() {
                                             </div>
                                         </td>
                                             <td className="px-6 py-4 whitespace-nowrap">
-                                            <Badge 
-                                                variant={u.is_active ? 'default' : 'destructive'} 
+                                            <Badge
+                                                variant={u.is_active ? 'default' : 'destructive'}
                                                 className={`font-normal ${u.is_active ? 'bg-green-50 text-green-700 hover:bg-green-100 hover:text-green-800 border-green-200' : ''}`}
                                             >
                                                 {u.is_active ? 'Active' : 'Inactive'}
@@ -279,6 +329,7 @@ export default function UsersPage() {
                             </tbody>
                         </table>
                     </div>
+                    </>
                 )}
                 </CardContent>
             </Card>
@@ -298,7 +349,7 @@ export default function UsersPage() {
                             <User className="h-8 w-8 text-muted-foreground" />
                         </div>
                         <h3 className="text-lg font-semibold text-gray-900">No staff profiles found</h3>
-                        <p className="text-muted-foreground max-w-sm mt-2">
+                        <p className="text-muted-foreground max-w-[384px] mt-2">
                              {searchQuery ? `No staff matching "${searchQuery}"` : "Create staff profiles to assign services and appointments."}
                         </p>
                         {!searchQuery && (isOwner || user?.role === 'receptionist') && (
@@ -309,7 +360,59 @@ export default function UsersPage() {
                         )}
                     </div>
                 ) : (
-                    <div className="overflow-x-auto">
+                    <>
+                    {/* Mobile Card View */}
+                    <div className="block md:hidden divide-y divide-gray-100">
+                        {filteredData.map((s) => (
+                            <div key={s.id} className="p-4 space-y-2">
+                                <div className="flex items-start justify-between gap-2">
+                                    <div className="flex items-center gap-3 min-w-0">
+                                        <Avatar className="h-9 w-9 border border-gray-200 shrink-0">
+                                            <AvatarFallback className="bg-purple-50 text-purple-600 text-xs font-medium">
+                                                {getInitials(s.display_name)}
+                                            </AvatarFallback>
+                                        </Avatar>
+                                        <div className="min-w-0">
+                                            <div className="font-medium text-gray-900 truncate">{s.display_name}</div>
+                                            <div className="text-xs text-muted-foreground">
+                                                {s.user ? `@${s.user.username}` : <span className="italic text-gray-400">No account</span>}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-1 shrink-0">
+                                        <Badge
+                                            variant={s.is_active ? 'default' : 'destructive'}
+                                            className={`font-normal text-xs ${s.is_active ? 'bg-green-50 text-green-700 border-green-200' : ''}`}
+                                        >
+                                            {s.is_active ? 'Active' : 'Inactive'}
+                                        </Badge>
+                                        {(isOwner || user?.role === 'receptionist') && (
+                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-500" onClick={() => setStaffDialog({ open: true, staff: s })}>
+                                                <Edit2 className="h-3.5 w-3.5" />
+                                            </Button>
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                    <Badge
+                                        variant="outline"
+                                        className={`font-normal text-xs ${s.is_service_provider ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-gray-50 text-gray-500 border-gray-200'}`}
+                                    >
+                                        {s.is_service_provider ? 'Provider' : 'Non-Provider'}
+                                    </Badge>
+                                    {s.specialization && s.specialization.length > 0 && s.specialization.slice(0, 2).map((spec: string, i: number) => (
+                                        <Badge key={i} variant="secondary" className="text-xs font-normal">{spec}</Badge>
+                                    ))}
+                                    {s.specialization && s.specialization.length > 2 && (
+                                        <Badge variant="outline" className="text-xs text-gray-500">+{s.specialization.length - 2}</Badge>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Desktop Table View */}
+                    <div className="hidden md:block overflow-x-auto">
                         <table className="w-full">
                             <thead className="bg-gray-50/50 border-b">
                                 <tr>
@@ -394,6 +497,7 @@ export default function UsersPage() {
                             </tbody>
                         </table>
                     </div>
+                    </>
                 )}
                 </CardContent>
             </Card>

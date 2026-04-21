@@ -10,6 +10,7 @@ This service provides business logic for:
 
 from datetime import date, datetime, time, timedelta
 from typing import List, Optional, Dict, Tuple
+import pytz
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, or_
 
@@ -260,47 +261,66 @@ class AccountingService:
         if cached_hourly:
             return cached_hourly
 
-        start_of_day = datetime.combine(target_date, time.min)
-        end_of_day = datetime.combine(target_date, time.max)
+        # Use IST-aware boundaries so UTC timestamps in DB are filtered correctly.
+        # IST = UTC+5:30, so midnight IST = 18:30 UTC previous day.
+        start_of_day_ist = IST.localize(datetime.combine(target_date, time.min))
+        end_of_day_ist = IST.localize(datetime.combine(target_date, time.max))
+        start_utc = start_of_day_ist.astimezone(pytz.UTC).replace(tzinfo=None)
+        end_utc = end_of_day_ist.astimezone(pytz.UTC).replace(tzinfo=None)
 
-        # Query bills grouped by hour
-        from sqlalchemy import extract
+        # Extract hour in IST by converting the UTC-stored timestamp via AT TIME ZONE.
+        from sqlalchemy import extract, func as sqlfunc, text
+        ist_bill_hour = extract(
+            'hour',
+            func.timezone('Asia/Kolkata', Bill.created_at)
+        ).label('hour')
+        ist_appt_hour = extract(
+            'hour',
+            func.timezone('Asia/Kolkata', Appointment.completed_at)
+        ).label('hour')
+
+        # Query bills grouped by IST hour
         hourly_bills = self.db.query(
-            extract('hour', Bill.created_at).label('hour'),
+            ist_bill_hour,
             func.count(Bill.id).label('bills_count'),
             func.sum(Bill.rounded_total).label('revenue_paise')
         ).filter(
-            Bill.created_at >= start_of_day,
-            Bill.created_at <= end_of_day,
+            Bill.created_at >= start_utc,
+            Bill.created_at <= end_utc,
             Bill.status == BillStatus.POSTED
-        ).group_by(extract('hour', Bill.created_at)).all()
+        ).group_by(ist_bill_hour).all()
 
-        # Query appointments grouped by hour (based on completed_at)
+        # Query appointments grouped by IST hour (based on completed_at)
         hourly_services = self.db.query(
-            extract('hour', Appointment.completed_at).label('hour'),
+            ist_appt_hour,
             func.count(Appointment.id).label('services_count')
         ).filter(
-            Appointment.completed_at >= start_of_day,
-            Appointment.completed_at <= end_of_day,
+            Appointment.completed_at >= start_utc,
+            Appointment.completed_at <= end_utc,
             Appointment.status == AppointmentStatus.COMPLETED
-        ).group_by(extract('hour', Appointment.completed_at)).all()
+        ).group_by(ist_appt_hour).all()
 
         # Create lookup dictionaries
         bills_by_hour = {int(row.hour): (row.bills_count, row.revenue_paise or 0) for row in hourly_bills}
         services_by_hour = {int(row.hour): row.services_count for row in hourly_services}
 
-        # Build full 24-hour breakdown
+        # Build salon-hours breakdown (10:00–23:00 covers any realistic closing time)
+        SALON_OPEN_HOUR = 10
         hourly_data = []
-        peak_hour = 0
+        peak_hour = SALON_OPEN_HOUR
         peak_revenue = 0
 
-        for hour in range(24):
+        for hour in range(SALON_OPEN_HOUR, 24):
             bills_count, revenue_paise = bills_by_hour.get(hour, (0, 0))
             services_count = services_by_hour.get(hour, 0)
 
-            # Format hour label
-            next_hour = (hour + 1) % 24
-            hour_label = f"{hour:02d}:00 - {next_hour:02d}:00"
+            # Format hour label (12-hour AM/PM for readability)
+            ampm = "AM" if hour < 12 else "PM"
+            h12 = hour if hour <= 12 else hour - 12
+            next_h = hour + 1
+            next_ampm = "AM" if next_h < 12 else "PM"
+            next_h12 = next_h if next_h <= 12 else next_h - 12
+            hour_label = f"{h12}:00 {ampm} – {next_h12}:00 {next_ampm}"
 
             hourly_data.append({
                 "hour": hour,

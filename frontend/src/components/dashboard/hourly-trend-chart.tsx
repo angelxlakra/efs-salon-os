@@ -8,6 +8,7 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
+  ReferenceLine,
 } from 'recharts';
 
 interface HourlyData {
@@ -23,43 +24,63 @@ interface HourlyTrendChartProps {
   peakHour?: number;
 }
 
-export function HourlyTrendChart({ data, peakHour }: HourlyTrendChartProps) {
-  const formatRevenue = (value: number) => {
-    return `₹${(value / 100).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
-  };
+const SALON_OPEN_HOUR = 10;
 
-  const formatHour = (hour: number) => {
-    return `${hour.toString().padStart(2, '0')}:00`;
-  };
+function formatHour12(hour: number): string {
+  const ampm = hour < 12 ? 'AM' : 'PM';
+  const h = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+  return `${h}${ampm}`;
+}
+
+export function HourlyTrendChart({ data, peakHour }: HourlyTrendChartProps) {
+  const formatRevenue = (value: number) =>
+    `₹${(value / 100).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
+
+  // Current local hour — trim future hours so the chart only shows up to now
+  const currentHour = new Date().getHours();
+
+  // Backend already trims to 10–23; additionally cut off future hours for today.
+  // We keep past-day data fully visible. If no data past SALON_OPEN_HOUR exists
+  // and it's a past date, show all returned hours.
+  const hasAnyRevenue = data.some(d => d.revenue_paise > 0);
+  const visibleData = data.filter(d => {
+    if (d.hour < SALON_OPEN_HOUR) return false;
+    // Only trim future hours if today has data or it's clearly today
+    // (i.e. currentHour is within the chart range)
+    if (currentHour >= SALON_OPEN_HOUR && d.hour > currentHour) return false;
+    return true;
+  });
+
+  const displayData = visibleData.length > 0 ? visibleData : data;
 
   const CustomTooltip = ({ active, payload }: any) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload;
-      return (
-        <div className="bg-white p-3 rounded-lg shadow-lg border border-gray-200">
-          <p className="text-xs font-semibold text-gray-900 mb-1">{data.hour_label}</p>
-          <div className="space-y-0.5">
-            <p className="text-xs text-gray-600">
-              Revenue: <span className="font-medium text-green-600">{formatRevenue(data.revenue_paise)}</span>
-            </p>
-            <p className="text-xs text-gray-600">
-              Bills: <span className="font-medium">{data.bills_count}</span>
-            </p>
-            <p className="text-xs text-gray-600">
-              Services: <span className="font-medium">{data.services_count}</span>
-            </p>
-          </div>
+    if (!active || !payload?.length) return null;
+    const d = payload[0].payload;
+    return (
+      <div className="bg-white p-3 rounded-lg shadow-lg border border-gray-200">
+        <p className="text-xs font-semibold text-gray-900 mb-1">{d.hour_label}</p>
+        <div className="space-y-0.5">
+          <p className="text-xs text-gray-600">
+            Revenue: <span className="font-medium text-green-600">{formatRevenue(d.revenue_paise)}</span>
+          </p>
+          <p className="text-xs text-gray-600">
+            Bills: <span className="font-medium">{d.bills_count}</span>
+          </p>
+          <p className="text-xs text-gray-600">
+            Services: <span className="font-medium">{d.services_count}</span>
+          </p>
         </div>
-      );
-    }
-    return null;
+      </div>
+    );
   };
+
+  const peakHourInView = peakHour !== undefined && displayData.some(d => d.hour === peakHour);
 
   return (
     <div className="w-full h-64">
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart
-          data={data}
+          data={displayData}
           margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
         >
           <defs>
@@ -71,10 +92,10 @@ export function HourlyTrendChart({ data, peakHour }: HourlyTrendChartProps) {
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
           <XAxis
             dataKey="hour"
-            tickFormatter={formatHour}
+            tickFormatter={formatHour12}
             tick={{ fontSize: 11, fill: '#6b7280' }}
             stroke="#9ca3af"
-            interval={2}
+            interval={1}
           />
           <YAxis
             tickFormatter={(value) => `₹${Math.round(value / 100)}`}
@@ -83,6 +104,15 @@ export function HourlyTrendChart({ data, peakHour }: HourlyTrendChartProps) {
             width={50}
           />
           <Tooltip content={<CustomTooltip />} />
+          {/* Peak hour reference line */}
+          {peakHourInView && (
+            <ReferenceLine
+              x={peakHour}
+              stroke="#f59e0b"
+              strokeDasharray="4 2"
+              label={{ value: 'Peak', position: 'top', fontSize: 10, fill: '#f59e0b' }}
+            />
+          )}
           <Area
             type="monotone"
             dataKey="revenue_paise"
@@ -92,10 +122,10 @@ export function HourlyTrendChart({ data, peakHour }: HourlyTrendChartProps) {
           />
         </AreaChart>
       </ResponsiveContainer>
-      {peakHour !== undefined && (
+      {peakHourInView && (
         <div className="mt-2 text-center">
           <p className="text-xs text-gray-500">
-            Peak hour: <span className="font-semibold text-gray-900">{formatHour(peakHour)}</span>
+            Peak hour: <span className="font-semibold text-gray-900">{formatHour12(peakHour!)}</span>
           </p>
         </div>
       )}

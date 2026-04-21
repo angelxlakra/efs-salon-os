@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shell Design v2</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0d0d0d; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #fff; min-height: 100vh; padding: 24px; }
+
+  .page-title { font-size: 13px; color: #666; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 20px; }
+  .version-badge { display:inline-block; background:#1a0f2e; color:#a78bfa; font-size:10px; font-weight:700; padding:3px 8px; border-radius:4px; margin-left:10px; vertical-align:middle; }
+
+  .app-frame {
+    display: flex;
+    height: 680px;
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1px solid #1f1f1f;
+    box-shadow: 0 32px 80px rgba(0,0,0,0.8);
+  }
+
+  /* Sidebar */
+  .sidebar {
+    width: 216px;
+    background: #0a0a0a;
+    border-right: 1px solid #1a1a1a;
+    display: flex; flex-direction: column; flex-shrink: 0;
+  }
+  .sidebar-header {
+    padding: 18px 14px 14px;
+    border-bottom: 1px solid #1a1a1a;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .sidebar-logo { width:30px;height:30px;background:#fff;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;color:#000;flex-shrink:0; }
+  .sidebar-brand-name { font-size:12px;font-weight:700;color:#fff; }
+  .sidebar-brand-sub { font-size:10px;color:#444;margin-top:1px; }
+
+  .sidebar-nav { flex:1;padding:8px 6px;overflow-y:auto;display:flex;flex-direction:column;gap:1px; }
+  .nav-item { display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:7px;font-size:12px;font-weight:500;color:#666;cursor:default; }
+  .nav-item:hover { background:#141414;color:#aaa; }
+  .nav-item.active { background:#1a0f2e;color:#e9d5ff;font-weight:600;border-left:2px solid #7c3aed;padding-left:8px; }
+  .ico { width:14px;height:14px;border-radius:3px;flex-shrink:0; }
+
+  .sidebar-footer { padding:10px 6px;border-top:1px solid #1a1a1a; }
+  .user-row { display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:8px;cursor:default; }
+  .avatar { width:28px;height:28px;border-radius:7px;background:linear-gradient(135deg,#7c3aed,#4f46e5);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;flex-shrink:0; }
+  .user-name { font-size:11px;font-weight:600;color:#bbb; }
+  .user-role { font-size:10px;color:#444; }
+  .theme-dots-mini { display:flex;gap:3px;margin-left:auto; }
+  .tdot { width:7px;height:7px;border-radius:50%; }
+
+  /* Main */
+  .main { flex:1;display:flex;flex-direction:column;background:#111;min-width:0; }
+  .topbar { height:46px;background:#0f0f0f;border-bottom:1px solid #1a1a1a;display:flex;align-items:center;justify-content:space-between;padding:0 18px;flex-shrink:0; }
+  .hbg { display:flex;flex-direction:column;gap:3px;cursor:default; }
+  .hl { width:15px;height:1.5px;background:#555;border-radius:2px; }
+  .date-pill { background:#161616;color:#555;font-size:10px;font-weight:600;padding:4px 10px;border-radius:20px;border:1px solid #222; }
+
+  .content { flex:1;padding:18px;overflow-y:auto;display:flex;flex-direction:column;gap:14px; }
+
+  .page-hdr { display:flex;align-items:flex-start;justify-content:space-between; }
+  .page-h { font-size:18px;font-weight:800;color:#fff;letter-spacing:-0.5px; }
+  .page-s { font-size:10px;color:#444;margin-top:3px; }
+  .primary-btn { background:#7c3aed;color:#fff;border:none;padding:7px 14px;border-radius:8px;font-size:10px;font-weight:700;letter-spacing:0.5px;cursor:default;box-shadow:0 4px 12px rgba(124,58,237,0.3); }
+
+  /* Stats row */
+  .stat-row { display:grid;grid-template-columns:repeat(4,1fr);gap:8px; }
+  .sc { background:#161616;border:1px solid #1f1f1f;border-radius:10px;padding:12px;position:relative;overflow:hidden; }
+  .sc:first-child { border-top:2px solid #7c3aed; }
+  .sl { font-size:9px;text-transform:uppercase;letter-spacing:1.5px;color:#444;font-weight:600; }
+  .sv { font-size:20px;font-weight:800;color:#fff;margin-top:4px;letter-spacing:-0.5px;line-height:1; }
+  .sd { font-size:9px;color:#22c55e;margin-top:4px; }
+  .sd.neutral { color:#444; }
+
+  /* Two-column layout */
+  .two-col { display:grid;grid-template-columns:1fr 1fr;gap:12px;flex:1; }
+
+  /* Active customers card */
+  .card { background:#161616;border:1px solid #1f1f1f;border-radius:12px;overflow:hidden;display:flex;flex-direction:column; }
+  .card-hdr { padding:12px 14px;border-bottom:1px solid #1a1a1a;display:flex;align-items:center;justify-content:space-between; }
+  .card-title { font-size:11px;font-weight:700;color:#bbb; }
+  .cnt-badge { background:#1e1e1e;color:#555;font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;border:1px solid #2a2a2a; }
+  .card-body { padding:10px;display:flex;flex-direction:column;gap:8px;flex:1;overflow-y:auto; }
+
+  /* Customer card */
+  .cust-card { background:#1a1a1a;border:1px solid #222;border-radius:10px;overflow:hidden; }
+  .cust-card-hdr { padding:9px 11px 7px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #1f1f1f; }
+  .cavatar { width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,#1a0f2e,#2d1f4e);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#a78bfa;flex-shrink:0; }
+  .cname { font-size:11px;font-weight:700;color:#e2e8f0; }
+  .cphone { font-size:9px;color:#444;margin-top:1px; }
+  .time-badge { background:#1f1f1f;color:#666;font-size:9px;font-weight:600;padding:2px 6px;border-radius:20px;border:1px solid #2a2a2a;margin-left:auto;white-space:nowrap; }
+
+  /* Service rows */
+  .svc-rows { padding:7px 11px;display:flex;flex-direction:column;gap:5px; }
+  .svc-row { display:flex;align-items:center;gap:6px; }
+  .status-dot { width:8px;height:8px;border-radius:50%;flex-shrink:0; }
+  .sd-checkin { background:#3b82f6; }
+  .sd-progress { background:#f59e0b;animation:pulse 1.5s infinite; }
+  .sd-done { background:#22c55e; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+  .svc-name { font-size:10px;font-weight:600;color:#ccc;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+  .svc-staff { font-size:9px;color:#444; }
+  .action-btn { width:20px;height:20px;border-radius:5px;border:1px solid #2a2a2a;background:#222;display:flex;align-items:center;justify-content:center;cursor:default;flex-shrink:0; }
+  .action-btn:hover { background:#2a2a2a; }
+  .play-ico { width:0;height:0;border-style:solid;border-width:4px 0 4px 7px;border-color:transparent transparent transparent #a78bfa;margin-left:1px; }
+  .check-ico { font-size:9px;color:#4ade80;font-weight:900; }
+
+  /* Total + checkout */
+  .cust-footer { padding:7px 11px;border-top:1px solid #1f1f1f;display:flex;align-items:center;justify-content:space-between;gap:8px; }
+  .total-label { font-size:9px;color:#444; }
+  .total-val { font-size:11px;font-weight:700;color:#e2e8f0; }
+  .checkout-btn { background:#7c3aed;color:#fff;border:none;border-radius:6px;font-size:9px;font-weight:700;padding:5px 10px;letter-spacing:0.5px;cursor:default;white-space:nowrap; }
+  .checkout-btn.dim { background:#1e1e1e;color:#666;border:1px solid #2a2a2a; }
+
+  /* Goals mini card */
+  .goals-card { background:#161616;border:1px solid #1f1f1f;border-radius:12px;padding:14px; }
+  .goals-title { font-size:11px;font-weight:700;color:#bbb;margin-bottom:12px; }
+  .goal-row { margin-bottom:10px; }
+  .goal-labels { display:flex;justify-content:space-between;align-items:center;margin-bottom:5px; }
+  .goal-name { font-size:10px;color:#666; }
+  .goal-pct { font-size:10px;font-weight:700;color:#a78bfa; }
+  .progress-track { height:4px;background:#1f1f1f;border-radius:2px;overflow:hidden; }
+  .progress-fill { height:100%;border-radius:2px;background:linear-gradient(90deg,#7c3aed,#a78bfa); }
+
+  /* Quick actions */
+  .qa-card { background:#161616;border:1px solid #1f1f1f;border-radius:12px;overflow:hidden; }
+  .qa-item { display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid #1a1a1a;cursor:default; }
+  .qa-item:last-child { border-bottom:none; }
+  .qa-item:hover { background:#1a1a1a; }
+  .qa-ico { width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0; }
+  .qa-label { font-size:11px;font-weight:600;color:#bbb;flex:1; }
+  .qa-arrow { font-size:12px;color:#333; }
+</style>
+</head>
+<body>
+
+<p class="page-title">Section 1 of 3 — Shell Design <span class="version-badge">v2 — accurate card</span></p>
+
+<div class="app-frame">
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo">S</div>
+      <div>
+        <div class="sidebar-brand-name">EFS Salon</div>
+        <div class="sidebar-brand-sub">Management</div>
+      </div>
+    </div>
+    <div class="sidebar-nav">
+      <div class="nav-item active"><div class="ico" style="background:#7c3aed;"></div>Dashboard</div>
+      <div class="nav-item"><div class="ico" style="background:#333;"></div>Point of Sale</div>
+      <div class="nav-item"><div class="ico" style="background:#333;"></div>Bills</div>
+      <div class="nav-item"><div class="ico" style="background:#333;"></div>Cash Drawer</div>
+      <div class="nav-item"><div class="ico" style="background:#333;"></div>EOD Reconciliation</div>
+      <div class="nav-item"><div class="ico" style="background:#333;"></div>Inventory</div>
+      <div class="nav-item"><div class="ico" style="background:#333;"></div>Purchases</div>
+      <div class="nav-item"><div class="ico" style="background:#333;"></div>Services</div>
+      <div class="nav-item"><div class="ico" style="background:#333;"></div>Customers</div>
+      <div class="nav-item"><div class="ico" style="background:#333;"></div>Attendance</div>
+      <div class="nav-item"><div class="ico" style="background:#333;"></div>Expenses</div>
+      <div class="nav-item"><div class="ico" style="background:#333;"></div>Reports</div>
+      <div class="nav-item"><div class="ico" style="background:#333;"></div>Profit &amp; Loss</div>
+      <div class="nav-item"><div class="ico" style="background:#333;"></div>Users &amp; Staff</div>
+      <div class="nav-item"><div class="ico" style="background:#333;"></div>Settings</div>
+    </div>
+    <div class="sidebar-footer">
+      <div class="user-row">
+        <div class="avatar">A</div>
+        <div>
+          <div class="user-name">Angel Lakra</div>
+          <div class="user-role">Owner</div>
+        </div>
+        <div class="theme-dots-mini">
+          <div class="tdot" style="background:#7c3aed;box-shadow:0 0 0 1.5px #0a0a0a,0 0 0 2.5px #7c3aed;"></div>
+          <div class="tdot" style="background:#e11d48;"></div>
+          <div class="tdot" style="background:#d97706;"></div>
+          <div class="tdot" style="background:#0d9488;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div class="hbg"><div class="hl"></div><div class="hl"></div><div class="hl"></div></div>
+        <span style="font-size:11px;color:#333;">Dashboard</span>
+      </div>
+      <div class="date-pill">Wed, 16 Apr 2026</div>
+    </div>
+
+    <div class="content">
+      <!-- Page header -->
+      <div class="page-hdr">
+        <div>
+          <div class="page-h">Dashboard</div>
+          <div class="page-s">Live overview · refreshes every 10s</div>
+        </div>
+        <button class="primary-btn">+ New Bill</button>
+      </div>
+
+      <!-- Stats -->
+      <div class="stat-row">
+        <div class="sc"><div class="sl">Revenue</div><div class="sv">₹18,420</div><div class="sd">↑ 12% vs yesterday</div></div>
+        <div class="sc"><div class="sl">Customers</div><div class="sv">42</div><div class="sd">↑ 5% vs yesterday</div></div>
+        <div class="sc"><div class="sl">Active Now</div><div class="sv">6</div><div class="sd neutral">In salon</div></div>
+        <div class="sc"><div class="sl">Pending Bills</div><div class="sv">3</div><div class="sd neutral">Not billed</div></div>
+      </div>
+
+      <!-- Two-column content -->
+      <div class="two-col">
+        <!-- Active customers -->
+        <div class="card">
+          <div class="card-hdr">
+            <div class="card-title">Active Customers</div>
+            <div class="cnt-badge">6 Active</div>
+          </div>
+          <div class="card-body">
+
+            <!-- Customer 1: has checked_in service (show ▶ Start) -->
+            <div class="cust-card">
+              <div class="cust-card-hdr">
+                <div class="cavatar">P</div>
+                <div>
+                  <div class="cname">Priya Sharma</div>
+                  <div class="cphone">+91 98765 43210</div>
+                </div>
+                <div class="time-badge">⏱ 24m</div>
+              </div>
+              <div class="svc-rows">
+                <div class="svc-row">
+                  <div class="status-dot sd-checkin"></div>
+                  <span class="svc-name">Haircut</span>
+                  <span class="svc-staff">· Riya</span>
+                  <div class="action-btn" title="Start service"><div class="play-ico"></div></div>
+                </div>
+                <div class="svc-row">
+                  <div class="status-dot sd-progress"></div>
+                  <span class="svc-name">Eyebrow Threading</span>
+                  <span class="svc-staff">· Sneha</span>
+                  <div class="action-btn" title="Complete service"><span class="check-ico">✓</span></div>
+                </div>
+              </div>
+              <div class="cust-footer">
+                <div><div class="total-label">Total</div><div class="total-val">₹650.00</div></div>
+                <button class="checkout-btn dim">Go to Checkout</button>
+              </div>
+            </div>
+
+            <!-- Customer 2: all completed, ready to checkout -->
+            <div class="cust-card">
+              <div class="cust-card-hdr">
+                <div class="cavatar">A</div>
+                <div>
+                  <div class="cname">Arjun Mehta</div>
+                  <div class="cphone">+91 87654 32109</div>
+                </div>
+                <div class="time-badge">⏱ 41m</div>
+              </div>
+              <div class="svc-rows">
+                <div class="svc-row">
+                  <div class="status-dot sd-done"></div>
+                  <span class="svc-name">Facial</span>
+                  <span class="svc-staff">· Sneha</span>
+                </div>
+                <div class="svc-row">
+                  <div class="status-dot sd-done"></div>
+                  <span class="svc-name">Head Massage</span>
+                  <span class="svc-staff">· Riya</span>
+                </div>
+              </div>
+              <div class="cust-footer">
+                <div><div class="total-label">Total</div><div class="total-val">₹1,200.00</div></div>
+                <button class="checkout-btn">Checkout</button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Right column: Goals + Quick Actions -->
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <!-- Daily Goals -->
+          <div class="goals-card">
+            <div class="goals-title">Daily Goals</div>
+            <div class="goal-row">
+              <div class="goal-labels">
+                <span class="goal-name">Revenue · ₹18,420 / ₹20,000</span>
+                <span class="goal-pct">92%</span>
+              </div>
+              <div class="progress-track"><div class="progress-fill" style="width:92%;"></div></div>
+            </div>
+            <div class="goal-row">
+              <div class="goal-labels">
+                <span class="goal-name">Services · 21 / 25</span>
+                <span class="goal-pct">84%</span>
+              </div>
+              <div class="progress-track"><div class="progress-fill" style="width:84%;"></div></div>
+            </div>
+            <div style="margin-top:10px;padding-top:8px;border-top:1px solid #1f1f1f;display:flex;justify-content:space-between;">
+              <span style="font-size:10px;color:#555;">Avg. bill value</span>
+              <span style="font-size:10px;font-weight:700;color:#bbb;">₹439</span>
+            </div>
+          </div>
+
+          <!-- Quick Actions -->
+          <div class="qa-card">
+            <div class="card-hdr" style="padding:10px 14px;">
+              <div class="card-title">Quick Actions</div>
+            </div>
+            <div class="qa-item">
+              <div class="qa-ico" style="background:#14091f;"><div style="width:12px;height:12px;background:#7c3aed;border-radius:3px;"></div></div>
+              <span class="qa-label">New Bill</span>
+              <span class="qa-arrow">›</span>
+            </div>
+            <div class="qa-item">
+              <div class="qa-ico" style="background:#0a1628;"><div style="width:12px;height:12px;background:#3b82f6;border-radius:3px;"></div></div>
+              <span class="qa-label">Add Customer</span>
+              <span class="qa-arrow">›</span>
+            </div>
+            <div class="qa-item">
+              <div class="qa-ico" style="background:#0a1a0a;"><div style="width:12px;height:12px;background:#22c55e;border-radius:3px;"></div></div>
+              <span class="qa-label">Manage Services</span>
+              <span class="qa-arrow">›</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div style="margin-top:20px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+  <div style="background:#141414;border:1px solid #222;border-radius:10px;padding:12px 14px;">
+    <div style="font-size:11px;font-weight:700;color:#bbb;margin-bottom:4px;">Active Customer Card</div>
+    <div style="font-size:10px;color:#555;line-height:1.5;">Per-service rows with status dots (<span style="color:#3b82f6;">●</span> checked-in, <span style="color:#f59e0b;">●</span> in-progress, <span style="color:#22c55e;">●</span> done). Inline ▶ Start / ✓ Complete buttons. Total amount + full-width Checkout at bottom. Checkout is dimmed until all services complete.</div>
+  </div>
+  <div style="background:#141414;border:1px solid #222;border-radius:10px;padding:12px 14px;">
+    <div style="font-size:11px;font-weight:700;color:#bbb;margin-bottom:4px;">Surface Depth</div>
+    <div style="font-size:10px;color:#555;line-height:1.5;">Page <code style="color:#666;">#111</code> → Card <code style="color:#666;">#161616</code> → Inner row <code style="color:#666;">#1a1a1a</code> → Hover <code style="color:#666;">#1f1f1f</code>. Each level reads as a distinct layer without heavy borders or shadows.</div>
+  </div>
+  <div style="background:#141414;border:1px solid #222;border-radius:10px;padding:12px 14px;">
+    <div style="font-size:11px;font-weight:700;color:#bbb;margin-bottom:4px;">Not shown here</div>
+    <div style="font-size:10px;color:#555;line-height:1.5;">Section 2 will show the POS page redesign. Section 3 will show mobile breakpoints (the 65+ audit fixes). Design doc and token spec will be written after your approval.</div>
+  </div>
+</div>
+
+</body>
+</html>

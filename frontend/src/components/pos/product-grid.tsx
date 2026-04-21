@@ -118,7 +118,7 @@ export function ProductGrid({ onProductAdded }: ProductGridProps) {
           />
         </div>
         <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-          <SelectTrigger className="w-[200px]">
+          <SelectTrigger className="w-full sm:w-[200px]">
             <SelectValue placeholder="All Categories" />
           </SelectTrigger>
           <SelectContent>

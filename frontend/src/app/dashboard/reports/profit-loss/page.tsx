@@ -50,7 +50,7 @@ export default function ProfitLossPage() {
       {/* Date Range Selector */}
       <Card>
         <CardContent className="pt-6">
-          <div className="flex gap-4 items-end">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 sm:items-end">
             <div className="flex-1">
               <label className="text-sm font-medium block mb-2">Start Date</label>
               <Input
@@ -67,7 +67,7 @@ export default function ProfitLossPage() {
                 onChange={(e) => setEndDate(e.target.value)}
               />
             </div>
-            <Button onClick={loadReport} disabled={loading}>
+            <Button onClick={loadReport} disabled={loading} className="w-full sm:w-auto">
               {loading ? 'Loading...' : 'Generate Report'}
             </Button>
           </div>
@@ -219,8 +219,8 @@ export default function ProfitLossPage() {
             </CardHeader>
             <CardContent className="space-y-3">
               {Object.entries(report.operating_expenses.by_category).map(([category, amount]) => (
-                <div key={category} className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">
+                <div key={category} className="flex justify-between gap-2">
+                  <span className="text-sm text-muted-foreground truncate">
                     {category.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
                   </span>
                   <span className="font-medium">{formatCurrency(amount)}</span>

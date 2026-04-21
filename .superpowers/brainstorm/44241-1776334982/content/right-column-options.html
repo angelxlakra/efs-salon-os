@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Right Column Options</title>
+<style>
+  * { margin:0;padding:0;box-sizing:border-box; }
+  body { background:#0d0d0d;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#fff;padding:24px; }
+  .page-title { font-size:13px;color:#666;text-transform:uppercase;letter-spacing:2px;margin-bottom:6px; }
+  .page-sub { font-size:11px;color:#444;margin-bottom:24px; }
+
+  /* Selection frame */
+  .options-row { display:grid;grid-template-columns:repeat(3,1fr);gap:16px; }
+  .opt { border:2px solid #1f1f1f;border-radius:14px;overflow:hidden;cursor:default;transition:border-color 0.15s; }
+  .opt:hover { border-color:#7c3aed44; }
+  .opt.selected { border-color:#7c3aed; }
+  .opt-label { padding:14px 16px 10px;border-bottom:1px solid #1f1f1f;display:flex;align-items:center;justify-content:space-between; }
+  .opt-title { font-size:12px;font-weight:700;color:#bbb; }
+  .opt-letter { background:#1a0f2e;color:#a78bfa;font-size:10px;font-weight:800;width:20px;height:20px;border-radius:5px;display:flex;align-items:center;justify-content:center; }
+  .opt-body { padding:14px;background:#111;min-height:320px; }
+  .opt-desc { padding:12px 14px;background:#0f0f0f;border-top:1px solid #1a1a1a; }
+  .opt-desc p { font-size:10px;color:#555;line-height:1.6; }
+
+  /* Shared dark card styles */
+  .card { background:#161616;border:1px solid #1f1f1f;border-radius:10px;overflow:hidden; }
+  .card-hdr { padding:10px 12px;border-bottom:1px solid #1a1a1a;display:flex;align-items:center;justify-content:space-between; }
+  .card-title { font-size:11px;font-weight:700;color:#bbb; }
+  .card-body { padding:10px;display:flex;flex-direction:column;gap:7px; }
+
+  /* ── OPTION A: Staff Availability ── */
+  .staff-row { display:flex;align-items:center;gap:8px;padding:7px 10px;background:#1a1a1a;border-radius:8px;border:1px solid #222; }
+  .s-avatar { width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0; }
+  .s-name { font-size:10px;font-weight:600;color:#ccc;flex:1; }
+  .s-service { font-size:9px;color:#555;margin-top:1px; }
+  .s-badge { font-size:8px;font-weight:700;padding:2px 7px;border-radius:20px;white-space:nowrap;flex-shrink:0; }
+  .badge-free { background:#052e16;color:#4ade80;border:1px solid #166534; }
+  .badge-busy { background:#1c1000;color:#fbbf24;border:1px solid #854d0e; }
+  .badge-break { background:#1a1a1a;color:#555;border:1px solid #2a2a2a; }
+  .s-timer { font-size:8px;color:#555;margin-left:4px; }
+
+  /* ── OPTION B: Top Services Today ── */
+  .svc-bar-row { display:flex;align-items:center;gap:8px; }
+  .svc-bar-name { font-size:10px;color:#888;width:80px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+  .bar-track { flex:1;height:5px;background:#1f1f1f;border-radius:3px;overflow:hidden; }
+  .bar-fill { height:100%;border-radius:3px; }
+  .svc-bar-count { font-size:9px;color:#555;width:18px;text-align:right;flex-shrink:0; }
+  .svc-bar-rev { font-size:9px;font-weight:700;color:#bbb;width:50px;text-align:right;flex-shrink:0; }
+
+  /* ── OPTION C: Recent Bills ── */
+  .bill-row { display:flex;align-items:center;gap:8px;padding:7px 10px;background:#1a1a1a;border-radius:8px;border:1px solid #222; }
+  .bill-num { font-size:9px;color:#444;font-weight:600;flex-shrink:0; }
+  .bill-cust { font-size:10px;font-weight:600;color:#ccc;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+  .bill-time { font-size:9px;color:#555;flex-shrink:0; }
+  .bill-amt { font-size:10px;font-weight:700;color:#e2e8f0;flex-shrink:0;margin-left:4px; }
+  .bill-status { font-size:8px;font-weight:700;padding:2px 6px;border-radius:20px;flex-shrink:0; }
+  .bs-paid { background:#052e16;color:#4ade80;border:1px solid #166534; }
+  .bs-pending { background:#1c0820;color:#c084fc;border:1px solid #6b21a8; }
+
+  /* Revenue hidden row (shown in all) */
+  .rev-row { display:flex;align-items:center;gap:8px;padding:8px 10px;background:#1a1a1a;border-radius:8px;margin-bottom:8px; }
+  .rev-label { font-size:9px;text-transform:uppercase;letter-spacing:1.5px;color:#444;font-weight:600; }
+  .rev-hidden { font-size:16px;font-weight:800;color:#333;letter-spacing:3px;flex:1; }
+  .eye-btn { width:22px;height:22px;border-radius:6px;background:#222;border:1px solid #2a2a2a;display:flex;align-items:center;justify-content:center;cursor:default; }
+  .eye-ico { font-size:10px; }
+</style>
+</head>
+<body>
+
+<p class="page-title">What replaces Quick Actions? · Pick one</p>
+<p class="page-sub">Revenue is hidden by default in all options — shown with an eye toggle. Pick the right-column widget.</p>
+
+<div class="options-row">
+
+  <!-- OPTION A: Staff Availability -->
+  <div class="opt" data-choice="a" onclick="this.classList.toggle('selected')">
+    <div class="opt-label">
+      <span class="opt-title">A — Staff Availability</span>
+      <span class="opt-letter">A</span>
+    </div>
+    <div class="opt-body">
+      <!-- Revenue hidden -->
+      <div class="rev-row">
+        <div>
+          <div class="rev-label">Revenue</div>
+          <div class="rev-hidden">● ● ● ● ●</div>
+        </div>
+        <div class="eye-btn"><span class="eye-ico">👁</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-hdr">
+          <span class="card-title">Staff Availability</span>
+          <span style="font-size:9px;color:#555;">5 staff today</span>
+        </div>
+        <div class="card-body">
+          <div class="staff-row">
+            <div class="s-avatar" style="background:linear-gradient(135deg,#052e16,#166534);">R</div>
+            <div style="flex:1;min-width:0;">
+              <div class="s-name">Riya</div>
+              <div class="s-service">With Priya · Haircut</div>
+            </div>
+            <div class="s-badge badge-busy">BUSY</div>
+            <span class="s-timer">12m</span>
+          </div>
+          <div class="staff-row">
+            <div class="s-avatar" style="background:linear-gradient(135deg,#1a0f2e,#2d1f4e);">S</div>
+            <div style="flex:1;min-width:0;">
+              <div class="s-name">Sneha</div>
+              <div class="s-service">Arjun · Facial done</div>
+            </div>
+            <div class="s-badge badge-free">FREE</div>
+          </div>
+          <div class="staff-row">
+            <div class="s-avatar" style="background:linear-gradient(135deg,#1c0820,#4a1942);">K</div>
+            <div style="flex:1;min-width:0;">
+              <div class="s-name">Kavita</div>
+              <div class="s-service">Free · 2 done today</div>
+            </div>
+            <div class="s-badge badge-free">FREE</div>
+          </div>
+          <div class="staff-row">
+            <div class="s-avatar" style="background:linear-gradient(135deg,#1c1000,#451a03);">M</div>
+            <div style="flex:1;min-width:0;">
+              <div class="s-name">Meena</div>
+              <div class="s-service">On break</div>
+            </div>
+            <div class="s-badge badge-break">BREAK</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="opt-desc"><p>See at a glance who's free to take the next customer — directly useful for the receptionist. Derived from active walkin data already loaded on the dashboard.</p></div>
+  </div>
+
+  <!-- OPTION B: Top Services Today -->
+  <div class="opt" data-choice="b" onclick="this.classList.toggle('selected')">
+    <div class="opt-label">
+      <span class="opt-title">B — Top Services Today</span>
+      <span class="opt-letter">B</span>
+    </div>
+    <div class="opt-body">
+      <div class="rev-row">
+        <div>
+          <div class="rev-label">Revenue</div>
+          <div class="rev-hidden">● ● ● ● ●</div>
+        </div>
+        <div class="eye-btn"><span class="eye-ico">👁</span></div>
+      </div>
+
+      <div class="card" style="margin-bottom:8px;">
+        <div class="card-hdr">
+          <span class="card-title">Top Services</span>
+          <span style="font-size:9px;color:#555;">21 total today</span>
+        </div>
+        <div class="card-body">
+          <div class="svc-bar-row">
+            <span class="svc-bar-name">Haircut</span>
+            <div class="bar-track"><div class="bar-fill" style="width:85%;background:linear-gradient(90deg,#7c3aed,#a78bfa);"></div></div>
+            <span class="svc-bar-count">9</span>
+            <span class="svc-bar-rev">₹4,500</span>
+          </div>
+          <div class="svc-bar-row">
+            <span class="svc-bar-name">Facial</span>
+            <div class="bar-track"><div class="bar-fill" style="width:55%;background:linear-gradient(90deg,#7c3aed,#a78bfa);opacity:0.7;"></div></div>
+            <span class="svc-bar-count">6</span>
+            <span class="svc-bar-rev">₹3,600</span>
+          </div>
+          <div class="svc-bar-row">
+            <span class="svc-bar-name">Threading</span>
+            <div class="bar-track"><div class="bar-fill" style="width:35%;background:linear-gradient(90deg,#7c3aed,#a78bfa);opacity:0.5;"></div></div>
+            <span class="svc-bar-count">4</span>
+            <span class="svc-bar-rev">₹600</span>
+          </div>
+          <div class="svc-bar-row">
+            <span class="svc-bar-name">Manicure</span>
+            <div class="bar-track"><div class="bar-fill" style="width:18%;background:linear-gradient(90deg,#7c3aed,#a78bfa);opacity:0.4;"></div></div>
+            <span class="svc-bar-count">2</span>
+            <span class="svc-bar-rev">₹800</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-hdr" style="padding:8px 12px;">
+          <span class="card-title">Daily Goals</span>
+        </div>
+        <div style="padding:10px;display:flex;flex-direction:column;gap:6px;">
+          <div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="font-size:9px;color:#555;">Revenue ₹18,420 / ₹20,000</span><span style="font-size:9px;font-weight:700;color:#a78bfa;">92%</span></div>
+            <div style="height:4px;background:#1f1f1f;border-radius:2px;overflow:hidden;"><div style="height:100%;width:92%;background:linear-gradient(90deg,#7c3aed,#a78bfa);border-radius:2px;"></div></div>
+          </div>
+          <div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="font-size:9px;color:#555;">Services 21 / 25</span><span style="font-size:9px;font-weight:700;color:#a78bfa;">84%</span></div>
+            <div style="height:4px;background:#1f1f1f;border-radius:2px;overflow:hidden;"><div style="height:100%;width:84%;background:linear-gradient(90deg,#7c3aed,#a78bfa);border-radius:2px;"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="opt-desc"><p>Replace the existing Service Distribution chart (Recharts pie) with a cleaner bar list — shows count + revenue per service. Goals card stays below it. Data already loaded.</p></div>
+  </div>
+
+  <!-- OPTION C: Recent Bills -->
+  <div class="opt" data-choice="c" onclick="this.classList.toggle('selected')">
+    <div class="opt-label">
+      <span class="opt-title">C — Recent Bills</span>
+      <span class="opt-letter">C</span>
+    </div>
+    <div class="opt-body">
+      <div class="rev-row">
+        <div>
+          <div class="rev-label">Revenue</div>
+          <div class="rev-hidden">● ● ● ● ●</div>
+        </div>
+        <div class="eye-btn"><span class="eye-ico">👁</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-hdr">
+          <span class="card-title">Recent Bills</span>
+          <span style="font-size:9px;color:#444;cursor:default;">View all →</span>
+        </div>
+        <div class="card-body">
+          <div class="bill-row">
+            <span class="bill-num">#0042</span>
+            <div style="flex:1;min-width:0;">
+              <div class="bill-cust">Priya Sharma</div>
+              <div style="font-size:9px;color:#555;">Haircut, Threading</div>
+            </div>
+            <span class="bill-time">2m ago</span>
+            <span class="bill-amt">₹650</span>
+            <span class="bill-status bs-paid">PAID</span>
+          </div>
+          <div class="bill-row">
+            <span class="bill-num">#0041</span>
+            <div style="flex:1;min-width:0;">
+              <div class="bill-cust">Arjun Mehta</div>
+              <div style="font-size:9px;color:#555;">Facial, Head Massage</div>
+            </div>
+            <span class="bill-time">18m ago</span>
+            <span class="bill-amt">₹1,200</span>
+            <span class="bill-status bs-pending">PENDING</span>
+          </div>
+          <div class="bill-row">
+            <span class="bill-num">#0040</span>
+            <div style="flex:1;min-width:0;">
+              <div class="bill-cust">Kavya Nair</div>
+              <div style="font-size:9px;color:#555;">Manicure</div>
+            </div>
+            <span class="bill-time">34m ago</span>
+            <span class="bill-amt">₹400</span>
+            <span class="bill-status bs-paid">PAID</span>
+          </div>
+          <div class="bill-row">
+            <span class="bill-num">#0039</span>
+            <div style="flex:1;min-width:0;">
+              <div class="bill-cust">Rahul Singh</div>
+              <div style="font-size:9px;color:#555;">Haircut</div>
+            </div>
+            <span class="bill-time">51m ago</span>
+            <span class="bill-amt">₹350</span>
+            <span class="bill-status bs-paid">PAID</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top:8px;padding:10px 12px;background:#161616;border:1px solid #1f1f1f;border-radius:10px;display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:10px;color:#555;">Daily Goals</span>
+        <span style="font-size:9px;color:#a78bfa;font-weight:700;">₹18,420 / ₹20,000 · 92%</span>
+      </div>
+    </div>
+    <div class="opt-desc"><p>Last 4–5 bills at a glance with paid/pending status. Useful for quickly spotting unbilled sessions. Needs a lightweight bills endpoint — or can reuse existing /reports/dashboard data.</p></div>
+  </div>
+
+</div>
+
+<div style="margin-top:20px;padding:14px 16px;background:#141414;border:1px solid #222;border-radius:10px;">
+  <div style="font-size:11px;font-weight:700;color:#bbb;margin-bottom:6px;">Revenue hide/reveal (all options)</div>
+  <div style="font-size:10px;color:#555;line-height:1.6;">The stat card shows <code style="color:#666;">● ● ● ●</code> dots by default. An eye icon toggles visibility. State saved to <code style="color:#666;">localStorage</code> per user — so staff who close the app won't accidentally expose revenue on reopen. Owner and receptionist see the toggle; staff role never sees the revenue card at all.</div>
+</div>
+</body>
+</html>

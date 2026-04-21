@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -23,9 +24,15 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 import { apiClient } from '@/lib/api-client';
 import { toast } from 'sonner';
 import { Loader2, UserCog, UserPlus } from 'lucide-react';
+
+const MONTHS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
 
 const userSchema = z.object({
   full_name: z.string().min(1, 'Full name is required').max(255, 'Name too long'),
@@ -56,6 +63,8 @@ export function UserDialog({ open, user, onClose, onSuccess }: UserDialogProps) 
   const [roles, setRoles] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isRolesLoading, setIsRolesLoading] = useState(false);
+  const [birthMonth, setBirthMonth] = useState('');
+  const [birthDay, setBirthDay] = useState('');
 
   const form = useForm<z.infer<typeof userSchema>>({
     resolver: zodResolver(userSchema),
@@ -82,6 +91,15 @@ export function UserDialog({ open, user, onClose, onSuccess }: UserDialogProps) 
           role_id: user.role?.id || '',
           password: '', // Password not editable here normally, but schema allows optional
         });
+        // Parse stored birthday (1900-MM-DD) into month+day selects
+        if (user.date_of_birth) {
+          const parts = user.date_of_birth.split('-');
+          setBirthMonth(parts[1] ? String(parseInt(parts[1], 10)) : '');
+          setBirthDay(parts[2] ? String(parseInt(parts[2], 10)) : '');
+        } else {
+          setBirthMonth('');
+          setBirthDay('');
+        }
       } else {
         form.reset({
           full_name: '',
@@ -91,6 +109,8 @@ export function UserDialog({ open, user, onClose, onSuccess }: UserDialogProps) 
           role_id: '',
           password: '',
         });
+        setBirthMonth('');
+        setBirthDay('');
       }
     }
   }, [open, user, form]);
@@ -116,6 +136,12 @@ export function UserDialog({ open, user, onClose, onSuccess }: UserDialogProps) 
       const dataToSubmit: any = { ...values };
       if (!dataToSubmit.email) delete dataToSubmit.email;
       if (!dataToSubmit.password) delete dataToSubmit.password;
+
+      // Construct date_of_birth from month+day selects; use 1900 as placeholder year
+      dataToSubmit.date_of_birth =
+        birthMonth && birthDay
+          ? `1900-${String(birthMonth).padStart(2, '0')}-${String(birthDay).padStart(2, '0')}`
+          : null;
 
       if (user) {
         // Edit mode
@@ -173,7 +199,7 @@ export function UserDialog({ open, user, onClose, onSuccess }: UserDialogProps) 
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent size="sm">
         <DialogHeader>
           <div className="mx-auto bg-primary/10 p-3 rounded-full w-fit mb-2">
             {user ? <UserCog className="h-6 w-6 text-primary" /> : <UserPlus className="h-6 w-6 text-primary" />}
@@ -185,7 +211,8 @@ export function UserDialog({ open, user, onClose, onSuccess }: UserDialogProps) 
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="contents">
+          <DialogBody className="space-y-4">
             <FormField
               control={form.control}
               name="full_name"
@@ -200,7 +227,7 @@ export function UserDialog({ open, user, onClose, onSuccess }: UserDialogProps) 
               )}
             />
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FormField
                 control={form.control}
                 name="username"
@@ -266,6 +293,37 @@ export function UserDialog({ open, user, onClose, onSuccess }: UserDialogProps) 
               )}
             />
 
+            {/* Birthday — month + day only, no year collected */}
+            <div className="space-y-2">
+              <Label>Birthday <span className="text-xs text-muted-foreground">(optional)</span></Label>
+              <div className="flex gap-2">
+                <Select value={birthMonth} onValueChange={setBirthMonth}>
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Month" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {MONTHS.map((name, i) => (
+                      <SelectItem key={i + 1} value={String(i + 1)}>
+                        {name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={birthDay} onValueChange={setBirthDay}>
+                  <SelectTrigger className="w-24">
+                    <SelectValue placeholder="Day" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+                      <SelectItem key={d} value={String(d)}>
+                        {d}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
             {!user && (
                 <FormField
                 control={form.control}
@@ -281,8 +339,9 @@ export function UserDialog({ open, user, onClose, onSuccess }: UserDialogProps) 
                 )}
                 />
             )}
+          </DialogBody>
 
-            <DialogFooter className="pt-4">
+            <DialogFooter>
               <Button type="button" variant="outline" onClick={onClose}>
                 Cancel
               </Button>

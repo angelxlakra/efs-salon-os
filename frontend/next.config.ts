@@ -11,6 +11,17 @@ const nextConfig: NextConfig = {
   images: {
     remotePatterns: [],
   },
+
+  // In dev mode (no Nginx), proxy /api requests to the backend
+  async rewrites() {
+    const apiUrl = process.env.BACKEND_URL || 'http://localhost:8000';
+    return [
+      {
+        source: '/api/:path*',
+        destination: `${apiUrl}/api/:path*`,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

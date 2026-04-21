@@ -5,9 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Package, Search, Edit, Plus, Minus, TrendingUp, CheckCircle, XCircle, RefreshCw, Camera } from 'lucide-react';
+import { Package, Search, Edit, Plus, Minus, TrendingUp, CheckCircle, XCircle, RefreshCw, Camera, ArrowRightLeft } from 'lucide-react';
 import { BarcodeScanner } from '@/components/barcode-scanner';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { TransferDialog } from '@/components/inventory/transfer-dialog';
+import { Dialog, DialogBody, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -92,6 +93,10 @@ export default function InventoryPage() {
 
   // Barcode scanner state
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
+
+  // Transfer state
+  const [transferDialogOpen, setTransferDialogOpen] = useState(false);
+  const [transferingSku, setTransferingSku] = useState<SKU | null>(null);
 
   useEffect(() => {
     loadSkus();
@@ -303,6 +308,11 @@ export default function InventoryPage() {
     }
   };
 
+  const handleTransfer = (sku: SKU) => {
+    setTransferingSku(sku);
+    setTransferDialogOpen(true);
+  };
+
   const handleSyncFromPurchases = async () => {
     setSyncing(true);
     try {
@@ -395,6 +405,9 @@ export default function InventoryPage() {
                   </Button>
                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleAdjustStock(sku)}>
                     <TrendingUp className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleTransfer(sku)} title="Transfer to another store">
+                    <ArrowRightLeft className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
@@ -491,6 +504,14 @@ export default function InventoryPage() {
                           title="Adjust stock"
                         >
                           <TrendingUp className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleTransfer(sku)}
+                          title="Transfer to another store"
+                        >
+                          <ArrowRightLeft className="h-4 w-4" />
                         </Button>
                       </div>
                     </td>
@@ -599,13 +620,13 @@ export default function InventoryPage() {
 
       {/* Stock Adjustment Dialog */}
       <Dialog open={stockDialogOpen} onOpenChange={setStockDialogOpen}>
-        <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent size="lg">
           <DialogHeader>
             <DialogTitle>Adjust Stock</DialogTitle>
           </DialogHeader>
 
           {adjustingSku && (
-            <div className="space-y-4">
+            <DialogBody className="space-y-4">
               <div>
                 <div className="text-sm font-medium mb-1">SKU: {adjustingSku.sku_code}</div>
                 <div className="text-sm text-muted-foreground">{adjustingSku.name}</div>
@@ -767,7 +788,7 @@ export default function InventoryPage() {
                   rows={3}
                 />
               </div>
-            </div>
+            </DialogBody>
           )}
 
           <DialogFooter>
@@ -783,13 +804,13 @@ export default function InventoryPage() {
 
       {/* Edit Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-[95vw] sm:max-w-lg">
+        <DialogContent size="md">
           <DialogHeader>
             <DialogTitle>Edit SKU</DialogTitle>
           </DialogHeader>
 
           {editingSku && (
-            <div className="space-y-4">
+            <DialogBody className="space-y-4">
               <div>
                 <div className="text-sm font-medium mb-1">SKU: {editingSku.sku_code}</div>
                 <div className="text-sm text-muted-foreground">{editingSku.name}</div>
@@ -867,7 +888,7 @@ export default function InventoryPage() {
                   </div>
                 </>
               )}
-            </div>
+            </DialogBody>
           )}
 
           <DialogFooter>
@@ -888,6 +909,16 @@ export default function InventoryPage() {
           }}
           onClose={() => setShowBarcodeScanner(false)}
           autoClose={true}
+        />
+      )}
+
+      {/* Transfer Dialog */}
+      {transferingSku && (
+        <TransferDialog
+          sku={transferingSku}
+          open={transferDialogOpen}
+          onOpenChange={setTransferDialogOpen}
+          onSuccess={() => loadSkus()}
         />
       )}
     </div>

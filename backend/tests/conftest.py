@@ -43,9 +43,10 @@ def test_engine(postgres_admin_engine, test_db_url):
     """
 
     from app.models import (
-          user, billing, customer, service,
-          appointment, inventory, accounting, audit
-      )
+        user, billing, customer, service,
+        appointment, inventory, accounting, audit,
+        settings, expense, purchase, reconciliation, attendance
+    )
 
     with postgres_admin_engine.connect() as conn:
         conn.execute(

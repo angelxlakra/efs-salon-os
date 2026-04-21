@@ -30,6 +30,7 @@ import {
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -732,7 +733,7 @@ export default function SettingsPage() {
 
       {/* Confirmation Dialog */}
       <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogContent size="lg">
           <DialogHeader>
             <DialogTitle>Confirm Settings Changes</DialogTitle>
             <DialogDescription>
@@ -740,13 +741,13 @@ export default function SettingsPage() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-4">
+          <DialogBody className="space-y-4">
             {changesSummary.length > 0 ? (
               <div className="space-y-3">
                 {changesSummary.map((change, index) => (
                   <div key={index} className="border rounded-lg p-3 bg-muted/50">
                     <p className="font-medium text-sm mb-2">{change.label}</p>
-                    <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                       <div>
                         <p className="text-muted-foreground mb-1">Previous:</p>
                         <p className="text-red-600 line-through">{change.oldValue}</p>
@@ -762,7 +763,7 @@ export default function SettingsPage() {
             ) : (
               <p className="text-sm text-muted-foreground">No changes detected.</p>
             )}
-          </div>
+          </DialogBody>
 
           <DialogFooter>
             <Button

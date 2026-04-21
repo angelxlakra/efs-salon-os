@@ -45,3 +45,44 @@ class CustomerListResponse(BaseModel):
     page: int
     size: int
     pages: int
+
+class CustomerStatsResponse(BaseModel):
+    total_customers: int
+    active_this_month: int
+    total_visits: int
+    total_revenue: int   # paise
+    total_pending: int   # paise
+
+
+# ---- Customer Bill / Visit History ----
+
+class CustomerBillItemSummary(BaseModel):
+    item_name: str
+    base_price: int      # paise
+    quantity: int
+    line_total: int      # paise
+    staff_name: Optional[str] = None   # display_name; "Multiple" for multi-staff
+    has_multi_staff: bool = False
+
+    class Config:
+        from_attributes = True
+
+
+class CustomerBillSummary(BaseModel):
+    id: str
+    invoice_number: Optional[str] = None
+    posted_at: Optional[datetime] = None
+    rounded_total: int               # paise
+    payment_methods: List[str]       # e.g. ["cash", "upi"]
+    items: List[CustomerBillItemSummary]
+
+    class Config:
+        from_attributes = True
+
+
+class CustomerBillsListResponse(BaseModel):
+    items: List[CustomerBillSummary]
+    total: int
+    page: int
+    size: int
+    pages: int

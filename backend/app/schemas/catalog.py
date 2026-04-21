@@ -375,3 +375,28 @@ class CatalogResponse(BaseModel):
 
 # Update forward references
 ServiceCategoryWithServices.model_rebuild()
+
+
+# ---- Service Usage History ----
+
+class ServiceHistoryItem(BaseModel):
+    bill_id: str
+    invoice_number: Optional[str] = None
+    posted_at: datetime
+    customer_name: str        # full_name for registered; stored name for anonymous; "Walk-in" as fallback
+    staff_name: Optional[str] = None   # display_name; "Multiple" for multi-staff; None if unassigned
+    has_multi_staff: bool = False
+    price_paid: int           # line_total in paise
+
+    class Config:
+        from_attributes = True
+
+
+class ServiceHistoryResponse(BaseModel):
+    service_id: str
+    service_name: str
+    items: List[ServiceHistoryItem]
+    total: int
+    page: int
+    size: int
+    pages: int

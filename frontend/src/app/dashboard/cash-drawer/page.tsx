@@ -56,6 +56,9 @@ export default function CashDrawerPage() {
   // Opening drawer state
   const [openingFloat, setOpeningFloat] = useState<string>("")
   const [openingDenoms, setOpeningDenoms] = useState<DenominationCounts>({
+    note_5: 0,
+    note_10: 0,
+    note_20: 0,
     note_50: 0,
     note_100: 0,
     note_200: 0,
@@ -65,6 +68,9 @@ export default function CashDrawerPage() {
   // Closing drawer state
   const [closingCounted, setClosingCounted] = useState<string>("")
   const [closingDenoms, setClosingDenoms] = useState<DenominationCounts>({
+    note_5: 0,
+    note_10: 0,
+    note_20: 0,
     note_50: 0,
     note_100: 0,
     note_200: 0,
@@ -108,7 +114,7 @@ export default function CashDrawerPage() {
 
       // Reset form
       setOpeningFloat("")
-      setOpeningDenoms({ note_50: 0, note_100: 0, note_200: 0, note_500: 0 })
+      setOpeningDenoms({ note_5: 0, note_10: 0, note_20: 0, note_50: 0, note_100: 0, note_200: 0, note_500: 0 })
     } catch (error: any) {
       console.error("Error opening drawer:", error)
       toast.error(error.response?.data?.detail || "Failed to open cash drawer")
@@ -136,7 +142,7 @@ export default function CashDrawerPage() {
 
       // Reset form
       setClosingCounted("")
-      setClosingDenoms({ note_50: 0, note_100: 0, note_200: 0, note_500: 0 })
+      setClosingDenoms({ note_5: 0, note_10: 0, note_20: 0, note_50: 0, note_100: 0, note_200: 0, note_500: 0 })
       setCashTakenOut("")
       setCashTakenOutReason("")
       setNotes("")
@@ -156,7 +162,7 @@ export default function CashDrawerPage() {
   }
 
   const calculateTotal = (denoms: DenominationCounts) => {
-    return denoms.note_50 * 50 + denoms.note_100 * 100 + denoms.note_200 * 200 + denoms.note_500 * 500
+    return denoms.note_5 * 5 + denoms.note_10 * 10 + denoms.note_20 * 20 + denoms.note_50 * 50 + denoms.note_100 * 100 + denoms.note_200 * 200 + denoms.note_500 * 500
   }
 
   if (isLoading) {

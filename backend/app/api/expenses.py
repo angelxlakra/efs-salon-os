@@ -227,7 +227,7 @@ def update_expense(
 
     **Permissions:** Owner only
 
-    Only pending or rejected expenses can be updated.
+    Owner can update expenses regardless of status.
     """
     expense = db.query(Expense).filter(Expense.id == expense_id).first()
 
@@ -235,12 +235,6 @@ def update_expense(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Expense not found: {expense_id}"
-        )
-
-    if expense.status == ExpenseStatus.APPROVED:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot update approved expenses"
         )
 
     # Update fields
@@ -320,7 +314,7 @@ def delete_expense(
 
     **Permissions:** Owner only
 
-    Only pending or rejected expenses can be deleted.
+    Owner can delete expenses regardless of status.
     """
     expense = db.query(Expense).filter(Expense.id == expense_id).first()
 
@@ -328,12 +322,6 @@ def delete_expense(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Expense not found: {expense_id}"
-        )
-
-    if expense.status == ExpenseStatus.APPROVED:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot delete approved expenses"
         )
 
     db.delete(expense)

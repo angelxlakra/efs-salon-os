@@ -16,16 +16,25 @@ import logging
 import sys
 from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.interval import IntervalTrigger
 from apscheduler.executors.pool import ThreadPoolExecutor
 import pytz
+
+from app.config import settings
 
 from app.jobs.scheduled import (
     generate_daily_summary_job,
     catchup_missing_summaries,
     catchup_missing_metrics,
+    catchup_missing_backup,
     nightly_backup_job,
     generate_recurring_expenses_job,
     test_job,
+    customer_sync_push_job,
+    customer_sync_pull_job,
+    central_heartbeat_job,
+    metrics_push_job,
+    transfer_poll_job,
 )
 
 # Configure logging
@@ -120,6 +129,76 @@ def start_worker():
     )
     logger.info("✅ Scheduled: Weekly Cloud Cleanup (Sunday 02:00 IST)")
 
+    # ============ Central Sync Jobs (only when enabled) ============
+
+    if settings.central_sync_enabled:
+        scheduler.add_job(
+            customer_sync_push_job,
+            trigger=IntervalTrigger(minutes=settings.central_sync_push_interval_minutes, timezone=IST),
+            id='customer_sync_push',
+            name='Customer Sync Push',
+            replace_existing=True,
+            max_instances=1,
+            misfire_grace_time=60,
+        )
+        logger.info(f"✅ Scheduled: Customer Sync Push (every {settings.central_sync_push_interval_minutes} min)")
+
+        scheduler.add_job(
+            customer_sync_pull_job,
+            trigger=IntervalTrigger(minutes=settings.central_sync_pull_interval_minutes, timezone=IST),
+            id='customer_sync_pull',
+            name='Customer Sync Pull',
+            replace_existing=True,
+            max_instances=1,
+            misfire_grace_time=60,
+        )
+        logger.info(f"✅ Scheduled: Customer Sync Pull (every {settings.central_sync_pull_interval_minutes} min)")
+
+        scheduler.add_job(
+            central_heartbeat_job,
+            trigger=IntervalTrigger(minutes=5, timezone=IST),
+            id='central_heartbeat',
+            name='Central Heartbeat',
+            replace_existing=True,
+            max_instances=1,
+            misfire_grace_time=60,
+        )
+        logger.info("✅ Scheduled: Central Heartbeat (every 5 min)")
+
+        scheduler.add_job(
+            metrics_push_job,
+            trigger=IntervalTrigger(minutes=settings.central_sync_metrics_push_interval_minutes, timezone=IST),
+            id='metrics_push',
+            name='Metrics Push to Central',
+            replace_existing=True,
+            max_instances=1,
+            misfire_grace_time=60,
+        )
+        logger.info(f"✅ Scheduled: Metrics Push (every {settings.central_sync_metrics_push_interval_minutes} min)")
+
+        scheduler.add_job(
+            transfer_poll_job,
+            trigger=IntervalTrigger(minutes=settings.central_transfer_poll_interval_minutes, timezone=IST),
+            id='transfer_poll',
+            name='Inventory Transfer Poll',
+            replace_existing=True,
+            max_instances=1,
+            misfire_grace_time=120,
+        )
+        logger.info(f"✅ Scheduled: Transfer Poll (every {settings.central_transfer_poll_interval_minutes} min)")
+
+        # Nightly catch-up push at 22:05 IST to handle any gaps from the day
+        scheduler.add_job(
+            customer_sync_push_job,
+            trigger=CronTrigger(hour=22, minute=5, timezone=IST),
+            id='customer_sync_catchup',
+            name='Customer Sync Catch-up (Nightly)',
+            replace_existing=True,
+            max_instances=1,
+            misfire_grace_time=1800,
+        )
+        logger.info("✅ Scheduled: Customer Sync Catch-up (22:05 IST nightly)")
+
     # ============ Development/Testing Jobs ============
 
     # Uncomment for testing scheduler (runs every 5 minutes)
@@ -148,6 +227,13 @@ def start_worker():
         logger.info("✅ Metrics catchup completed")
     except Exception as e:
         logger.error(f"❌ Metrics catchup failed: {str(e)}")
+
+    logger.info("🔄 Running catchup job for missing backup...")
+    try:
+        catchup_missing_backup()
+        logger.info("✅ Backup catchup completed")
+    except Exception as e:
+        logger.error(f"❌ Backup catchup failed: {str(e)}")
 
     # ============ Start Scheduler ============
 

@@ -19,6 +19,9 @@ class ExpenseCategory(str, enum.Enum):
     TAXES_FEES = "taxes_fees"
     PROFESSIONAL_SERVICES = "professional_services"
     OTHER = "other"
+    # Inter-branch inventory transfers (Sprint 7)
+    TRANSFER_OUT = "transfer_out"  # stock sent to another branch
+    TRANSFER_IN = "transfer_in"    # stock received from another branch
 
 
 class RecurrenceType(str, enum.Enum):
@@ -85,8 +88,8 @@ class Expense(Base, ULIDMixin, TimestampMixin):
     recorder = relationship("User", foreign_keys=[recorded_by])
     approver = relationship("User", foreign_keys=[approved_by])
     rejector = relationship("User", foreign_keys=[rejected_by])
-    parent_expense = relationship("Expense", remote_side="Expense.id", foreign_keys=[parent_expense_id])
-    recurring_instances = relationship("Expense", foreign_keys=[parent_expense_id], remote_side=[parent_expense_id])
+    parent_expense = relationship("Expense", remote_side="Expense.id", foreign_keys=[parent_expense_id], overlaps="recurring_instances")
+    recurring_instances = relationship("Expense", foreign_keys=[parent_expense_id], overlaps="parent_expense")
 
     def __repr__(self):
         return f"<Expense {self.category.value} - Rs {self.amount / 100:.2f}>"

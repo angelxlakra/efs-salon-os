@@ -13,14 +13,19 @@ SalonOS uses **SQLAlchemy 2.0** with **PostgreSQL 15** for data persistence. All
 | Domain | Models | Tables |
 |--------|--------|--------|
 | User & Auth | 3 | `roles`, `users`, `staff` |
-| Customer | 1 | `customers` |
-| Services | 3 | `service_categories`, `services`, `service_addons` |
+| Customer | 2 | `customers`, `pending_payment_collections` |
+| Services | 5 | `service_categories`, `services`, `service_addons`, `service_material_usage`, `service_staff_templates` |
 | Appointments | 2 | `appointments`, `walkins` |
-| Billing | 3 | `bills`, `bill_items`, `payments` |
-| Inventory | 4 | `inventory_categories`, `suppliers`, `skus`, `stock_ledger`, `inventory_change_requests` |
+| Billing | 4 | `bills`, `bill_items`, `bill_item_staff_contributions`, `payments` |
+| Inventory | 5 | `inventory_categories`, `suppliers`, `skus`, `stock_ledger`, `inventory_change_requests` |
 | Accounting | 3 | `cash_drawer`, `day_summary`, `export_log` |
+| Expenses | 2 | `expenses`, `expense_categories` |
+| Purchases | 3 | `purchase_invoices`, `purchase_items`, `supplier_payments` |
+| Reconciliation | 1 | `daily_reconciliations` |
+| Settings | 1 | `salon_settings` |
+| Attendance | 1 | `attendance` |
 | Audit | 2 | `events`, `audit_log` |
-| **Total** | **21+** | **21+ tables** |
+| **Total** | **34+** | **34+ tables** |
 
 ---
 
@@ -30,13 +35,24 @@ SalonOS uses **SQLAlchemy 2.0** with **PostgreSQL 15** for data persistence. All
 |---|----------|-------------|
 | 01 | [Base Mixins](./01-base-mixins.md) | TimestampMixin, SoftDeleteMixin, ULIDMixin |
 | 02 | [User & Auth](./02-user-auth.md) | Role, User, Staff models |
-| 03 | [Billing](./03-billing.md) | Bill, BillItem, Payment models |
+| 03 | [Billing](./03-billing.md) | Bill, BillItem, BillItemStaffContribution, Payment models |
 | 04 | [Appointments](./04-appointments.md) | Appointment, WalkIn models |
-| 05 | [Services](./05-services.md) | ServiceCategory, Service, ServiceAddon |
-| 06 | [Customers](./06-customers.md) | Customer model |
+| 05 | [Services](./05-services.md) | ServiceCategory, Service, ServiceAddon, ServiceMaterialUsage, ServiceStaffTemplate |
+| 06 | [Customers](./06-customers.md) | Customer, PendingPaymentCollection models |
 | 07 | [Inventory](./07-inventory.md) | SKU, Supplier, ChangeRequest, StockLedger |
 | 08 | [Accounting](./08-accounting.md) | CashDrawer, DaySummary, ExportLog |
 | 09 | [Audit](./09-audit.md) | Event, AuditLog models |
+
+**Additional models (not yet documented in detail):**
+
+| Domain | Models | File |
+|--------|--------|------|
+| Expenses | Expense, ExpenseCategory | `expense.py` |
+| Purchases | PurchaseInvoice, PurchaseItem, SupplierPayment | `purchase.py` |
+| Reconciliation | DailyReconciliation | `reconciliation.py` |
+| Settings | SalonSettings | `settings.py` |
+| Attendance | Attendance | `attendance.py` |
+| Pending Payments | PendingPaymentCollection | `pending_payment.py` |
 
 ---
 
@@ -194,6 +210,10 @@ Reset: Daily at midnight
 | `UOMEnum` | piece, ml, gm, kg, liter, box, bottle | SKU.uom |
 | `ChangeType` | receive, adjust, consume | InventoryChangeRequest.change_type |
 | `ChangeStatus` | pending, approved, rejected | InventoryChangeRequest.status |
+| `ExpenseStatus` | pending, approved, rejected, paid | Expense.status |
+| `RecurrenceType` | one_time, daily, weekly, monthly, yearly | Expense.recurrence |
+| `PurchaseStatus` | draft, received, partial, paid, cancelled | PurchaseInvoice.status |
+| `AttendanceStatus` | present, absent, half_day, leave | Attendance.status |
 
 ---
 
@@ -276,16 +296,16 @@ from app.models import (
     Role, RoleEnum, User, Staff,
 
     # Customer
-    Customer,
+    Customer, PendingPaymentCollection,
 
     # Services
-    ServiceCategory, Service, ServiceAddon,
+    ServiceCategory, Service, ServiceAddon, ServiceMaterialUsage, ServiceStaffTemplate,
 
     # Appointments
     Appointment, AppointmentStatus, WalkIn,
 
     # Billing
-    Bill, BillItem, BillStatus, Payment, PaymentMethod,
+    Bill, BillItem, BillItemStaffContribution, BillStatus, Payment, PaymentMethod,
 
     # Inventory
     InventoryCategory, Supplier, SKU, UOMEnum,
@@ -293,6 +313,21 @@ from app.models import (
 
     # Accounting
     CashDrawer, DaySummary, ExportLog,
+
+    # Expenses
+    Expense, ExpenseCategory, RecurrenceType, ExpenseStatus,
+
+    # Purchases
+    PurchaseInvoice, PurchaseItem, SupplierPayment, PurchaseStatus,
+
+    # Reconciliation
+    DailyReconciliation,
+
+    # Settings
+    SalonSettings,
+
+    # Attendance
+    Attendance, AttendanceStatus,
 
     # Audit
     Event, AuditLog,
@@ -305,16 +340,22 @@ from app.models import (
 
 ```
 backend/app/models/
-├── __init__.py        # Exports all models
-├── base.py            # Mixins (Timestamp, SoftDelete, ULID)
-├── user.py            # Role, User, Staff
-├── customer.py        # Customer
-├── service.py         # ServiceCategory, Service, ServiceAddon
-├── appointment.py     # Appointment, WalkIn
-├── billing.py         # Bill, BillItem, Payment
-├── inventory.py       # InventoryCategory, Supplier, SKU, etc.
-├── accounting.py      # CashDrawer, DaySummary, ExportLog
-└── audit.py           # Event, AuditLog
+├── __init__.py          # Exports all models
+├── base.py              # Mixins (Timestamp, SoftDelete, ULID)
+├── user.py              # Role, User, Staff
+├── customer.py          # Customer
+├── pending_payment.py   # PendingPaymentCollection
+├── service.py           # ServiceCategory, Service, ServiceAddon, ServiceMaterialUsage, ServiceStaffTemplate
+├── appointment.py       # Appointment, WalkIn
+├── billing.py           # Bill, BillItem, BillItemStaffContribution, Payment
+├── inventory.py         # InventoryCategory, Supplier, SKU, etc.
+├── accounting.py        # CashDrawer, DaySummary, ExportLog
+├── expense.py           # Expense, ExpenseCategory
+├── purchase.py          # PurchaseInvoice, PurchaseItem, SupplierPayment
+├── reconciliation.py    # DailyReconciliation
+├── settings.py          # SalonSettings
+├── attendance.py        # Attendance
+└── audit.py             # Event, AuditLog
 ```
 
 ---
@@ -328,6 +369,6 @@ backend/app/models/
 
 ---
 
-**Last Updated**: October 2025
-**Models Version**: 1.0
+**Last Updated**: February 2026
+**Models Version**: 2.0
 **Database**: PostgreSQL 15

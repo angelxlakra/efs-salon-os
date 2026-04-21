@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { Loader2 } from 'lucide-react';
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -31,11 +32,11 @@ interface Customer {
   id: string;
   first_name: string;
   last_name: string;
-  phone: string;
-  email: string;
+  phone: string | null;
+  email: string | null;
   date_of_birth: string | null;
   gender: string | null;
-  notes: string;
+  notes: string | null;
   total_visits: number;
   total_spent: number;
   last_visit_at: string | null;
@@ -66,12 +67,16 @@ const customerSchema = z.object({
 
 type CustomerFormData = z.infer<typeof customerSchema>;
 
+const MONTHS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+
 export function CustomerDialog({ open, customer, initialPhone, onClose, onSuccess }: CustomerDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [birthMonth, setBirthMonth] = useState('');
+  const [birthDay, setBirthDay] = useState('');
   const isEdit = !!customer;
-
-  console.log({customer});
-  
 
   const {
     register,
@@ -101,12 +106,21 @@ export function CustomerDialog({ open, customer, initialPhone, onClose, onSucces
       reset({
         first_name: customer.first_name,
         last_name: customer.last_name,
-        phone: customer.phone,
+        phone: customer.phone || '',
         email: customer.email || '',
         date_of_birth: customer.date_of_birth || '',
         gender: customer.gender || '',
         notes: customer.notes || '',
       });
+      // Parse stored date into month + day (ignore year)
+      if (customer.date_of_birth) {
+        const parts = customer.date_of_birth.split('-');
+        setBirthMonth(parts[1] ? String(parseInt(parts[1], 10)) : '');
+        setBirthDay(parts[2] ? String(parseInt(parts[2], 10)) : '');
+      } else {
+        setBirthMonth('');
+        setBirthDay('');
+      }
     } else if (open && !customer) {
       // Reset form for new customer, pre-fill phone if provided
       const phoneValue = initialPhone?.replace(/\D/g, '').slice(-10) || '';
@@ -119,6 +133,8 @@ export function CustomerDialog({ open, customer, initialPhone, onClose, onSucces
         gender: '',
         notes: '',
       });
+      setBirthMonth('');
+      setBirthDay('');
     }
   }, [open, customer, initialPhone, reset]);
 
@@ -126,18 +142,24 @@ export function CustomerDialog({ open, customer, initialPhone, onClose, onSucces
     try {
       setIsSubmitting(true);
 
+      // Construct date_of_birth from month+day selects; use 1900 as placeholder year
+      const date_of_birth =
+        birthMonth && birthDay
+          ? `1900-${String(birthMonth).padStart(2, '0')}-${String(birthDay).padStart(2, '0')}`
+          : null;
+
       const payload = {
         first_name: data.first_name,
         last_name: data.last_name,
         phone: data.phone,
         email: data.email || null,
-        date_of_birth: data.date_of_birth || null,
+        date_of_birth,
         gender: data.gender || null,
         notes: data.notes || '',
       };
 
       if (isEdit) {
-        await apiClient.put(`/customers/${customer.id}`, payload);
+        await apiClient.patch(`/customers/${customer.id}`, payload);
         toast.success('Customer updated successfully');
         onSuccess();
       } else {
@@ -161,7 +183,8 @@ export function CustomerDialog({ open, customer, initialPhone, onClose, onSucces
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[525px] max-h-[90vh] overflow-y-auto">
+      <DialogContent size="md">
+        <form onSubmit={handleSubmit(onSubmit)} className="contents">
         <DialogHeader>
           <DialogTitle>{isEdit ? 'Edit Customer' : 'Add New Customer'}</DialogTitle>
           <DialogDescription>
@@ -169,9 +192,9 @@ export function CustomerDialog({ open, customer, initialPhone, onClose, onSucces
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <DialogBody className="space-y-4">
           {/* Name */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="first_name">First Name *</Label>
               <Input
@@ -228,7 +251,7 @@ export function CustomerDialog({ open, customer, initialPhone, onClose, onSucces
           </div>
 
           {/* Gender and DOB */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="gender">Gender</Label>
               <Select
@@ -248,13 +271,41 @@ export function CustomerDialog({ open, customer, initialPhone, onClose, onSucces
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="date_of_birth">Date of Birth</Label>
-              <Input
-                id="date_of_birth"
-                type="date"
-                {...register('date_of_birth')}
-                disabled={isSubmitting}
-              />
+              <Label>Birthday</Label>
+              <div className="flex gap-2">
+                <Select
+                  value={birthMonth}
+                  onValueChange={setBirthMonth}
+                  disabled={isSubmitting}
+                >
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Month" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {MONTHS.map((name, i) => (
+                      <SelectItem key={i + 1} value={String(i + 1)}>
+                        {name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={birthDay}
+                  onValueChange={setBirthDay}
+                  disabled={isSubmitting}
+                >
+                  <SelectTrigger className="w-20">
+                    <SelectValue placeholder="Day" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+                      <SelectItem key={d} value={String(d)}>
+                        {d}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
 
@@ -270,6 +321,7 @@ export function CustomerDialog({ open, customer, initialPhone, onClose, onSucces
             />
             {errors.notes && <p className="text-sm text-red-600">{errors.notes.message}</p>}
           </div>
+        </DialogBody>
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>

@@ -4,7 +4,7 @@ from datetime import datetime, date
 from decimal import Decimal
 from enum import Enum as PyEnum
 
-from sqlalchemy import Column, String, Integer, Text, Date, DateTime, ForeignKey, Enum, Numeric
+from sqlalchemy import Column, String, Integer, SmallInteger, Text, Date, DateTime, ForeignKey, Enum, Numeric
 from sqlalchemy.orm import relationship
 
 from app.database import Base
@@ -35,7 +35,8 @@ class PurchaseInvoice(Base, ULIDMixin, TimestampMixin):
     # Amounts (in paise)
     subtotal = Column(Integer, nullable=False, default=0)  # Sum of all items before invoice discount
     invoice_discount_amount = Column(Integer, nullable=False, default=0)  # Invoice-level discount in paise
-    total_amount = Column(Integer, nullable=False, default=0)  # subtotal - invoice_discount_amount
+    round_off_amount = Column(Integer, nullable=False, default=0)  # Rounding adjustment in paise (can be negative)
+    total_amount = Column(Integer, nullable=False, default=0)  # subtotal - invoice_discount + round_off
     paid_amount = Column(Integer, nullable=False, default=0)
     balance_due = Column(Integer, nullable=False, default=0)  # Auto-calculated
 
@@ -61,9 +62,13 @@ class PurchaseInvoice(Base, ULIDMixin, TimestampMixin):
     creator = relationship("User", foreign_keys=[created_by])
 
     def calculate_totals(self):
-        """Calculate total_amount from items with discounts."""
+        """Calculate total_amount from items with discounts and round-off."""
         self.subtotal = sum(item.total_cost for item in self.items)
-        self.total_amount = self.subtotal - (self.invoice_discount_amount or 0)
+        self.total_amount = (
+            self.subtotal
+            - (self.invoice_discount_amount or 0)
+            + (self.round_off_amount or 0)
+        )
         self.balance_due = self.total_amount - (self.paid_amount or 0)
 
     def update_status(self):
@@ -101,9 +106,16 @@ class PurchaseItem(Base, ULIDMixin, TimestampMixin):
 
     # Quantity and pricing (in paise)
     quantity = Column(Numeric(10, 2), nullable=False)
-    unit_cost = Column(Integer, nullable=False)  # Buying price per unit
-    discount_amount = Column(Integer, nullable=False, default=0)  # Discount in paise
+    unit_cost = Column(Integer, nullable=False)  # All-in cost per unit (incl. GST, after discount)
+    discount_amount = Column(Integer, nullable=False, default=0)  # Flat line discount in paise
     total_cost = Column(Integer, nullable=False)  # (quantity × unit_cost) - discount_amount
+
+    # GST fields (auto-calc reference data)
+    rate_incl_tax = Column(Integer, nullable=True)           # MRP per unit in paise (incl. GST)
+    tax_rate_percent = Column(SmallInteger, nullable=False, default=18)  # GST rate, e.g. 18
+    discount_percent = Column(Numeric(5, 2), nullable=True)  # Trade discount % on base rate
+    cgst_amount = Column(Integer, nullable=False, default=0)  # Line-level CGST in paise
+    sgst_amount = Column(Integer, nullable=False, default=0)  # Line-level SGST in paise
 
     # Relationships
     invoice = relationship("PurchaseInvoice", back_populates="items")

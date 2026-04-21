@@ -22,7 +22,7 @@ class RoleEnum(str, enum.Enum):
 | Feature | Owner | Receptionist | Staff |
 |---------|-------|--------------|-------|
 | Create bills | Yes | Yes | No |
-| Apply discounts | Unlimited | Up to Rs 500 | No |
+| Apply discounts | Unlimited | Unlimited | No |
 | Refund bills | Yes | No | No |
 | View profit/COGS | Yes | No | No |
 | Approve inventory | Yes | No | No |
@@ -153,6 +153,7 @@ Staff profile for service providers (stylists, beauticians).
 | `display_name` | String | No | - | - | Customer-facing name |
 | `specialization` | ARRAY(String) | Yes | - | - | Service specializations |
 | `is_active` | Boolean | No | - | - | Active status (default: true) |
+| `is_service_provider` | Boolean | No | - | - | Whether staff provides services (default: true) |
 | `created_at` | DateTime(tz) | No | - | - | Creation timestamp |
 | `updated_at` | DateTime(tz) | No | - | - | Last update timestamp |
 
@@ -161,6 +162,7 @@ Staff profile for service providers (stylists, beauticians).
 | Relationship | Target | Type | Description |
 |--------------|--------|------|-------------|
 | `user` | User | One-to-One | Linked user account |
+| `attendance_records` | Attendance | One-to-Many | Attendance history (ordered desc by date) |
 
 ### Specializations
 

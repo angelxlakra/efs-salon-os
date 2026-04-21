@@ -11,13 +11,17 @@ This module provides REST API endpoints for:
 import math
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Header, status
+from datetime import datetime
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Header, status
+from sqlalchemy import or_, func, select as sa_select
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import get_db
 from app.models.user import User
-from app.models.billing import Bill, BillStatus
+from app.models.billing import Bill, BillStatus, Payment
+from app.models.pending_payment import PendingPaymentCollection
 from app.services.billing_service import BillingService
 from app.services.idempotency_service import IdempotencyService
 from app.services.export_service import ExportService
@@ -34,16 +38,39 @@ from app.schemas.billing import (
     RefundCreate,
     RefundResponse,
     BillListResponse,
-    BillListItem
+    BillListItem,
+    BillAssignCustomer,
+    BillDiscountUpdate,
+    BillWriteOff,
 )
 from app.auth.dependencies import get_current_user
 from app.auth.dependencies import get_current_user
 from app.auth.permissions import PermissionChecker
 from fastapi.responses import Response
 from app.services.receipt_service import ReceiptService
+from app.utils import IST
 
 
 router = APIRouter(prefix="/pos", tags=["POS"])
+
+
+def _push_metrics_background(target_date) -> None:
+    """Fire-and-forget metrics push. Creates its own DB session (request session already closed)."""
+    from app.database import SessionLocal
+    from app.services.central_sync_service import CentralSyncService
+
+    db = SessionLocal()
+    try:
+        service = CentralSyncService(db)
+        try:
+            service.push_metrics_snapshot(target_date)
+        finally:
+            service.close()
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).error("Background metrics push failed: %s", exc)
+    finally:
+        db.close()
 
 
 @router.post(
@@ -146,6 +173,7 @@ def create_bill(
 def add_payment(
     bill_id: str,
     payment_data: PaymentCreate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -199,6 +227,11 @@ def add_payment(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Bill not found"
             )
+
+        # Trigger metrics push when a bill is posted
+        if bill.status == BillStatus.POSTED and settings.central_sync_enabled:
+            today_ist = datetime.now(IST).date()
+            background_tasks.add_task(_push_metrics_background, today_ist)
 
         # Return payment with bill status
         return PaymentResponseWithBill(
@@ -659,12 +692,12 @@ def void_bill(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Void a draft bill.
+    """Void a bill.
 
-    Voids a bill that hasn't been posted yet. Used for cancellations
-    or mistakes. Only draft bills can be voided.
+    Voids a draft bill (any permitted user) or a posted bill (Owner only).
+    Used for cancellations or billing mistakes.
 
-    **Permissions**: Owner or Receptionist
+    **Permissions**: Owner or Receptionist (draft); Owner only (posted)
 
     Args:
         bill_id: ID of bill to void.
@@ -693,7 +726,8 @@ def void_bill(
         voided_bill = billing_service.void_bill(
             bill_id=bill_id,
             voided_by_id=current_user.id,
-            reason=void_data.reason
+            reason=void_data.reason,
+            allow_posted=current_user.is_owner,
         )
 
         return BillResponse.model_validate(voided_bill)
@@ -787,6 +821,8 @@ def list_bills(
     to_date: Optional[str] = None,
     customer_id: Optional[str] = None,
     invoice_number: Optional[str] = None,
+    search: Optional[str] = None,
+    pending_only: bool = False,
     page: int = 1,
     limit: int = 50,
     db: Session = Depends(get_db),
@@ -861,7 +897,37 @@ def list_bills(
         query = query.filter(Bill.customer_id == customer_id)
 
     if invoice_number:
-        query = query.filter(Bill.invoice_number == invoice_number)
+        query = query.filter(Bill.invoice_number.ilike(f"%{invoice_number}%"))
+
+    if search:
+        query = query.filter(
+            or_(
+                Bill.invoice_number.ilike(f"%{search}%"),
+                Bill.customer_name.ilike(f"%{search}%"),
+                Bill.customer_phone.ilike(f"%{search}%"),
+            )
+        )
+
+    if pending_only:
+        payment_subquery = (
+            sa_select(func.coalesce(func.sum(Payment.amount), 0))
+            .where(Payment.bill_id == Bill.id)
+            .correlate(Bill)
+            .scalar_subquery()
+        )
+        # Also count pending_payment_collections linked to the bill so that
+        # bills whose pending amount was collected via the Collect workflow
+        # no longer appear in the "Pending Payment" filter.
+        collection_subquery = (
+            sa_select(func.coalesce(func.sum(PendingPaymentCollection.amount), 0))
+            .where(PendingPaymentCollection.bill_id == Bill.id)
+            .correlate(Bill)
+            .scalar_subquery()
+        )
+        query = query.filter(
+            Bill.status == BillStatus.POSTED,
+            Bill.rounded_total > payment_subquery + collection_subquery + Bill.write_off_amount,
+        )
 
     # Get total count
     total = query.count()
@@ -873,8 +939,29 @@ def list_bills(
     # Get paginated results
     bills = query.order_by(Bill.created_at.desc()).offset(offset).limit(limit).all()
 
-    # Convert to response format
-    bill_items = [BillListItem.model_validate(bill) for bill in bills]
+    # Batch-fetch collection totals per bill (single query, not N queries)
+    bill_ids = [b.id for b in bills]
+    bill_collection_totals: dict[str, int] = {}
+    if bill_ids:
+        rows = (
+            db.query(PendingPaymentCollection.bill_id, func.sum(PendingPaymentCollection.amount))
+            .filter(PendingPaymentCollection.bill_id.in_(bill_ids))
+            .group_by(PendingPaymentCollection.bill_id)
+            .all()
+        )
+        bill_collection_totals = {row[0]: row[1] for row in rows}
+
+    # Convert to response format: total_paid includes direct payments
+    # + any pending collections that have been linked back to this bill.
+    bill_items = []
+    for bill in bills:
+        item = BillListItem.model_validate(bill)
+        item.total_paid = (
+            sum(p.amount for p in bill.payments)
+            + bill_collection_totals.get(bill.id, 0)
+        )
+        item.write_off_amount = bill.write_off_amount or 0
+        bill_items.append(item)
 
     return BillListResponse(
         bills=bill_items,
@@ -1015,3 +1102,234 @@ def export_bills(
                 "Content-Disposition": f'attachment; filename="{filename}"'
             }
         )
+
+
+@router.patch(
+    "/bills/{bill_id}/discount",
+    response_model=BillResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Update discount on a draft bill"
+)
+def update_bill_discount(
+    bill_id: str,
+    discount_data: BillDiscountUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Update the discount on a draft bill and recalculate totals.
+
+    Use this when a discount was missed or entered incorrectly at billing time.
+    If the revised total is now fully covered by any existing partial payments,
+    the bill is automatically posted.
+
+    **Permissions**: Owner or Receptionist (billing.discount)
+
+    Args:
+        bill_id: ID of the draft bill to update.
+        discount_data: New discount amount (paise) and optional reason.
+        db: Database session.
+        current_user: Authenticated user.
+
+    Returns:
+        BillResponse: Updated bill (status may change to posted if fully paid).
+
+    Raises:
+        400: Bill is not in draft status, or discount exceeds subtotal.
+        403: Insufficient permissions.
+        404: Bill not found.
+    """
+    if not PermissionChecker.has_permission(current_user.role.name, "billing", "discount"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions to apply discounts"
+        )
+
+    billing_service = BillingService(db)
+
+    try:
+        updated_bill = billing_service.apply_discount(
+            bill_id=bill_id,
+            discount_amount=discount_data.discount_amount,
+            discount_reason=discount_data.reason,
+            applied_by_id=current_user.id,
+        )
+        return BillResponse.model_validate(updated_bill)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
+
+@router.post(
+    "/bills/{bill_id}/collect-pending",
+    response_model=BillResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Collect payment against a posted bill with pending balance"
+)
+def collect_pending_bill_payment(
+    bill_id: str,
+    payment_data: PaymentCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Collect a payment directly against a specific posted bill with a pending balance.
+
+    Creates a Payment record on the bill and reduces the customer's
+    pending_balance. Amount must not exceed the remaining pending
+    (rounded_total - total_paid - write_off_amount).
+
+    **Permissions**: Receptionist or Owner
+
+    Raises:
+        400: Bill not posted, no pending balance, or amount exceeds pending.
+        403: Insufficient permissions.
+        404: Bill not found.
+    """
+    if not PermissionChecker.has_permission(current_user.role.name, "billing", "create"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions to collect payments"
+        )
+
+    billing_service = BillingService(db)
+    try:
+        updated_bill = billing_service.collect_pending_bill_payment(
+            bill_id=bill_id,
+            payment_method=payment_data.method,
+            amount_paise=int(round(payment_data.amount * 100)),
+            confirmed_by_id=current_user.id,
+            reference_number=payment_data.reference_number,
+            notes=payment_data.notes,
+        )
+        return BillResponse.model_validate(updated_bill)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.patch(
+    "/bills/{bill_id}/write-off",
+    response_model=BillResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Write off pending balance on a posted bill"
+)
+def write_off_pending_balance(
+    bill_id: str,
+    data: BillWriteOff,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Write off (forgive) some or all pending balance on a posted bill.
+
+    Increases the bill's discount by write_off_amount, recalculates totals
+    (including GST breakdown), and reduces the linked customer's pending_balance.
+
+    **Permissions**: Owner only.
+
+    Args:
+        bill_id: ID of the posted bill.
+        data: Write-off amount (paise) and required reason.
+        db: Database session.
+        current_user: Authenticated user.
+
+    Returns:
+        BillResponse: Updated bill with reduced rounded_total.
+
+    Raises:
+        400: Bill not posted, no pending balance, or amount exceeds pending.
+        403: Not owner.
+        404: Bill not found.
+    """
+    if not current_user.is_owner:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only owners can write off pending balances"
+        )
+
+    billing_service = BillingService(db)
+    try:
+        updated_bill = billing_service.write_off_pending_discount(
+            bill_id=bill_id,
+            write_off_amount=data.write_off_amount,
+            reason=data.reason,
+            approved_by_id=current_user.id,
+        )
+        return BillResponse.model_validate(updated_bill)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.patch(
+    "/bills/{bill_id}/customer",
+    response_model=BillResponse,
+    summary="Assign a customer to a walk-in bill"
+)
+def assign_customer_to_bill(
+    bill_id: str,
+    payload: BillAssignCustomer,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Assign a registered customer to a walk-in bill.
+
+    Only walk-in bills (no customer_id) can have a customer assigned.
+
+    **Permissions**: billing.update (Owner, Receptionist)
+
+    Args:
+        bill_id: Bill ID to update.
+        payload: Customer ID to assign.
+        db: Database session.
+        current_user: Authenticated user.
+
+    Returns:
+        BillResponse: Updated bill with customer info.
+
+    Raises:
+        403: Insufficient permissions.
+        404: Bill or customer not found.
+        400: Bill already has a customer assigned.
+    """
+    if not PermissionChecker.has_permission(current_user.role.name, "billing", "update"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions to update bills"
+        )
+
+    bill = db.query(Bill).filter(Bill.id == bill_id).first()
+    if not bill:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Bill not found: {bill_id}"
+        )
+
+    if bill.customer_phone:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Bill already has a customer assigned. Only walk-in bills can be updated."
+        )
+
+    from app.models.customer import Customer
+    customer = db.query(Customer).filter(Customer.id == payload.customer_id).first()
+    if not customer:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Customer not found: {payload.customer_id}"
+        )
+
+    # Assign customer to bill
+    bill.customer_id = customer.id
+    bill.customer_name = f"{customer.first_name} {customer.last_name}".strip()
+    bill.customer_phone = customer.phone
+
+    # If bill is posted with pending balance, update customer's pending_balance
+    if bill.status == BillStatus.POSTED:
+        total_paid = sum(payment.amount for payment in bill.payments)
+        pending_amount = bill.rounded_total - total_paid
+        if pending_amount > 0:
+            customer.pending_balance += pending_amount
+
+    db.commit()
+    db.refresh(bill)
+
+    return bill

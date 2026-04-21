@@ -46,7 +46,7 @@
 ```
 LAN (192.168.1.0/24)
     │
-    └─── nginx:80 (http://salon.local)
+    └─── nginx:80 (http://localhost)
            │
            ├─── frontend:3000 (internal)
            └─── api:8000 (internal)
@@ -87,10 +87,10 @@ cp .env.example .env
 nano .env
 
 # Start all services
-./start.sh
+./scripts/start.sh
 
 # Access the application
-# http://salon.local (or http://192.168.1.50)
+# http://localhost (or http://192.168.1.50)
 ```
 
 ### First Time Setup
@@ -117,7 +117,7 @@ If you're deploying on Windows with WSL2 and Docker Desktop:
 1. Deploy normally in WSL2 following the Quick Start above
 2. Run the port forwarding script in Windows PowerShell (as Administrator):
    ```powershell
-   .\wsl-port-forward.ps1
+   .\scripts\wsl-port-forward.ps1
    ```
 3. Access from any device on your network: `https://<your-windows-ip>`
 
@@ -126,9 +126,9 @@ If you're deploying on Windows with WSL2 and Docker Desktop:
 - **Full Guide**: [WSL2-NETWORK-SETUP.md](WSL2-NETWORK-SETUP.md)
 
 **Common WSL2 Issues:**
-- Works on Windows PC but not on phones/other laptops? → Run `wsl-port-forward.ps1`
+- Works on Windows PC but not on phones/other laptops? → Run `scripts/wsl-port-forward.ps1`
 - Need Tailscale access? → Install Tailscale in WSL2 (see full guide)
-- Issues after Windows reboot? → Run `setup-auto-forward.ps1` once for automatic setup
+- Issues after Windows reboot? → Run `scripts/setup-auto-forward.ps1` once for automatic setup
 
 ## Development
 
@@ -136,7 +136,7 @@ If you're deploying on Windows with WSL2 and Docker Desktop:
 
 ```bash
 # Start with hot-reload enabled
-./dev.sh
+./scripts/dev.sh
 
 # Or manually with docker compose
 docker compose up --build
@@ -166,7 +166,7 @@ uv run black app/
 uv run ruff check app/
 ```
 
-See [backend/CLAUDE.md](backend/claude.md) for detailed backend development guide.
+See [backend/CLAUDE.md](backend/CLAUDE.md) for detailed backend development guide.
 
 ### Database Migrations
 
@@ -229,12 +229,21 @@ efs-salon-os/
 │   ├── logs/           # Application logs
 │   └── backups/        # Automated backups
 │
+├── scripts/            # Utility scripts
+│   ├── start.sh        # Quick start script
+│   ├── stop.sh         # Quick stop script
+│   ├── dev.sh          # Development mode script
+│   ├── setup-https.sh  # HTTPS setup script
+│   ├── wsl-port-forward.ps1    # WSL2 port forwarding
+│   ├── setup-auto-forward.ps1  # Auto port forwarding on boot
+│   ├── diagnose-network.ps1    # Network diagnostics
+│   └── mobile-access-troubleshoot.ps1  # Mobile access troubleshooting
+│
+├── .claude/
+│   └── CLAUDE.md       # Project instructions
+│
 ├── compose.yaml        # Docker Compose configuration
 ├── .env.example        # Environment variables template
-├── start.sh            # Quick start script
-├── stop.sh             # Quick stop script
-├── dev.sh              # Development mode script
-├── claude.md           # Project instructions
 └── README.md           # This file
 ```
 
@@ -268,9 +277,9 @@ Example: `01HXXX1234ABCD567890EFGH`
 
 Once running, access interactive API documentation:
 
-- **Swagger UI**: http://salon.local/api/docs
-- **ReDoc**: http://salon.local/api/redoc
-- **Health Check**: http://salon.local/healthz
+- **Swagger UI**: http://localhost/api/docs
+- **ReDoc**: http://localhost/api/redoc
+- **Health Check**: http://localhost/healthz
 
 ### Key Endpoints
 
@@ -349,10 +358,10 @@ docker compose up -d
 
 ```bash
 # Basic health check
-curl http://salon.local/healthz
+curl http://localhost/healthz
 
 # Readiness check (will include DB + Redis in future)
-curl http://salon.local/readyz
+curl http://localhost/readyz
 
 # Service status
 docker compose ps
@@ -441,7 +450,7 @@ docker compose restart
 Starts all services in production mode:
 
 ```bash
-./start.sh
+./scripts/start.sh
 ```
 
 ### stop.sh
@@ -449,7 +458,7 @@ Starts all services in production mode:
 Stops all services (data is preserved):
 
 ```bash
-./stop.sh
+./scripts/stop.sh
 ```
 
 ### dev.sh
@@ -457,7 +466,7 @@ Stops all services (data is preserved):
 Starts services in development mode with build:
 
 ```bash
-./dev.sh
+./scripts/dev.sh
 ```
 
 ## Environment Variables
@@ -526,8 +535,8 @@ docker compose exec api uv run pytest tests/test_api/test_pos.py
 
 Complete technical specifications available in:
 
-- [claude.md](claude.md) - Project overview and instructions
-- [backend/claude.md](backend/claude.md) - Backend development guide
+- [CLAUDE.md](.claude/CLAUDE.md) - Project overview and instructions
+- [backend/CLAUDE.md](backend/CLAUDE.md) - Backend development guide
 
 ## Version
 
@@ -553,10 +562,10 @@ Complete technical specifications available in:
 
 ### Health Status Endpoints
 
-- Dashboard: http://salon.local
-- API Health: http://salon.local/healthz
-- API Readiness: http://salon.local/readyz
-- API Docs: http://salon.local/api/docs
+- Dashboard: http://localhost
+- API Health: http://localhost/healthz
+- API Readiness: http://localhost/readyz
+- API Docs: http://localhost/api/docs
 
 ## License
 
@@ -576,4 +585,4 @@ Built with modern Python tooling:
 **Status**: Phase 1 Development
 **Repository**: [efs-salon-os](https://github.com/yourusername/efs-salon-os)
 
-For detailed development instructions, see [claude.md](claude.md)
+For detailed development instructions, see [CLAUDE.md](.claude/CLAUDE.md)

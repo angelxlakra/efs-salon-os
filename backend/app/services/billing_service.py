@@ -23,6 +23,7 @@
 from datetime import datetime
 from typing import List, Optional
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from ulid import ULID
 
@@ -458,10 +459,10 @@ class BillingService:
                     payment.notes = f"Applied Rs {overpayment_amount/100:.2f} to pending balance"
 
         if new_total >= bill.rounded_total:
-            # Generate invoice number
-            invoice_number = InvoiceNumberGenerator.generate(self.db)
-
-            bill.invoice_number = invoice_number
+            # Preserve existing invoice number if bill was previously posted and
+            # reverted to draft via payment deletion — don't generate a duplicate.
+            if not bill.invoice_number:
+                bill.invoice_number = InvoiceNumberGenerator.generate(self.db)
             bill.status = BillStatus.POSTED
             bill.posted_at = datetime.now(IST)
 
@@ -606,6 +607,14 @@ class BillingService:
                 f"Can only complete draft bills. Current status: {bill.status}"
             )
 
+        # Walk-in customers (no phone) cannot have pending balance
+        total_paid = sum(payment.amount for payment in bill.payments)
+        if not bill.customer_phone and bill.rounded_total > 0 and total_paid < bill.rounded_total:
+            raise ValueError(
+                "Walk-in customers cannot have pending balance. "
+                "Please assign a customer profile or collect full payment."
+            )
+
         # Generate invoice number
         invoice_number = InvoiceNumberGenerator.generate(self.db)
         bill.invoice_number = invoice_number
@@ -637,9 +646,9 @@ class BillingService:
             total_paid = sum(payment.amount for payment in bill.payments)
             pending_amount = bill.rounded_total - total_paid
 
-            # Only update customer stats with what they actually paid
-            if total_paid > 0:
-                self._update_customer_stats(bill.customer_id, total_paid, increment=True)
+            # Always count the visit and update last_visit_at; total_spent reflects
+            # only the amount actually received (may be 0 for full-pending bills).
+            self._update_customer_stats(bill.customer_id, total_paid, increment=True)
 
             # Update pending balance if there's an outstanding amount
             if pending_amount > 0:
@@ -656,30 +665,47 @@ class BillingService:
         self,
         bill_id: str,
         voided_by_id: str,
-        reason: Optional[str] = None
+        reason: Optional[str] = None,
+        allow_posted: bool = False,
     ) -> Bill:
-        """Void a draft bill.
+        """Void a bill.
 
-            Voids a bill that hasn't been posted yet. Only draft bills
-            can be voided. This is used for cancellations or mistakes.
+            Voids a draft bill, or — when allow_posted=True (owner only) — a
+            posted bill. Used for cancellations or billing mistakes.
+
+            When a posted bill is voided the customer's stats are reversed so
+            that total_spent and total_visits remain accurate.
 
             Args:
                 bill_id: Bill ID to void.
                 voided_by_id: User ID performing the void operation.
                 reason: Optional reason for voiding.
+                allow_posted: If True, also allows voiding POSTED bills.
+                    Should only be set to True when the caller is an Owner.
 
             Returns:
                 Bill: Voided bill.
 
             Raises:
-                ValueError: If bill not found or not in draft status.
+                ValueError: If bill not found or status not voidable.
         """
         bill = self.get_bill(bill_id)
 
         if not bill:
             raise ValueError(f"Bill not found: {bill_id}")
 
-        if bill.status != BillStatus.DRAFT:
+        if bill.status == BillStatus.DRAFT:
+            # Delete any partial payment records — the bill was never finalized,
+            # so these payments are orphaned and should be treated as if they
+            # never occurred (cash must be returned to the customer manually).
+            self.db.query(Payment).filter(Payment.bill_id == bill_id).delete()
+        elif bill.status == BillStatus.POSTED and allow_posted:
+            # Reverse customer stats that were recorded on posting
+            if bill.customer_id:
+                self._update_customer_stats(
+                    bill.customer_id, bill.rounded_total, increment=False
+                )
+        else:
             raise ValueError(
                 f"Can only void draft bills. Current status: {bill.status}"
             )
@@ -705,6 +731,205 @@ class BillingService:
         self.db.commit()
         self.db.refresh(bill)
 
+        return bill
+
+    def apply_discount(
+        self,
+        bill_id: str,
+        discount_amount: int,  # paise
+        discount_reason: Optional[str] = None,
+        applied_by_id: Optional[str] = None,
+    ) -> Bill:
+        """Update the discount on a draft bill and recalculate totals.
+
+            Only works on DRAFT bills. If the revised total is now fully covered
+            by existing partial payments, the bill is automatically posted.
+
+            Args:
+                bill_id: Bill ID to update.
+                discount_amount: New discount in paise.
+                discount_reason: Optional reason for the discount.
+                applied_by_id: User ID applying the discount.
+
+            Returns:
+                Bill: Updated bill (may transition to POSTED if fully paid).
+
+            Raises:
+                ValueError: If bill not found, not draft, or discount exceeds subtotal.
+        """
+        bill = self.get_bill(bill_id)
+        if not bill:
+            raise ValueError(f"Bill not found: {bill_id}")
+        if bill.status != BillStatus.DRAFT:
+            raise ValueError("Can only edit discount on draft bills")
+        if discount_amount > bill.subtotal:
+            raise ValueError("Discount cannot exceed subtotal")
+
+        # Recalculate all totals from scratch using the new discount
+        amount_after_discount = bill.subtotal - discount_amount
+        tax_breakdown = TaxCalculator.calculate_tax_breakdown(amount_after_discount)
+        total_amount = amount_after_discount  # prices are tax-inclusive
+        rounded_total, rounding_adjustment = TaxCalculator.round_to_rupee(total_amount)
+
+        bill.discount_amount = discount_amount
+        bill.discount_reason = discount_reason
+        bill.discount_approved_by = applied_by_id
+        bill.tax_amount = tax_breakdown["total_tax"]
+        bill.cgst_amount = tax_breakdown["cgst"]
+        bill.sgst_amount = tax_breakdown["sgst"]
+        bill.total_amount = total_amount
+        bill.rounded_total = rounded_total
+        bill.rounding_adjustment = rounding_adjustment
+        bill.updated_at = datetime.now(IST)
+
+        # Auto-post if partial payments now fully cover the revised total
+        existing_payments = self.db.query(Payment).filter(
+            Payment.bill_id == bill_id
+        ).all()
+        total_paid = sum(p.amount for p in existing_payments)
+        if existing_payments and total_paid >= rounded_total:
+            bill.status = BillStatus.POSTED
+            bill.posted_at = datetime.now(IST)
+            # Preserve existing invoice number (bill may have been posted before
+            # and reverted to draft via payment deletion — don't generate a duplicate)
+            if not bill.invoice_number:
+                bill.invoice_number = InvoiceNumberGenerator.generate(self.db)
+            if bill.customer_id:
+                self._update_customer_stats(
+                    bill.customer_id, rounded_total, increment=True
+                )
+
+        self.db.commit()
+        self.db.refresh(bill)
+        return bill
+
+    def write_off_pending_discount(
+        self,
+        bill_id: str,
+        write_off_amount: int,    # paise — amount to forgive (1 to pending balance)
+        reason: str,              # required
+        approved_by_id: str,
+    ) -> Bill:
+        """Write off (forgive) some or all pending balance on a posted bill.
+
+            Records the forgiven amount in write_off_amount, write_off_at,
+            write_off_reason, and write_off_approved_by WITHOUT altering
+            discount_amount, rounded_total, total_amount, tax_amount,
+            cgst_amount, sgst_amount, or rounding_adjustment.
+
+            Multiple calls accumulate: each call adds write_off_amount to the
+            existing bill.write_off_amount, and the remaining pending is
+            computed as:
+
+                pending = rounded_total - sum(payments) - existing_write_off_amount
+
+            Args:
+                bill_id: Bill ID to update.
+                write_off_amount: Paise to forgive this call (1 to remaining pending).
+                reason: Required reason for the write-off.
+                approved_by_id: User ID of the approving owner.
+
+            Returns:
+                Bill: Updated bill with write_off fields set.
+
+            Raises:
+                ValueError: If bill not found, not posted, no remaining pending
+                            balance, or write_off_amount out of [1, remaining].
+        """
+        bill = self.get_bill(bill_id)
+        if not bill:
+            raise ValueError(f"Bill not found: {bill_id}")
+        if bill.status != BillStatus.POSTED:
+            raise ValueError("Can only write off pending balance on posted bills")
+
+        total_paid = sum(p.amount for p in bill.payments)
+        existing_write_off = bill.write_off_amount or 0
+        # Remaining pending accounts for prior write-offs on the same bill
+        pending = bill.rounded_total - total_paid - existing_write_off
+        if pending <= 0:
+            raise ValueError("Bill has no pending balance")
+        if write_off_amount <= 0 or write_off_amount > pending:
+            raise ValueError(f"Write-off amount must be between 1 and {pending} paise")
+
+        # Accumulate the write-off amount; do NOT touch any financial column
+        bill.write_off_amount = existing_write_off + write_off_amount
+        bill.write_off_at = datetime.now(IST)
+        bill.write_off_reason = reason
+        bill.write_off_approved_by = approved_by_id
+        bill.updated_at = datetime.now(IST)
+
+        if bill.customer_id:
+            customer = self.db.query(Customer).filter(Customer.id == bill.customer_id).first()
+            if customer:
+                customer.pending_balance = max(0, customer.pending_balance - write_off_amount)
+
+        self.db.commit()
+        self.db.refresh(bill)
+        return bill
+
+    def collect_pending_bill_payment(
+        self,
+        bill_id: str,
+        payment_method: PaymentMethod,
+        amount_paise: int,
+        confirmed_by_id: str,
+        reference_number: Optional[str] = None,
+        notes: Optional[str] = None,
+    ) -> Bill:
+        """Collect a payment against a posted bill that has a pending balance.
+
+            Creates a Payment record directly on the bill and reduces the linked
+            customer's pending_balance. Only works on POSTED bills with remaining
+            pending (rounded_total - total_paid - write_off_amount > 0).
+
+            Args:
+                bill_id: Posted bill ID to collect against.
+                payment_method: Payment method (cash, upi, card, other).
+                amount_paise: Amount to collect in paise.
+                confirmed_by_id: User confirming the payment.
+                reference_number: Optional transaction reference.
+                notes: Optional payment notes.
+
+            Returns:
+                Bill: Updated bill with new payment attached.
+
+            Raises:
+                ValueError: If bill not found, not posted, no pending balance,
+                            or amount exceeds remaining pending.
+        """
+        bill = self.get_bill(bill_id)
+        if not bill:
+            raise ValueError("Bill not found")
+        if bill.status != BillStatus.POSTED:
+            raise ValueError("Can only collect payment on posted bills")
+
+        total_paid = sum(p.amount for p in bill.payments)
+        existing_write_off = bill.write_off_amount or 0
+        pending = bill.rounded_total - total_paid - existing_write_off
+        if pending <= 0:
+            raise ValueError("Bill has no pending balance")
+        if amount_paise <= 0 or amount_paise > pending:
+            raise ValueError(f"Amount must be between 1 and {pending} paise")
+
+        payment = Payment(
+            id=str(ULID()),
+            bill_id=bill_id,
+            payment_method=payment_method,
+            amount=amount_paise,
+            reference_number=reference_number,
+            notes=notes,
+            confirmed_at=datetime.now(IST),
+            confirmed_by=confirmed_by_id,
+        )
+        self.db.add(payment)
+
+        if bill.customer_id:
+            customer = self.db.query(Customer).filter(Customer.id == bill.customer_id).first()
+            if customer:
+                customer.pending_balance = max(0, customer.pending_balance - amount_paise)
+
+        self.db.commit()
+        self.db.refresh(bill)
         return bill
 
     def get_bill(self, bill_id: str) -> Optional[Bill]:
@@ -960,26 +1185,86 @@ class BillingService:
         previous_balance = customer.pending_balance
         customer.pending_balance -= amount
 
-        # Create pending payment collection record
-        collection = PendingPaymentCollection(
-            id=str(ULID()),
-            customer_id=customer_id,
-            amount=amount,
-            payment_method=payment_method,
-            reference_number=reference_number,
-            notes=notes,
-            bill_id=None,  # Direct collection, not linked to specific bill
-            collected_by=collected_by_id,
-            collected_at=datetime.now(IST),
-            previous_balance=previous_balance,
-            new_balance=customer.pending_balance
+        # Allocate collection amount to outstanding bills in FIFO order
+        # (oldest posted bill first) so the bills list can show them as settled.
+        pending_bills = (
+            self.db.query(Bill)
+            .filter(
+                Bill.customer_id == customer_id,
+                Bill.status == BillStatus.POSTED,
+                Bill.original_bill_id.is_(None),
+            )
+            .order_by(Bill.posted_at.asc())
+            .all()
         )
 
-        self.db.add(collection)
-        self.db.commit()
-        self.db.refresh(collection)
+        remaining = amount
+        current_balance = previous_balance
+        first_collection: Optional[PendingPaymentCollection] = None
+        collected_at = datetime.now(IST)
 
-        return collection
+        for bill in pending_bills:
+            if remaining <= 0:
+                break
+
+            # How much of this bill is still uncovered by payments + prior collections?
+            bill_paid_direct = sum(p.amount for p in bill.payments)
+            bill_already_collected = (
+                self.db.query(func.coalesce(func.sum(PendingPaymentCollection.amount), 0))
+                .filter(PendingPaymentCollection.bill_id == bill.id)
+                .scalar()
+            )
+            bill_uncovered = max(0, bill.rounded_total - bill_paid_direct - bill_already_collected)
+            if bill_uncovered <= 0:
+                continue
+
+            apply_amount = min(remaining, bill_uncovered)
+            new_balance = current_balance - apply_amount
+
+            coll = PendingPaymentCollection(
+                id=str(ULID()),
+                customer_id=customer_id,
+                amount=apply_amount,
+                payment_method=payment_method,
+                reference_number=reference_number,
+                notes=notes,
+                bill_id=bill.id,
+                collected_by=collected_by_id,
+                collected_at=collected_at,
+                previous_balance=current_balance,
+                new_balance=new_balance,
+            )
+            self.db.add(coll)
+            if first_collection is None:
+                first_collection = coll
+
+            remaining -= apply_amount
+            current_balance = new_balance
+
+        # Any unallocated remainder (e.g. no pending bills yet, or float rounding)
+        if remaining > 0:
+            new_balance = current_balance - remaining
+            coll = PendingPaymentCollection(
+                id=str(ULID()),
+                customer_id=customer_id,
+                amount=remaining,
+                payment_method=payment_method,
+                reference_number=reference_number,
+                notes=notes,
+                bill_id=None,
+                collected_by=collected_by_id,
+                collected_at=collected_at,
+                previous_balance=current_balance,
+                new_balance=new_balance,
+            )
+            self.db.add(coll)
+            if first_collection is None:
+                first_collection = coll
+
+        self.db.commit()
+        if first_collection:
+            self.db.refresh(first_collection)
+        return first_collection
 
     def _update_customer_stats(
         self,

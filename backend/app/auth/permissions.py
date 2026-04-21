@@ -99,7 +99,7 @@ class PermissionChecker:
             "expenses": ["create", "read", "update", "delete", "approve"]
         },
         RoleEnum.RECEPTIONIST: {
-            "billing": ["create", "read", "discount", "view_totals"],
+            "billing": ["create", "read", "update", "discount", "view_totals"],
             "appointments": ["create", "read", "update", "assign_staff"],
             "walkins": ["create", "read", "update", "start", "complete"],
             "inventory": ["read", "request"],

@@ -121,38 +121,38 @@ export default function InvoiceDetailPage() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-4 md:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => router.back()}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <div>
-            <h1 className="text-3xl font-bold">{invoice.invoice_number}</h1>
-            <p className="text-muted-foreground">Purchase Invoice Details</p>
+          <div className="min-w-0">
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold truncate">{invoice.invoice_number}</h1>
+            <p className="text-sm text-muted-foreground">Purchase Invoice Details</p>
           </div>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {invoice.status !== 'paid' && (
-            <Button variant="outline" onClick={() => setShowEditDialog(true)}>
-              <Edit className="mr-2 h-4 w-4" />
-              Edit Invoice
+            <Button variant="outline" size="sm" onClick={() => setShowEditDialog(true)}>
+              <Edit className="mr-1.5 h-4 w-4" />
+              Edit
             </Button>
           )}
 
           {invoice.status === 'draft' && (
-            <Button onClick={handleMarkReceived}>
-              <CheckCircle className="mr-2 h-4 w-4" />
-              Mark Received
+            <Button size="sm" onClick={handleMarkReceived}>
+              <CheckCircle className="mr-1.5 h-4 w-4" />
+              Received
             </Button>
           )}
 
           {(invoice.status === 'received' || invoice.status === 'partially_paid') && invoice.balance_due > 0 && (
-            <Button onClick={() => router.push(`/dashboard/purchases/payments/new?invoice_id=${invoice.id}`)}>
-              <DollarSign className="mr-2 h-4 w-4" />
-              Record Payment
+            <Button size="sm" onClick={() => router.push(`/dashboard/purchases/payments/new?invoice_id=${invoice.id}`)}>
+              <DollarSign className="mr-1.5 h-4 w-4" />
+              Pay
             </Button>
           )}
         </div>
@@ -170,7 +170,7 @@ export default function InvoiceDetailPage() {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Invoice Number</p>
                   <p className="font-semibold">{invoice.invoice_number}</p>
@@ -212,7 +212,8 @@ export default function InvoiceDetailPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                <div className="grid grid-cols-12 gap-2 text-sm font-medium text-muted-foreground pb-2 border-b">
+                {/* Desktop table header */}
+                <div className="hidden md:grid grid-cols-12 gap-2 text-sm font-medium text-muted-foreground pb-2 border-b">
                   <div className="col-span-5">Product</div>
                   <div className="col-span-2 text-center">UOM</div>
                   <div className="col-span-2 text-right">Quantity</div>
@@ -220,25 +221,47 @@ export default function InvoiceDetailPage() {
                 </div>
 
                 {invoice.items.map((item) => (
-                  <div key={item.id} className="grid grid-cols-12 gap-2 text-sm py-2 border-b">
-                    <div className="col-span-5">
-                      <p className="font-medium">{item.product_name}</p>
-                      {item.barcode && (
-                        <p className="text-xs text-muted-foreground">Barcode: {item.barcode}</p>
-                      )}
-                    </div>
-                    <div className="col-span-2 text-center">{item.uom}</div>
-                    <div className="col-span-2 text-right">{item.quantity}</div>
-                    <div className="col-span-3 text-right space-y-1">
-                      <div className="text-xs text-muted-foreground">
-                        @ {formatCurrency(item.unit_cost)}
-                      </div>
-                      {item.discount_amount > 0 && (
-                        <div className="text-xs text-green-600">
-                          Discount: -{formatCurrency(item.discount_amount)}
+                  <div key={item.id}>
+                    {/* Mobile card */}
+                    <div className="md:hidden py-3 border-b space-y-1">
+                      <div className="flex justify-between items-start">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-sm">{item.product_name}</p>
+                          {item.barcode && (
+                            <p className="text-xs text-muted-foreground">Barcode: {item.barcode}</p>
+                          )}
                         </div>
-                      )}
-                      <div className="font-semibold">{formatCurrency(item.total_cost)}</div>
+                        <p className="font-semibold text-sm ml-2">{formatCurrency(item.total_cost)}</p>
+                      </div>
+                      <div className="flex gap-3 text-xs text-muted-foreground">
+                        <span>{item.quantity} {item.uom}</span>
+                        <span>@ {formatCurrency(item.unit_cost)}</span>
+                        {item.discount_amount > 0 && (
+                          <span className="text-green-600">-{formatCurrency(item.discount_amount)}</span>
+                        )}
+                      </div>
+                    </div>
+                    {/* Desktop row */}
+                    <div className="hidden md:grid grid-cols-12 gap-2 text-sm py-2 border-b">
+                      <div className="col-span-5">
+                        <p className="font-medium">{item.product_name}</p>
+                        {item.barcode && (
+                          <p className="text-xs text-muted-foreground">Barcode: {item.barcode}</p>
+                        )}
+                      </div>
+                      <div className="col-span-2 text-center">{item.uom}</div>
+                      <div className="col-span-2 text-right">{item.quantity}</div>
+                      <div className="col-span-3 text-right space-y-1">
+                        <div className="text-xs text-muted-foreground">
+                          @ {formatCurrency(item.unit_cost)}
+                        </div>
+                        {item.discount_amount > 0 && (
+                          <div className="text-xs text-green-600">
+                            Discount: -{formatCurrency(item.discount_amount)}
+                          </div>
+                        )}
+                        <div className="font-semibold">{formatCurrency(item.total_cost)}</div>
+                      </div>
                     </div>
                   </div>
                 ))}

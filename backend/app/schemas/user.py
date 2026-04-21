@@ -1,6 +1,6 @@
 """User management schemas for request/response validation."""
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import List, Optional
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from app.models.user import RoleEnum
@@ -26,6 +26,7 @@ class UserBase(BaseModel):
     email: Optional[EmailStr] = None
     full_name: str = Field(..., min_length=1, max_length=100)
     phone: str = Field(..., pattern=r"^\+?[1-9]\d{1,14}$")
+    date_of_birth: Optional[date] = None  # Only month+day used; year stored as 1900
 
 
 class UserCreate(UserBase):
@@ -56,6 +57,7 @@ class UserUpdate(BaseModel):
     phone: Optional[str] = Field(None, pattern=r"^\+?[1-9]\d{1,14}$")
     role_id: Optional[str] = Field(None, min_length=26, max_length=26)
     is_active: Optional[bool] = None
+    date_of_birth: Optional[date] = None  # Only month+day used; year stored as 1900
 
 
 class UserPasswordChange(BaseModel):
@@ -104,6 +106,7 @@ class UserResponse(BaseModel):
     email: Optional[str] = None
     full_name: str
     phone: Optional[str] = None
+    date_of_birth: Optional[date] = None
     role: RoleResponse
     is_active: bool
     last_login_at: Optional[datetime] = None
@@ -178,3 +181,19 @@ class StaffListResponse(BaseModel):
     page: int
     size: int
     pages: int
+
+
+# ========== Birthday Schemas ==========
+
+class BirthdayUserResponse(BaseModel):
+    """Minimal user info for birthday display."""
+    id: str
+    full_name: str
+
+    class Config:
+        from_attributes = True
+
+
+class TodayBirthdaysResponse(BaseModel):
+    """Today's employee birthdays."""
+    birthdays: List[BirthdayUserResponse]

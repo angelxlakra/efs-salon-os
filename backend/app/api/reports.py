@@ -547,6 +547,8 @@ def get_profit_loss_report(
     """
     from app.models.accounting import DaySummary
     from app.models.expense import Expense, ExpenseStatus, ExpenseCategory
+    from app.models.billing import Bill as BillModel
+    from sqlalchemy import func as sa_func
 
     # Parse dates
     try:
@@ -571,12 +573,22 @@ def get_profit_loss_report(
         DaySummary.summary_date <= end_date_obj
     ).all()
 
-    # Aggregate revenue
+    # Aggregate revenue from day summaries
     total_bills = sum(s.total_bills for s in summaries)
     gross_revenue = sum(s.gross_revenue for s in summaries)
     discount_amount = sum(s.discount_amount for s in summaries)
     refund_amount = sum(s.refund_amount for s in summaries)
-    net_revenue = gross_revenue - discount_amount - refund_amount
+
+    # Write-offs: filtered by write_off_at falling within the report period.
+    # This is a live query because write-offs are not yet aggregated in DaySummary.
+    written_off_bills = db.query(BillModel).filter(
+        sa_func.date(BillModel.write_off_at) >= start_date_obj,
+        sa_func.date(BillModel.write_off_at) <= end_date_obj,
+        BillModel.write_off_amount > 0,
+    ).all()
+    total_write_offs = sum(b.write_off_amount for b in written_off_bills)
+
+    net_revenue = gross_revenue - discount_amount - refund_amount - total_write_offs
 
     # Aggregate COGS
     service_cogs = sum(s.actual_service_cogs for s in summaries)
@@ -616,6 +628,7 @@ def get_profit_loss_report(
             gross_revenue=gross_revenue,
             discount_amount=discount_amount,
             refund_amount=refund_amount,
+            write_off_amount=total_write_offs,
             net_revenue=net_revenue
         ),
         cogs=PLCostOfGoodsSold(

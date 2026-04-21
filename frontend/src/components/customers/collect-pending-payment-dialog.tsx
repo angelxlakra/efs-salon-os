@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Loader2, Wallet, CreditCard, Banknote } from 'lucide-react';
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogHeader,
   DialogTitle,
@@ -95,7 +96,7 @@ export function CollectPendingPaymentDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto" style={{ maxWidth: 'min(32rem, calc(100vw - 2rem))' }}>
+      <DialogContent size="md">
         <DialogHeader>
           <DialogTitle>Collect Pending Payment</DialogTitle>
           <DialogDescription>
@@ -103,7 +104,7 @@ export function CollectPendingPaymentDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 sm:space-y-5 mt-4">
+        <DialogBody className="space-y-4 sm:space-y-5">
           {/* Pending Balance Info */}
           <div className="bg-red-50 rounded-lg p-3 sm:p-4 border border-red-200">
             <div className="flex justify-between items-center">
@@ -211,7 +212,7 @@ export function CollectPendingPaymentDialog({
               )}
             </Button>
           </div>
-        </div>
+        </DialogBody>
       </DialogContent>
     </Dialog>
   );

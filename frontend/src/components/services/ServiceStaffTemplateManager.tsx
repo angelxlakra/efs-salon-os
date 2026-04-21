@@ -8,6 +8,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, GripVertical, Save, X, Users } from 'lucide-react';
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -222,7 +223,7 @@ export const ServiceStaffTemplateManager: React.FC<ServiceStaffTemplateManagerPr
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent size="xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Users className="h-5 w-5" />
@@ -234,7 +235,7 @@ export const ServiceStaffTemplateManager: React.FC<ServiceStaffTemplateManagerPr
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <DialogBody className="space-y-4">
           {/* Existing Templates */}
           {isLoading ? (
             <div className="text-center py-8 text-gray-500">Loading roles...</div>
@@ -330,9 +331,9 @@ export const ServiceStaffTemplateManager: React.FC<ServiceStaffTemplateManagerPr
               <h4 className="font-semibold mb-4 text-blue-900">
                 {isAddingNew ? 'Add New Role' : 'Edit Role'}
               </h4>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Role Name */}
-                <div className="col-span-2">
+                <div className="sm:col-span-2">
                   <Label>Role Name *</Label>
                   <Input
                     value={editingTemplate.role_name}
@@ -344,7 +345,7 @@ export const ServiceStaffTemplateManager: React.FC<ServiceStaffTemplateManagerPr
                 </div>
 
                 {/* Role Description */}
-                <div className="col-span-2">
+                <div className="sm:col-span-2">
                   <Label>Description</Label>
                   <Textarea
                     value={editingTemplate.role_description}
@@ -494,7 +495,7 @@ export const ServiceStaffTemplateManager: React.FC<ServiceStaffTemplateManagerPr
               Add Another Role
             </Button>
           )}
-        </div>
+        </DialogBody>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>

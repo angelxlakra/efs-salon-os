@@ -9,15 +9,18 @@ This module provides REST API endpoints for:
 """
 
 from app.utils import generate_ulid
-from typing import Optional, List
+from typing import Literal, Optional, List
 import csv
 import io
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status, File, UploadFile
+from sqlalchemy import select, func
 from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
 from app.models.user import User
+from app.models.billing import Bill, BillItem, BillStatus
+from app.models.customer import Customer
 from app.models.service import ServiceCategory, Service, ServiceAddon, ServiceStaffTemplate
 from app.models.inventory import SKU
 from app.auth.dependencies import get_current_user, require_owner, require_owner_or_receptionist
@@ -50,6 +53,9 @@ from app.schemas.catalog import (
     ServiceStaffTemplateResponse,
     # Full catalog
     CatalogResponse,
+    # History
+    ServiceHistoryItem,
+    ServiceHistoryResponse,
 )
 
 
@@ -365,16 +371,19 @@ def delete_category(
 def list_services(
     category_id: Optional[str] = Query(None, description="Filter by category"),
     include_inactive: bool = Query(False, description="Include inactive services"),
+    sort_by: Literal["display_order", "popularity"] = Query("display_order", description="Sort order: display_order or popularity"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """List all services with optional filtering.
+    """List all services with optional filtering and sorting.
 
     **Permissions**: Any authenticated user
 
     Args:
         category_id: Optional category filter.
         include_inactive: Whether to include inactive services.
+        sort_by: Sort order — "display_order" (default) or "popularity" (all-time
+            bill_item count descending, display_order ascending as tiebreaker).
         db: Database session.
         current_user: Authenticated user.
 
@@ -393,7 +402,17 @@ def list_services(
     if category_id:
         query = query.filter(Service.category_id == category_id)
 
-    services = query.order_by(Service.display_order).all()
+    if sort_by == "popularity":
+        # Correlated subquery avoids GROUP BY which would conflict with joinedload.
+        popularity_subquery = (
+            select(func.count(BillItem.id))
+            .where(BillItem.service_id == Service.id)
+            .correlate(Service)
+            .scalar_subquery()
+        )
+        services = query.order_by(popularity_subquery.desc(), Service.display_order.asc()).all()
+    else:
+        services = query.order_by(Service.display_order).all()
 
     service_list = []
     for s in services:
@@ -589,6 +608,87 @@ def update_service(
     db.refresh(service)
 
     return ServiceResponse.model_validate(service)
+
+
+@router.get(
+    "/services/{service_id}/history",
+    response_model=ServiceHistoryResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get service usage history"
+)
+def get_service_history(
+    service_id: str,
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=50),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_owner_or_receptionist),
+):
+    """List all POSTED bill items for a service: who was the client and which staff performed it."""
+    service = db.query(Service).filter(Service.id == service_id).first()
+    if not service:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Service not found")
+
+    base_q = (
+        db.query(BillItem)
+        .join(Bill, BillItem.bill_id == Bill.id)
+        .filter(
+            BillItem.service_id == service_id,
+            Bill.status == BillStatus.POSTED,
+        )
+    )
+    total = base_q.count()
+    pages = (total + size - 1) // size
+
+    bill_items = (
+        base_q
+        .options(
+            joinedload(BillItem.bill).joinedload(Bill.customer),
+            joinedload(BillItem.staff),
+            joinedload(BillItem.staff_contributions),
+        )
+        .order_by(Bill.posted_at.desc())
+        .offset((page - 1) * size)
+        .limit(size)
+        .all()
+    )
+
+    result = []
+    for item in bill_items:
+        bill = item.bill
+        if bill.customer:
+            customer_name = bill.customer.full_name
+        elif bill.customer_name:
+            customer_name = bill.customer_name
+        else:
+            customer_name = "Walk-in"
+
+        has_multi = bool(item.staff_contributions)
+        if has_multi:
+            staff_name = "Multiple"
+        elif item.staff:
+            staff_name = item.staff.display_name
+        else:
+            staff_name = None
+
+        result.append(ServiceHistoryItem(
+            bill_id=bill.id,
+            invoice_number=bill.invoice_number,
+            posted_at=bill.posted_at,
+            customer_name=customer_name,
+            staff_name=staff_name,
+            has_multi_staff=has_multi,
+            price_paid=item.line_total,
+        ))
+
+    return ServiceHistoryResponse(
+        service_id=service_id,
+        service_name=service.name,
+        items=result,
+        total=total,
+        page=page,
+        size=size,
+        pages=pages,
+    )
 
 
 @router.delete(

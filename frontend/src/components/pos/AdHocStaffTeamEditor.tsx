@@ -8,6 +8,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, Users, X, Save } from 'lucide-react';
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -220,7 +221,7 @@ export const AdHocStaffTeamEditor: React.FC<AdHocStaffTeamEditorProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent size="lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Users className="h-5 w-5" />
@@ -232,7 +233,7 @@ export const AdHocStaffTeamEditor: React.FC<AdHocStaffTeamEditorProps> = ({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <DialogBody className="space-y-4">
           {/* Current Assignments */}
           {assignments.length === 0 ? (
             <Alert>
@@ -328,9 +329,9 @@ export const AdHocStaffTeamEditor: React.FC<AdHocStaffTeamEditorProps> = ({
               Equal Split ({Math.floor(100 / assignments.length)}% each)
             </Button>
           )}
-        </div>
+        </DialogBody>
 
-        <DialogFooter className="gap-2">
+        <DialogFooter>
           <Button variant="outline" onClick={handleCancel}>
             <X className="h-4 w-4 mr-2" />
             Cancel

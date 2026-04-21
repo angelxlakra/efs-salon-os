@@ -14,6 +14,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { apiClient } from '@/lib/api-client';
 import { toast } from 'sonner';
 import { useAuthStore } from '@/stores/auth-store';
+import { titleCase } from '@/lib/utils';
 import { ServiceGrid } from '@/components/pos/service-grid';
 
 interface Service {
@@ -217,7 +218,7 @@ export default function MyServicesPage() {
               Add Service
             </Button>
           </SheetTrigger>
-          <SheetContent side="right" className="w-full sm:max-w-2xl p-0">
+          <SheetContent side="right" className="w-full sm:max-w-[672px] p-0">
             <div className="h-full flex flex-col">
               <SheetHeader className="p-6 border-b">
                 <SheetTitle>Add New Service</SheetTitle>
@@ -333,7 +334,7 @@ export default function MyServicesPage() {
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
                         <h3 className="text-lg font-semibold text-gray-900">
-                          {service.customer_name}
+                          {titleCase(service.customer_name)}
                         </h3>
                         {getStatusBadge(service.status)}
                         <Badge variant="outline">{service.ticket_number}</Badge>
@@ -380,7 +381,7 @@ export default function MyServicesPage() {
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
                         <h3 className="text-lg font-semibold text-gray-900">
-                          {service.customer_name}
+                          {titleCase(service.customer_name)}
                         </h3>
                         {getStatusBadge(service.status)}
                         <Badge variant="outline">{service.ticket_number}</Badge>
@@ -437,7 +438,7 @@ export default function MyServicesPage() {
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
                         <h3 className="text-lg font-semibold text-gray-900">
-                          {service.customer_name}
+                          {titleCase(service.customer_name)}
                         </h3>
                         {getStatusBadge(service.status)}
                         <Badge variant="outline">{service.ticket_number}</Badge>
@@ -468,7 +469,7 @@ export default function MyServicesPage() {
       {/* Notes Dialog */}
       {activeService && (
         <Sheet open={!!activeService} onOpenChange={() => setActiveService(null)}>
-          <SheetContent side="right" className="w-full sm:max-w-md">
+          <SheetContent side="right" className="w-full sm:max-w-[448px]">
             <SheetHeader className="mb-4">
               <SheetTitle>Add Service Notes</SheetTitle>
             </SheetHeader>
@@ -476,7 +477,7 @@ export default function MyServicesPage() {
             <div className="space-y-4">
               <div>
                 <p className="text-sm text-gray-600 mb-1">Customer</p>
-                <p className="font-semibold">{activeService.customer_name}</p>
+                <p className="font-semibold">{titleCase(activeService.customer_name)}</p>
               </div>
 
               <div>

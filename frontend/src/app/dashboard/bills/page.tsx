@@ -1,18 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Search, Filter, Download, Eye, Printer, RotateCcw, XCircle, Loader2, FileText, FileSpreadsheet } from 'lucide-react';
+import { Search, Download, Eye, Printer, RotateCcw, XCircle, Loader2, FileText, FileSpreadsheet, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,12 +15,17 @@ import {
 import { apiClient } from '@/lib/api-client';
 import { toast } from 'sonner';
 import { BillDetailsDialog } from '@/components/bills/bill-details-dialog';
+import { titleCase } from '@/lib/utils';
+import { useAuthStore } from '@/stores/auth-store';
 
 interface Bill {
   id: string;
   invoice_number: string | null;
   customer_name: string | null;
+  customer_phone: string | null;
   rounded_total: number; // in paise
+  total_paid: number; // in paise
+  write_off_amount: number; // in paise
   status: string;
   created_at: string;
   posted_at: string | null;
@@ -44,6 +42,8 @@ interface BillsResponse {
 }
 
 export default function BillsPage() {
+  const { user } = useAuthStore();
+  const isOwner = user?.role === 'owner';
   const [bills, setBills] = useState<Bill[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -53,10 +53,21 @@ export default function BillsPage() {
   const [total, setTotal] = useState(0);
   const [selectedBillId, setSelectedBillId] = useState<string | null>(null);
   const [showBillDetails, setShowBillDetails] = useState(false);
+  const [searchDebounced, setSearchDebounced] = useState('');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearchDebounced(searchQuery);
+      setPage(1); // reset to page 1 on new search
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   useEffect(() => {
     fetchBills();
-  }, [page, statusFilter]);
+  }, [page, statusFilter, searchDebounced, fromDate, toDate]);
 
   const fetchBills = async () => {
     try {
@@ -66,13 +77,18 @@ export default function BillsPage() {
         limit: 20,
       };
 
-      if (statusFilter !== 'all') {
+      if (statusFilter === 'pending') {
+        params.pending_only = true;
+      } else if (statusFilter !== 'all') {
         params.status = statusFilter;
       }
 
-      if (searchQuery.trim()) {
-        params.invoice_number = searchQuery.trim();
+      if (searchDebounced) {
+        params.search = searchDebounced;
       }
+
+      if (fromDate) params.from_date = fromDate;
+      if (toDate) params.to_date = toDate;
 
       const { data } = await apiClient.get<BillsResponse>('/pos/bills', { params });
 
@@ -92,7 +108,7 @@ export default function BillsPage() {
 
   const handleSearch = () => {
     setPage(1);
-    fetchBills();
+    setSearchDebounced(searchQuery);
   };
 
   const formatPrice = (paise: number) => {
@@ -126,6 +142,10 @@ export default function BillsPage() {
         return <Badge variant="outline">{status}</Badge>;
     }
   };
+
+  const hasPendingBalance = (bill: Bill) =>
+    bill.status === 'posted' &&
+    bill.total_paid + (bill.write_off_amount ?? 0) < bill.rounded_total;
 
   const handleViewBill = (billId: string) => {
     setSelectedBillId(billId);
@@ -253,6 +273,28 @@ export default function BillsPage() {
         </p>
       </div>
 
+      {/* Quick Filters */}
+      <div className="flex gap-2 overflow-x-auto pb-1 flex-nowrap">
+        {[
+          { label: 'All', value: 'all' },
+          { label: 'Pending Payment', value: 'pending' },
+          { label: 'Draft', value: 'draft' },
+          { label: 'Paid', value: 'posted' },
+          { label: 'Refunds', value: 'refunded' },
+          { label: 'Voided', value: 'void' },
+        ].map(({ label, value }) => (
+          <Button
+            key={value}
+            variant={statusFilter === value ? 'default' : 'outline'}
+            size="sm"
+            className={`shrink-0${value === 'pending' && statusFilter !== 'pending' ? ' border-red-300 text-red-600 hover:bg-red-50' : ''}`}
+            onClick={() => { setStatusFilter(value); setPage(1); }}
+          >
+            {label}
+          </Button>
+        ))}
+      </div>
+
       {/* Filters */}
       <Card>
         <CardContent className="p-4">
@@ -262,7 +304,7 @@ export default function BillsPage() {
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
-                  placeholder="Search by invoice number..."
+                  placeholder="Search by invoice #, customer name, or phone..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
@@ -274,19 +316,21 @@ export default function BillsPage() {
               </Button>
             </div>
 
-            {/* Status Filter */}
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full sm:w-40">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="draft">Draft</SelectItem>
-                <SelectItem value="posted">Paid</SelectItem>
-                <SelectItem value="void">Voided</SelectItem>
-                <SelectItem value="refunded">Refunded</SelectItem>
-              </SelectContent>
-            </Select>
+            {/* Date Range */}
+            <Input
+              type="date"
+              value={fromDate}
+              onChange={(e) => { setFromDate(e.target.value); setPage(1); }}
+              className="w-36"
+              title="From date"
+            />
+            <Input
+              type="date"
+              value={toDate}
+              onChange={(e) => { setToDate(e.target.value); setPage(1); }}
+              className="w-36"
+              title="To date"
+            />
 
             {/* Export */}
             <DropdownMenu>
@@ -328,13 +372,19 @@ export default function BillsPage() {
             ) : (
               <div className="divide-y">
                 {bills.map((bill) => (
-                  <div key={bill.id} className="p-4 space-y-2">
+                  <div key={bill.id} className={`p-4 space-y-2${hasPendingBalance(bill) ? ' bg-red-50 border-l-4 border-red-500' : ''}`}>
                     <div className="flex justify-between items-start">
                       <div>
                         <p className="font-semibold">{bill.invoice_number}</p>
                         <p className="text-sm text-muted-foreground">
-                          {bill.customer_name || 'Walk-in'}
+                          {titleCase(bill.customer_name) || 'Walk-in'}
                         </p>
+                        {hasPendingBalance(bill) && (
+                          <p className="text-sm font-semibold text-red-600 flex items-center gap-1.5">
+                            <AlertTriangle className="h-4 w-4" />
+                            Pending: {formatPrice(bill.rounded_total - bill.total_paid - (bill.write_off_amount ?? 0))}
+                          </p>
+                        )}
                       </div>
                       {getStatusBadge(bill.status)}
                     </div>
@@ -406,12 +456,18 @@ export default function BillsPage() {
                   </tr>
                 ) : (
                   bills.map((bill) => (
-                    <tr key={bill.id} className="hover:bg-gray-50">
+                    <tr key={bill.id} className={hasPendingBalance(bill) ? 'bg-red-50 border-l-4 border-red-500' : 'hover:bg-gray-50'}>
                       <td className="px-4 py-3 text-sm font-medium">
                         {bill.invoice_number}
                       </td>
                       <td className="px-4 py-3 text-sm">
-                        <p className="font-medium">{bill.customer_name || 'Walk-in'}</p>
+                        <p className="font-medium">{titleCase(bill.customer_name) || 'Walk-in'}</p>
+                        {hasPendingBalance(bill) && (
+                          <p className="text-xs font-semibold text-red-600 flex items-center gap-1 mt-0.5">
+                            <AlertTriangle className="h-3 w-3" />
+                            Pending {formatPrice(bill.rounded_total - bill.total_paid - (bill.write_off_amount ?? 0))}
+                          </p>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-sm text-muted-foreground">
                         {formatDate(bill.created_at)}
@@ -438,7 +494,7 @@ export default function BillsPage() {
                               <Printer className="h-4 w-4 mr-2" />
                               Reprint Receipt
                             </DropdownMenuItem>
-                            {bill.status === 'draft' && (
+                            {(bill.status === 'draft' || (bill.status === 'posted' && isOwner)) && (
                               <DropdownMenuItem
                                 onClick={() => handleVoidBill(bill.id)}
                                 className="text-destructive"

@@ -5,6 +5,7 @@ import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -153,7 +154,8 @@ export function AttendanceMarkDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent size="md">
+        <form onSubmit={handleSubmit} className="contents">
         <DialogHeader>
           <DialogTitle>Mark Attendance</DialogTitle>
           <DialogDescription>
@@ -161,7 +163,7 @@ export function AttendanceMarkDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <DialogBody className="space-y-4">
           {/* Staff Selection */}
           <div className="space-y-2">
             <Label htmlFor="staff">Staff Member *</Label>
@@ -246,6 +248,7 @@ export function AttendanceMarkDialog({
               {notes.length}/500 characters
             </p>
           </div>
+        </DialogBody>
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={handleClose}>
