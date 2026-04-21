@@ -3,8 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Plus, FileText, CheckCircle, DollarSign, Eye, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
 import { purchaseApi, PurchaseInvoiceListItem } from '@/lib/api/purchases';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
@@ -22,7 +21,7 @@ export default function PurchaseInvoicesPage() {
   const loadInvoices = async () => {
     try {
       setLoading(true);
-      const params: any = { size: 100 };
+      const params: Record<string, string | number> = { size: 100 };
       if (statusFilter !== 'all') {
         params.status = statusFilter;
       }
@@ -48,18 +47,17 @@ export default function PurchaseInvoicesPage() {
     });
   };
 
-  const getStatusBadge = (status: string) => {
-    const variants: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
-      draft: 'secondary',
-      received: 'default',
-      partially_paid: 'secondary',
-      paid: 'default',
+  const getStatusChip = (status: string) => {
+    const styles: Record<string, string> = {
+      draft: 'bg-slate-500/40 text-slate-400',
+      received: 'bg-blue-500/40 text-blue-400',
+      partially_paid: 'bg-amber-500/40 text-amber-400',
+      paid: 'bg-green-500/40 text-green-400',
     };
-
     return (
-      <Badge variant={variants[status] || 'secondary'}>
+      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${styles[status] ?? 'bg-slate-500/40 text-slate-400'}`}>
         {status.replace('_', ' ').toUpperCase()}
-      </Badge>
+      </span>
     );
   };
 
@@ -137,36 +135,65 @@ export default function PurchaseInvoicesPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-3">
-          {filteredInvoices.map((invoice) => (
-            <Card key={invoice.id} className="hover:shadow-md transition-shadow">
-              <CardContent className="p-6">
+        <>
+          {/* Mobile Cards */}
+          <div className="md:hidden space-y-2">
+            {filteredInvoices.map((invoice) => (
+              <div key={invoice.id} className="bg-surface-card border border-border-subtle rounded-lg p-4 space-y-2">
+                {/* Row 1: invoice ref + date */}
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-mono text-xs text-text-muted">{invoice.invoice_number}</span>
+                  <span className="text-xs text-text-secondary">{formatDate(invoice.invoice_date)}</span>
+                </div>
+                {/* Row 2: supplier name + status chip */}
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-text-primary font-semibold text-sm">{invoice.supplier_name}</span>
+                  {getStatusChip(invoice.status)}
+                </div>
+                {/* Row 3: total amount + view button */}
+                <div className="flex items-center justify-between gap-2 pt-1 border-t border-border-subtle">
+                  <span className="text-accent font-bold">{formatCurrency(invoice.total_amount)}</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => router.push(`/dashboard/purchases/invoices/${invoice.id}`)}
+                  >
+                    <Eye className="mr-1 h-4 w-4" />
+                    View
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop Cards */}
+          <div className="hidden md:block space-y-3">
+            {filteredInvoices.map((invoice) => (
+              <div key={invoice.id} className="bg-surface-card border border-border-subtle rounded-lg p-6 hover:bg-surface-row transition-colors">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-start gap-4">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-2">
-                          <h3 className="text-lg font-semibold">{invoice.invoice_number}</h3>
-                          {getStatusBadge(invoice.status)}
+                          <h3 className="text-lg font-semibold text-text-primary">{invoice.invoice_number}</h3>
+                          {getStatusChip(invoice.status)}
                         </div>
-                        <p className="text-sm text-muted-foreground mb-1">
-                          <span className="font-medium">{invoice.supplier_name}</span>
-                        </p>
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-sm text-text-primary font-medium mb-1">{invoice.supplier_name}</p>
+                        <p className="text-sm text-text-secondary">
                           Invoice Date: {formatDate(invoice.invoice_date)}
                           {invoice.due_date && ` • Due: ${formatDate(invoice.due_date)}`}
                         </p>
                       </div>
 
                       <div className="text-right min-w-[200px]">
-                        <div className="text-2xl font-bold">
+                        <div className="text-2xl font-bold text-accent">
                           {formatCurrency(invoice.total_amount)}
                         </div>
-                        <div className="text-sm text-muted-foreground">
+                        <div className="text-sm text-text-secondary">
                           Paid: {formatCurrency(invoice.paid_amount)}
                         </div>
                         {invoice.balance_due > 0 && (
-                          <div className="text-sm font-medium text-orange-600">
+                          <div className="text-sm font-medium text-amber-400">
                             Due: {formatCurrency(invoice.balance_due)}
                           </div>
                         )}
@@ -216,10 +243,10 @@ export default function PurchaseInvoicesPage() {
                     </div>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+              </div>
+            ))}
+          </div>
+        </>
       )}
     </div>
   );

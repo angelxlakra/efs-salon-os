@@ -147,7 +147,7 @@ export default function InventoryPage() {
     if (!editingSku) return;
 
     try {
-      const updateData: any = {
+      const updateData: Record<string, string | number | boolean | null> = {
         is_sellable: isSellable,
         barcode: editBarcode.trim() || null,
       };
@@ -169,9 +169,10 @@ export default function InventoryPage() {
       toast.success('SKU updated successfully');
       setIsDialogOpen(false);
       loadSkus(); // Reload data
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to update SKU:', error);
-      toast.error(error.response?.data?.detail || 'Failed to update SKU');
+      const detail = error instanceof Error ? error.message : 'Failed to update SKU';
+      toast.error(detail);
     }
   };
 
@@ -236,7 +237,7 @@ export default function InventoryPage() {
     }
 
     try {
-      const payload: any = {
+      const payload: Record<string, string | number | undefined> = {
         sku_id: adjustingSku.id,
         change_type: adjustmentType,
         quantity: parseFloat(adjustmentQty),
@@ -274,9 +275,10 @@ export default function InventoryPage() {
       setSupplierDiscountFixed('');
 
       loadChangeRequests();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to create adjustment:', error);
-      toast.error(error.response?.data?.detail || 'Failed to create adjustment request');
+      const detail = error instanceof Error ? error.message : 'Failed to create adjustment request';
+      toast.error(detail);
     }
   };
 
@@ -286,9 +288,10 @@ export default function InventoryPage() {
       toast.success('Change request approved');
       loadChangeRequests();
       loadSkus(); // Reload SKUs to reflect stock changes
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to approve request:', error);
-      toast.error(error.response?.data?.detail || 'Failed to approve request');
+      const detail = error instanceof Error ? error.message : 'Failed to approve request';
+      toast.error(detail);
     }
   };
 
@@ -297,9 +300,10 @@ export default function InventoryPage() {
       await apiClient.post(`/inventory/change-requests/${requestId}/reject`);
       toast.success('Change request rejected');
       loadChangeRequests();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to reject request:', error);
-      toast.error(error.response?.data?.detail || 'Failed to reject request');
+      const detail = error instanceof Error ? error.message : 'Failed to reject request';
+      toast.error(detail);
     }
   };
 
@@ -314,9 +318,10 @@ export default function InventoryPage() {
       } else {
         toast.info('All purchase items are already synced to inventory');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to sync from purchases:', error);
-      toast.error(error.response?.data?.detail || 'Failed to sync from purchases');
+      const detail = error instanceof Error ? error.message : 'Failed to sync from purchases';
+      toast.error(detail);
     } finally {
       setSyncing(false);
     }
@@ -377,16 +382,26 @@ export default function InventoryPage() {
           </div>
 
       {/* SKU List - Mobile Cards */}
-      <div className="md:hidden space-y-3">
-        {filteredSkus.map((sku) => (
-          <Card key={sku.id}>
-            <CardContent className="p-4">
+      <div className="md:hidden space-y-2">
+        {filteredSkus.map((sku) => {
+          const isLowStock = sku.current_stock <= (5);
+          return (
+            <div key={sku.id} className="bg-surface-card border border-border-subtle rounded-lg p-4 space-y-2">
+              {/* Row 1: SKU code + category chip */}
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-mono text-xs text-text-muted">{sku.sku_code}</span>
+                {sku.category_name && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-500/40 text-purple-400">
+                    {sku.category_name}
+                  </span>
+                )}
+              </div>
+              {/* Row 2: Product name + brand */}
               <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0 flex-1">
-                  <div className="font-medium truncate">{sku.name}</div>
-                  <div className="text-xs font-mono text-muted-foreground">{sku.sku_code}</div>
-                  {sku.category_name && (
-                    <div className="text-xs text-muted-foreground mt-1">{sku.category_name}</div>
+                <div>
+                  <div className="text-text-primary font-semibold text-sm">{sku.name}</div>
+                  {sku.brand_name && (
+                    <div className="text-text-secondary text-xs mt-0.5">{sku.brand_name}</div>
                   )}
                 </div>
                 <div className="flex gap-1 shrink-0">
@@ -398,28 +413,26 @@ export default function InventoryPage() {
                   </Button>
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t">
-                <div>
-                  <div className="text-xs text-muted-foreground">Stock</div>
-                  <div className="text-sm font-medium">{sku.current_stock} {sku.uom}</div>
-                </div>
-                <div>
-                  <div className="text-xs text-muted-foreground">Cost</div>
-                  <div className="text-sm font-medium">{formatCurrency(sku.avg_cost_per_unit)}</div>
-                </div>
-                <div>
-                  <div className="text-xs text-muted-foreground">Retail</div>
-                  <div className="text-sm font-medium">{sku.retail_price ? formatCurrency(sku.retail_price) : '-'}</div>
-                </div>
+              {/* Row 3: Stock quantity + sellable chip */}
+              <div className="flex items-center gap-3 pt-1 border-t border-border-subtle">
+                <span className={`text-sm font-medium ${isLowStock ? 'text-red-400' : 'text-text-primary'}`}>
+                  {sku.current_stock} {sku.uom}
+                </span>
+                <span className="text-text-muted text-xs">{formatCurrency(sku.avg_cost_per_unit)} cost</span>
+                {sku.retail_price && (
+                  <span className="text-text-secondary text-xs">{formatCurrency(sku.retail_price)} retail</span>
+                )}
+                {sku.is_sellable && (
+                  <span className="ml-auto inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/40 text-green-400">
+                    POS
+                  </span>
+                )}
               </div>
-              {sku.is_sellable && (
-                <Badge variant="outline" className="mt-2 text-xs">Sellable in POS</Badge>
-              )}
-            </CardContent>
-          </Card>
-        ))}
+            </div>
+          );
+        })}
         {filteredSkus.length === 0 && (
-          <div className="text-center py-12 text-muted-foreground">
+          <div className="text-center py-12 text-text-secondary">
             <Package className="h-12 w-12 mx-auto mb-4 opacity-20" />
             <p>No SKUs found</p>
           </div>
@@ -435,72 +448,75 @@ export default function InventoryPage() {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b">
-                  <th className="text-left py-3 px-4">SKU Code</th>
-                  <th className="text-left py-3 px-4">Name</th>
-                  <th className="text-left py-3 px-4">Category</th>
-                  <th className="text-right py-3 px-4">Stock</th>
-                  <th className="text-right py-3 px-4">Cost</th>
-                  <th className="text-center py-3 px-4">Sellable</th>
-                  <th className="text-right py-3 px-4">Retail Price</th>
-                  <th className="text-center py-3 px-4">Actions</th>
+                <tr className="border-b border-border-subtle">
+                  <th className="text-left py-3 px-4 text-text-secondary font-medium text-sm">SKU Code</th>
+                  <th className="text-left py-3 px-4 text-text-secondary font-medium text-sm">Name</th>
+                  <th className="text-left py-3 px-4 text-text-secondary font-medium text-sm">Category</th>
+                  <th className="text-right py-3 px-4 text-text-secondary font-medium text-sm">Stock</th>
+                  <th className="text-right py-3 px-4 text-text-secondary font-medium text-sm">Cost</th>
+                  <th className="text-center py-3 px-4 text-text-secondary font-medium text-sm">Sellable</th>
+                  <th className="text-right py-3 px-4 text-text-secondary font-medium text-sm">Retail Price</th>
+                  <th className="text-center py-3 px-4 text-text-secondary font-medium text-sm">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredSkus.map((sku) => (
-                  <tr key={sku.id} className="border-b hover:bg-gray-50">
-                    <td className="py-3 px-4 font-mono text-sm">{sku.sku_code}</td>
-                    <td className="py-3 px-4">{sku.name}</td>
-                    <td className="py-3 px-4 text-sm text-muted-foreground">
-                      {sku.category_name || '-'}
-                    </td>
-                    <td className="py-3 px-4 text-right">
-                      {sku.current_stock} {sku.uom}
-                    </td>
-                    <td className="py-3 px-4 text-right">
-                      {formatCurrency(sku.avg_cost_per_unit)}
-                    </td>
-                    <td className="py-3 px-4 text-center">
-                      {sku.is_sellable ? (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                          Yes
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                          No
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-3 px-4 text-right">
-                      {sku.retail_price ? formatCurrency(sku.retail_price) : '-'}
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="flex gap-1 justify-center">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEdit(sku)}
-                          title="Edit SKU"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleAdjustStock(sku)}
-                          title="Adjust stock"
-                        >
-                          <TrendingUp className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {filteredSkus.map((sku) => {
+                  const isLowStock = sku.current_stock <= 5;
+                  return (
+                    <tr key={sku.id} className="border-b border-border-subtle hover:bg-surface-row">
+                      <td className="py-3 px-4 font-mono text-sm text-text-muted">{sku.sku_code}</td>
+                      <td className="py-3 px-4 text-text-primary">{sku.name}</td>
+                      <td className="py-3 px-4 text-sm text-text-secondary">
+                        {sku.category_name || '-'}
+                      </td>
+                      <td className={`py-3 px-4 text-right font-medium ${isLowStock ? 'text-red-400' : 'text-text-primary'}`}>
+                        {sku.current_stock} {sku.uom}
+                      </td>
+                      <td className="py-3 px-4 text-right text-text-primary">
+                        {formatCurrency(sku.avg_cost_per_unit)}
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        {sku.is_sellable ? (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-500/40 text-green-400">
+                            Yes
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-surface-row text-text-muted">
+                            No
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-3 px-4 text-right text-text-primary">
+                        {sku.retail_price ? formatCurrency(sku.retail_price) : '-'}
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="flex gap-1 justify-center">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEdit(sku)}
+                            title="Edit SKU"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleAdjustStock(sku)}
+                            title="Adjust stock"
+                          >
+                            <TrendingUp className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
 
             {filteredSkus.length === 0 && (
-              <div className="text-center py-12 text-muted-foreground">
+              <div className="text-center py-12 text-text-secondary">
                 <Package className="h-12 w-12 mx-auto mb-4 opacity-20" />
                 <p>No SKUs found</p>
               </div>
@@ -706,9 +722,9 @@ export default function InventoryPage() {
                   </div>
 
                   {(supplierDiscountPercent || supplierDiscountFixed) && unitCost && (
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                      <p className="text-sm font-medium text-blue-900">Final Unit Cost</p>
-                      <p className="text-lg font-bold text-blue-900">
+                    <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
+                      <p className="text-sm font-medium text-blue-400">Final Unit Cost</p>
+                      <p className="text-lg font-bold text-blue-400">
                         ₹{(() => {
                           const base = parseFloat(unitCost) || 0;
                           const percentDiscount = (base * (parseFloat(supplierDiscountPercent) || 0)) / 100;
