@@ -71,9 +71,10 @@ export default function ReconciliationPage() {
       }
 
       setNotes(data.notes || '');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error fetching EOD report:', error);
-      toast.error(error.response?.data?.detail || 'Failed to load EOD report');
+      const apiError = error as { response?: { data?: { detail?: string } } };
+      toast.error(apiError.response?.data?.detail || 'Failed to load EOD report');
     } finally {
       setIsLoading(false);
     }
@@ -100,9 +101,10 @@ export default function ReconciliationPage() {
 
       setReport(data);
       toast.success('Reconciliation submitted successfully');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error submitting reconciliation:', error);
-      toast.error(error.response?.data?.detail || 'Failed to submit reconciliation');
+      const apiError = error as { response?: { data?: { detail?: string } } };
+      toast.error(apiError.response?.data?.detail || 'Failed to submit reconciliation');
     } finally {
       setIsSubmitting(false);
     }
@@ -137,8 +139,8 @@ export default function ReconciliationPage() {
     return (
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-gray-400 mx-auto mb-2" />
-          <p className="text-sm text-gray-500">Loading EOD report...</p>
+          <Loader2 className="h-8 w-8 animate-spin text-text-muted mx-auto mb-2" />
+          <p className="text-sm text-text-muted">Loading EOD report...</p>
         </div>
       </div>
     );
@@ -148,8 +150,8 @@ export default function ReconciliationPage() {
     return (
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center">
-          <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-2" />
-          <p className="text-gray-500">Failed to load report</p>
+          <AlertCircle className="h-12 w-12 text-text-muted mx-auto mb-2" />
+          <p className="text-text-muted">Failed to load report</p>
         </div>
       </div>
     );
@@ -173,7 +175,7 @@ export default function ReconciliationPage() {
       <Card>
         <CardContent className="p-4">
           <div className="flex items-center gap-3">
-            <Calendar className="h-5 w-5 text-gray-500" />
+            <Calendar className="h-5 w-5 text-text-muted" />
             <div className="flex-1">
               <Label htmlFor="date" className="text-sm font-medium">
                 Reconciliation Date
@@ -285,14 +287,14 @@ export default function ReconciliationPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Expected Cash */}
-          <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
+          <div className="flex justify-between items-center p-3 bg-accent/10 rounded-lg">
             <div>
-              <p className="text-sm text-muted-foreground">Expected Cash (From System)</p>
-              <p className="text-2xl font-bold text-blue-700">
+              <p className="text-sm text-text-muted">Expected Cash (From System)</p>
+              <p className="text-2xl font-bold text-accent">
                 {formatPrice(report.expected_cash)}
               </p>
             </div>
-            <DollarSign className="h-8 w-8 text-blue-500" />
+            <DollarSign className="h-8 w-8 text-accent" />
           </div>
 
           {/* Actual Cash Input */}
@@ -314,22 +316,22 @@ export default function ReconciliationPage() {
           {/* Actual Cash Display (if reconciled) */}
           {report.reconciled && report.actual_cash !== null && (
             <div className={`flex justify-between items-center p-3 rounded-lg ${
-              isExact ? 'bg-green-50' : isShort ? 'bg-red-50' : 'bg-yellow-50'
+              isExact ? 'bg-green-500/10' : isShort ? 'bg-red-500/10' : 'bg-yellow-500/10'
             }`}>
               <div>
-                <p className="text-sm text-muted-foreground">Actual Cash Counted</p>
+                <p className="text-sm text-text-muted">Actual Cash Counted</p>
                 <p className={`text-2xl font-bold ${
-                  isExact ? 'text-green-700' : isShort ? 'text-red-700' : 'text-yellow-700'
+                  isExact ? 'text-green-400' : isShort ? 'text-red-400' : 'text-yellow-400'
                 }`}>
                   {formatPrice(report.actual_cash)}
                 </p>
               </div>
               {isExact ? (
-                <CheckCircle className="h-8 w-8 text-green-500" />
+                <CheckCircle className="h-8 w-8 text-green-400" />
               ) : isShort ? (
-                <TrendingDown className="h-8 w-8 text-red-500" />
+                <TrendingDown className="h-8 w-8 text-red-400" />
               ) : (
-                <TrendingUp className="h-8 w-8 text-yellow-500" />
+                <TrendingUp className="h-8 w-8 text-yellow-400" />
               )}
             </div>
           )}
@@ -337,9 +339,9 @@ export default function ReconciliationPage() {
           {/* Cash Difference */}
           {report.reconciled && report.cash_difference !== null && (
             <div className={`p-3 rounded-lg ${
-              isExact ? 'bg-green-100 text-green-800' :
-              isShort ? 'bg-red-100 text-red-800' :
-              'bg-yellow-100 text-yellow-800'
+              isExact ? 'bg-green-500/20 text-green-400' :
+              isShort ? 'bg-red-500/20 text-red-400' :
+              'bg-yellow-500/20 text-yellow-400'
             }`}>
               <p className="text-sm font-medium">
                 {isExact ? '✓ Cash matches exactly!' :
@@ -396,7 +398,7 @@ export default function ReconciliationPage() {
                 Reconciled on {formatDateTime(report.reconciled_at)}
               </p>
               {report.notes && (
-                <div className="mt-2 p-2 bg-gray-50 rounded text-sm">
+                <div className="mt-2 p-2 bg-surface-row rounded text-sm">
                   <p className="font-medium">Notes:</p>
                   <p className="text-muted-foreground">{report.notes}</p>
                 </div>
