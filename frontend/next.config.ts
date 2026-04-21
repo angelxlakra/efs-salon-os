@@ -1,15 +1,21 @@
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-  // Enable React strict mode for better development experience
   reactStrictMode: true,
-
-  // Output standalone for Docker deployment
   output: 'standalone',
-
-  // Configure image domains if needed
   images: {
     remotePatterns: [],
+  },
+  // In Docker, Nginx intercepts /api/* before Next.js sees it.
+  // In local dev (no Nginx), this proxy forwards /api/* to the backend.
+  async rewrites() {
+    const apiUrl = process.env.INTERNAL_API_URL ?? 'http://localhost:8000';
+    return [
+      {
+        source: '/api/:path*',
+        destination: `${apiUrl}/:path*`,
+      },
+    ];
   },
 };
 
