@@ -1,261 +1,85 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "../styles/tokens.css";
+@import "../styles/typography.css";
 
-@custom-variant dark (&:is(.dark *));
-
-/* Custom CSS variables for SalonOS theme */
-@theme {
-  /* Color palette - Professional salon aesthetic */
-  --color-primary: #6366f1;
-  --color-primary-dark: #4f46e5;
-  --color-secondary: #ec4899;
-  --color-success: #10b981;
-  --color-warning: #f59e0b;
-  --color-danger: #ef4444;
-  --color-info: #3b82f6;
-
-  /* Neutrals */
-  --color-gray-50: #f9fafb;
-  --color-gray-100: #f3f4f6;
-  --color-gray-200: #e5e7eb;
-  --color-gray-300: #d1d5db;
-  --color-gray-400: #9ca3af;
-  --color-gray-500: #6b7280;
-  --color-gray-600: #4b5563;
-  --color-gray-700: #374151;
-  --color-gray-800: #1f2937;
-  --color-gray-900: #111827;
-
-  /* Spacing scale */
-  --spacing-xs: 0.25rem;
-  --spacing-sm: 0.5rem;
-  --spacing-md: 1rem;
-  --spacing-lg: 1.5rem;
-  --spacing-xl: 2rem;
-  --spacing-2xl: 3rem;
-
-  /* Typography */
-  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-heading: 'Outfit', ui-sans-serif, system-ui, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Monaco, Consolas, monospace;
-
-}
-
-/* ─── Dark surface tokens ───────────────────────────────── */
-:root {
-  --surface-page: #111111;
-  --surface-card: #161616;
-  --surface-row: #1a1a1a;
-  --surface-hover: #202020;
-  --surface-sidebar: #0a0a0a;
-  --border-subtle: #2a2a2a;
-  --text-primary: #f5f5f5;
-  --text-secondary: #b0b0b0;
-  --text-muted: #737373;
-
-  /* Accent: Violet (default) */
-  --salon-accent: #7c3aed;
-  --salon-accent-hover: #6d28d9;
-  --salon-accent-bg: #160d2b;
-}
-
-[data-accent="rose"] {
-  --salon-accent: #e11d48;
-  --salon-accent-hover: #be123c;
-  --salon-accent-bg: #2b0d14;
-  --accent: #e11d48;
-  --accent-foreground: #ffffff;
-  --primary: #e11d48;
-  --primary-foreground: #ffffff;
-  --ring: #e11d48;
-  --sidebar-primary: #e11d48;
-  --sidebar-ring: #e11d48;
-  --sidebar-accent: #2b0d14;
-}
-
-[data-accent="amber"] {
-  --salon-accent: #d97706;
-  --salon-accent-hover: #b45309;
-  --salon-accent-bg: #2b1a00;
-  --accent: #d97706;
-  --accent-foreground: #ffffff;
-  --primary: #d97706;
-  --primary-foreground: #ffffff;
-  --ring: #d97706;
-  --sidebar-primary: #d97706;
-  --sidebar-ring: #d97706;
-  --sidebar-accent: #2b1a00;
-}
-
-[data-accent="teal"] {
-  --salon-accent: #0d9488;
-  --salon-accent-hover: #0f766e;
-  --salon-accent-bg: #00211f;
-  --accent: #0d9488;
-  --accent-foreground: #ffffff;
-  --primary: #0d9488;
-  --primary-foreground: #ffffff;
-  --ring: #0d9488;
-  --sidebar-primary: #0d9488;
-  --sidebar-ring: #0d9488;
-  --sidebar-accent: #00211f;
-}
-
-/* Custom utility classes */
-.container-salon {
-  max-width: 1440px;
-  margin-left: auto;
-  margin-right: auto;
-  padding-left: var(--spacing-lg);
-  padding-right: var(--spacing-lg);
-}
-
-.card-salon {
-  background-color: var(--surface-card);
-  border-radius: var(--radius-lg);
-  padding: var(--spacing-lg);
-  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
-}
-
-/* Receipt printing styles */
-@media print {
-  body {
-    background-color: white;
-  }
-
-  .no-print {
-    display: none !important;
-  }
-
-  .receipt-print {
-    width: 80mm;
-    font-size: 10pt;
-    margin: 0;
-    padding: 0;
-  }
-}
+@custom-variant dark (&:is([data-theme="dark"] *));
 
 @theme inline {
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-  --radius-2xl: calc(var(--radius) + 8px);
-  --radius-3xl: calc(var(--radius) + 12px);
-  --radius-4xl: calc(var(--radius) + 16px);
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-ring: var(--sidebar-ring);
+  /* Colours exposed as Tailwind utilities */
+  --color-surface-page:       var(--surface-page);
+  --color-surface-card:       var(--surface-card);
+  --color-surface-row:        var(--surface-row);
+  --color-surface-row-hover:  var(--surface-row-hover);
+  --color-surface-sidebar:    var(--surface-sidebar);
+  --color-surface-overlay:    var(--surface-overlay);
 
-  /* ─── Surface + accent token mappings ───────────────────── */
-  --color-surface-page: var(--surface-page);
-  --color-surface-card: var(--surface-card);
-  --color-surface-row: var(--surface-row);
-  --color-surface-hover: var(--surface-hover);
-  --color-surface-sidebar: var(--surface-sidebar);
-  --color-border-subtle: var(--border-subtle);
-  --color-text-primary: var(--text-primary);
-  --color-text-secondary: var(--text-secondary);
-  --color-text-muted: var(--text-muted);
-  --color-accent: var(--salon-accent);
-  --color-accent-hover: var(--salon-accent-hover);
-  --color-accent-bg: var(--salon-accent-bg);
+  --color-border-subtle:      var(--border-subtle);
+  --color-border-default:     var(--border-default);
+  --color-border-strong:      var(--border-strong);
+  --color-border-focus:       var(--border-focus);
+
+  --color-text-primary:       var(--text-primary);
+  --color-text-secondary:     var(--text-secondary);
+  --color-text-muted:         var(--text-muted);
+  --color-text-disabled:      var(--text-disabled);
+  --color-text-inverse:       var(--text-inverse);
+
+  --color-accent:             var(--accent-default);
+  --color-accent-hover:       var(--accent-hover);
+  --color-accent-active:      var(--accent-active);
+  --color-accent-bg-soft:     var(--accent-bg-soft);
+  --color-accent-fg:          var(--accent-fg);
+
+  --color-success-fg:         var(--success-fg);
+  --color-success-bg-soft:    var(--success-bg-soft);
+  --color-success-border:     var(--success-border);
+  --color-warning-fg:         var(--warning-fg);
+  --color-warning-bg-soft:    var(--warning-bg-soft);
+  --color-warning-border:     var(--warning-border);
+  --color-danger-fg:          var(--danger-fg);
+  --color-danger-bg-soft:     var(--danger-bg-soft);
+  --color-danger-border:      var(--danger-border);
+  --color-info-fg:            var(--info-fg);
+  --color-info-bg-soft:       var(--info-bg-soft);
+  --color-info-border:        var(--info-border);
+
+  /* Radius */
+  --radius-sm:                var(--radius-sm);
+  --radius-md:                var(--radius-md);
+  --radius-lg:                var(--radius-lg);
+  --radius-xl:                var(--radius-xl);
+
+  /* Shadow */
+  --shadow-xs:                var(--shadow-xs);
+  --shadow-sm:                var(--shadow-sm);
+  --shadow-md:                var(--shadow-md);
+  --shadow-focus:             var(--shadow-focus);
+
+  /* Font families */
+  --font-sans:                var(--font-body);
+  --font-display:             var(--font-display);
+  --font-mono:                var(--font-mono);
 }
 
-:root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
-
-  /* Dark surface overrides — wire shadcn semantic tokens to our dark palette */
-  --background: #111111;
-  --foreground: #f5f5f5;
-  --card: #161616;
-  --card-foreground: #f5f5f5;
-  --popover: #161616;
-  --popover-foreground: #f5f5f5;
-  --muted: #1a1a1a;
-  --muted-foreground: #a3a3a3;
-  --border: #2a2a2a;
-  --input: #1a1a1a;
-  --accent: #7c3aed;
-  --accent-foreground: #ffffff;
-  --primary: #7c3aed;
-  --primary-foreground: #ffffff;
-  --secondary: #1a1a1a;
-  --secondary-foreground: #f5f5f5;
-  --ring: #7c3aed;
-  --sidebar: #0a0a0a;
-  --sidebar-foreground: #f5f5f5;
-  --sidebar-border: #2a2a2a;
-  --sidebar-accent: #160d2b;
-  --sidebar-accent-foreground: #f5f5f5;
-  --sidebar-primary: #7c3aed;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-ring: #7c3aed;
+/* Print styles preserved from V1 — receipt template is out of scope for V2 */
+@media print {
+  body { background-color: white; }
+  .no-print { display: none !important; }
+  .receipt-print { width: 80mm; font-size: 10pt; margin: 0; padding: 0; }
 }
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    border-color: var(--border-default);
   }
   body {
-    @apply bg-background text-foreground;
+    background-color: var(--surface-page);
+    color: var(--text-primary);
+  }
+  *:focus-visible {
+    outline: 2px solid var(--border-focus);
+    outline-offset: 2px;
+    box-shadow: var(--shadow-focus);
   }
 }
