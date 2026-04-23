@@ -88,3 +88,5 @@ backups/
 backend/test_*.py
 backend/check_*.sh
 worktrees/
+.superpowers/
+.playwright-mcp/
