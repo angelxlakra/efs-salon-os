@@ -1422,6 +1422,9 @@ Run: `cd frontend && npm test -- dialog --run`
 
 Read `frontend/src/components/ui/dialog.tsx`, then rewrite end-to-end (keep the other exports as direct Radix re-exports):
 
+> **Amendment 2026-04-23:** `DialogProps` and `DialogBody` retained as additive exports — V1 callers (25 sites + `command.tsx`) depend on them and must compile under Phase 0 doctrine.
+> **Amendment 2026-04-23 (cont.):** `DialogContent` cva base uses `flex flex-col overflow-hidden` (not `overflow-y-auto`) — `DialogBody`'s `flex-1`/`min-h-0` requires a flex parent for the V1 sticky-header/scrolling-body pattern.
+
 ```tsx
 "use client";
 
@@ -1434,7 +1437,7 @@ import { cn } from "@/lib/utils";
 const contentVariants = cva(
   "fixed z-50 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 " +
     "bg-surface-card text-text-primary rounded-lg shadow-[var(--shadow-md)] " +
-    "w-[calc(100vw-2rem)] max-h-[90dvh] overflow-y-auto " +
+    "w-[calc(100vw-2rem)] max-h-[90dvh] flex flex-col overflow-hidden " +
     "data-[state=open]:animate-in data-[state=open]:fade-in-0 " +
     "data-[state=closed]:animate-out data-[state=closed]:fade-out-0",
   {
@@ -1454,6 +1457,9 @@ const contentVariants = cva(
     defaultVariants: { size: "md", variant: "default" },
   }
 );
+
+// Backwards-compat type so command.tsx's `extends DialogProps {}` still compiles
+export type DialogProps = React.ComponentPropsWithoutRef<typeof DialogPrimitive.Root>;
 
 export const Dialog = DialogPrimitive.Root;
 export const DialogTrigger = DialogPrimitive.Trigger;
@@ -1511,6 +1517,9 @@ DialogContent.displayName = "DialogContent";
 
 export const DialogHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
   <div className={cn("flex flex-col gap-1 p-6 border-b border-border-subtle", className)} {...props} />
+);
+export const DialogBody = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
+  <div className={cn("flex-1 overflow-y-auto min-h-0 p-6", className)} {...props} />
 );
 export const DialogFooter = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
   <div className={cn("flex flex-col-reverse sm:flex-row sm:justify-end gap-2 p-6 border-t border-border-subtle", className)} {...props} />
