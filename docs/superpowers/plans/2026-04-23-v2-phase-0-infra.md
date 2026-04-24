@@ -1766,6 +1766,34 @@ git commit -m "feat(ui): Card compound API (Header/Body/Footer) + density prop"
 
 **Why:** V1 badges use hand-rolled colours. V2 routes through semantic tokens exclusively — no red-border filter pill can exist.
 
+> **Amendment 2026-04-25:** Pre-dispatch audit using a quote-agnostic grep
+> (`grep -rn "@/components/ui/badge" frontend/src`) found 24 caller files
+> and 40 call sites still passing the V1 shadcn `variant` prop
+> (`outline`/`secondary`/`destructive`/`default`). Shipping the plan's
+> wholesale rewrite as-written would add ~40 TS errors and break
+> `next build`. Fix (applied in same commit): keep the V2 `tone` prop
+> exactly as spec'd AND accept `variant` as a deprecated additive prop
+> mapped to a tone via `LEGACY_VARIANT_TO_TONE` (`destructive→danger`,
+> everything else→`neutral`). `variant` is destructured so it never
+> spreads onto the DOM span. `tone` wins when both are provided.
+> Mirrors T11(a) (Dialog `DialogBody`/`DialogProps`) and T12(a) (Card V1
+> shims). Phase 1 retrofit deletes the shim + legacy-variant tests.
+> `asChild` and `badgeVariants` export also dropped here — zero external
+> callers verified.
+
+> **Amendment 2026-04-25 (post-review):** Code-quality review flagged 4
+> Important coverage gaps. Fixed in same commit (no behavior change):
+> (1) Added `size` prop coverage (default sm + md). (2) Strengthened the
+> `danger` tone test to also assert the cva class string is emitted
+> (`bg-danger-bg-soft` / `text-danger-fg` / `border-danger-border`) so a
+> broken cva mapping cannot pass with only `data-tone` checks.
+> (3) Reorganised legacy-variant tests into a `describe("legacy variant
+> shim (remove in Phase 1)")` block with `it.each` over all 4 legacy
+> variants — completes the mapping contract and marks the block for
+> one-shot deletion at retrofit time. (4) Added a comment in
+> `badge.tsx` documenting the `outline → neutral` visual drift decision.
+> Test count 11 → 16. tsc unchanged at 162.
+
 - [ ] **Step 1: Write failing tests**
 
 ```tsx
@@ -1784,6 +1812,51 @@ describe("Badge", () => {
   it("defaults to neutral", () => {
     render(<Badge>default</Badge>);
     expect(screen.getByText("default")).toHaveAttribute("data-tone", "neutral");
+  });
+
+  it("danger tone emits the danger class string (cva mapping is wired)", () => {
+    render(<Badge tone="danger">x</Badge>);
+    const el = screen.getByText("x");
+    expect(el.className).toMatch(/bg-danger-bg-soft/);
+    expect(el.className).toMatch(/text-danger-fg/);
+    expect(el.className).toMatch(/border-danger-border/);
+  });
+
+  it("defaults to size=sm", () => {
+    render(<Badge>x</Badge>);
+    expect(screen.getByText("x").className).toMatch(/text-\[11px\]/);
+  });
+
+  it("renders size=md", () => {
+    render(<Badge size="md">x</Badge>);
+    expect(screen.getByText("x").className).toMatch(/text-\[12px\]/);
+  });
+
+  // ---------------------------------------------------------------------
+  // Legacy variant shim — the entire describe block below deletes during
+  // Phase 1 retrofit once all 24 V1 caller files are migrated to `tone`.
+  // ---------------------------------------------------------------------
+  describe("legacy variant shim (remove in Phase 1)", () => {
+    it.each([
+      ["default", "neutral"],
+      ["secondary", "neutral"],
+      ["destructive", "danger"],
+      ["outline", "neutral"],
+    ] as const)("variant=%s maps to tone=%s", (variant, tone) => {
+      render(<Badge variant={variant}>x</Badge>);
+      expect(screen.getByText("x")).toHaveAttribute("data-tone", tone);
+    });
+
+    it("legacy variant is not spread to the DOM", () => {
+      const { container } = render(<Badge variant="secondary">s</Badge>);
+      const span = container.querySelector("span");
+      expect(span).not.toHaveAttribute("variant");
+    });
+
+    it("explicit tone takes precedence over legacy variant", () => {
+      render(<Badge tone="success" variant="destructive">mixed</Badge>);
+      expect(screen.getByText("mixed")).toHaveAttribute("data-tone", "success");
+    });
   });
 });
 ```
@@ -1818,10 +1891,41 @@ const badgeVariants = cva(
   }
 );
 
-type BadgeProps = React.HTMLAttributes<HTMLSpanElement> & VariantProps<typeof badgeVariants>;
+type Tone = NonNullable<VariantProps<typeof badgeVariants>["tone"]>;
 
-export function Badge({ tone, size, className, ...props }: BadgeProps) {
-  return <span data-tone={tone ?? "neutral"} className={cn(badgeVariants({ tone, size }), className)} {...props} />;
+/**
+ * Legacy shim — maps the V1 shadcn `variant` prop onto the V2 `tone` prop.
+ * Deprecated: do not reach for `variant` in new code; use `tone` directly.
+ * Kept additive to preserve tsc+next-build health on 24 V1 caller files
+ * (40 call sites) until Phase 1 retrofit migrates them. See plan T13
+ * amendment (2026-04-25).
+ */
+type LegacyVariant = "default" | "secondary" | "destructive" | "outline";
+const LEGACY_VARIANT_TO_TONE: Record<LegacyVariant, Tone> = {
+  default: "neutral",
+  secondary: "neutral",
+  destructive: "danger",
+  // V1 `outline` was visually distinct (transparent bg, prominent border).
+  // V2 maps it to neutral — a deliberate visual drift; revisit per call-site
+  // during Phase 1 retrofit if any chips read as wrong.
+  outline: "neutral",
+};
+
+type BadgeProps = React.HTMLAttributes<HTMLSpanElement> &
+  VariantProps<typeof badgeVariants> & {
+    /** @deprecated Use `tone` instead. Mapped internally to a tone for V1 compat. */
+    variant?: LegacyVariant;
+  };
+
+export function Badge({ tone, size, variant, className, ...props }: BadgeProps) {
+  const resolvedTone: Tone = tone ?? (variant ? LEGACY_VARIANT_TO_TONE[variant] : "neutral");
+  return (
+    <span
+      data-tone={resolvedTone}
+      className={cn(badgeVariants({ tone: resolvedTone, size }), className)}
+      {...props}
+    />
+  );
 }
 ```
 
@@ -1831,7 +1935,7 @@ export function Badge({ tone, size, className, ...props }: BadgeProps) {
 
 ```bash
 git add frontend/src/components/ui/badge.tsx frontend/src/components/ui/__tests__/badge.test.tsx
-git commit -m "feat(ui): Badge with semantic tone prop"
+git commit -m "feat(ui): Badge with semantic tone prop (+ V1 variant shim)"
 ```
 
 ---
