@@ -1548,6 +1548,35 @@ git commit -m "feat(ui): V2 Dialog with responsive size prop + 90dvh max-h"
 
 **Why:** Design system §6.5 specifies a compound `<Card>` with `Card.Header` / `Card.Body` / `Card.Footer`. V1's Card is a dumb wrapper — we upgrade it to the compound shape, keeping the bare `Card` export so V1 callers still compile.
 
+> **Amendment 2026-04-23:** Plan-vs-reality grep miss — pre-dispatch audit
+> quoted `"@/components/ui/card"` literally and counted only 1 caller. A
+> quote-agnostic grep surfaced 31 V1 pages (dashboard/bills/customers/
+> expenses/inventory/attendance/purchases/my-services/…) importing
+> `CardHeader`/`CardTitle`/`CardDescription`/`CardFooter`/`CardAction`.
+> Shipping the wholesale rewrite as-written added ~59 TS errors and broke
+> `next build`. Fix (applied in the same commit as the rewrite): keep the
+> plan's compound API exactly as spec'd, AND add additive V1 legacy shims
+> re-exporting the pre-T12 implementations of `CardHeader` / `CardTitle` /
+> `CardDescription` / `CardFooter` / `CardAction` verbatim. Compound internals
+> were renamed `HeaderSlot` / `BodySlot` / `FooterSlot` to avoid collision
+> with the legacy V1 names at the export boundary. Phase 1 retrofit deletes
+> the shims block. Mirrors the T11(a) DialogBody/DialogProps pattern at
+> larger scale.
+
+> **Amendment 2026-04-25:** Code-quality review caught two issues post-ship.
+> (1) `HeaderSlot` rendered an empty `<div className="flex flex-col ...">`
+> when only `action` was passed with no title/description/children — DOM
+> noise + a11y concern. Fixed: gate the left stack behind
+> `const hasLeft = title || description || children;`. (2) Test coverage
+> was too shallow for a primitive that gates 31 V1 callers; added a
+> regression-guard test ensuring all 5 V1 legacy shim exports remain
+> present (so Phase 1 retrofit cannot silently drop one), and a test for
+> the action-only Header branch. Also update the Step 3 code block below
+> to reflect the `hasLeft` guard. Deferred to Phase 1: redundant
+> `data-density` attribute (parallel to Dialog `data-size`/`data-variant`);
+> `FooterSlot` unconditional `border-t` (consumer can override via
+> `className`).
+
 - [ ] **Step 1: Write failing tests**
 
 ```tsx
@@ -1609,7 +1638,7 @@ function CardRoot({ className, density, hover, ...props }: CardProps) {
   return <div data-density={density ?? "md"} className={cn(cardVariants({ density, hover }), className)} {...props} />;
 }
 
-function CardHeader({
+function HeaderSlot({
   title,
   description,
   action,
@@ -1617,34 +1646,105 @@ function CardHeader({
   children,
   ...props
 }: React.HTMLAttributes<HTMLDivElement> & { title?: string; description?: string; action?: React.ReactNode }) {
+  const hasLeft = title || description || children;
   return (
     <div data-slot="header" className={cn("flex items-start justify-between gap-4", className)} {...props}>
-      <div className="flex flex-col gap-1 min-w-0">
-        {title && <h3 className="text-heading-md text-text-primary truncate">{title}</h3>}
-        {description && <p className="text-body-sm text-text-muted">{description}</p>}
-        {children}
-      </div>
+      {hasLeft && (
+        <div className="flex flex-col gap-1 min-w-0">
+          {title && <h3 className="text-heading-md text-text-primary truncate">{title}</h3>}
+          {description && <p className="text-body-sm text-text-muted">{description}</p>}
+          {children}
+        </div>
+      )}
       {action && <div className="shrink-0">{action}</div>}
     </div>
   );
 }
 
-function CardBody({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+function BodySlot({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return <div data-slot="body" className={cn("text-body text-text-primary", className)} {...props} />;
 }
 
-function CardFooter({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+function FooterSlot({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return <div data-slot="footer" className={cn("border-t border-border-subtle text-body-sm text-text-muted", className)} {...props} />;
 }
 
 export const Card = Object.assign(CardRoot, {
-  Header: CardHeader,
-  Body: CardBody,
-  Footer: CardFooter,
+  Header: HeaderSlot,
+  Body: BodySlot,
+  Footer: FooterSlot,
 });
 
-// Named exports retained for V1 callers importing { CardContent, CardHeader as OldHeader, … }
-export { CardBody as CardContent };
+// V1 `CardContent` alias preserved — used by callers that never migrated past the shadcn default export shape.
+export { BodySlot as CardContent };
+
+// ---------------------------------------------------------------------------
+// V1 legacy shims — deprecated. Do not reach for these in new code; use the
+// compound `<Card.Header />` / `<Card.Body />` / `<Card.Footer />` API.
+//
+// Kept verbatim from the pre-T12 implementation so ~30 V1 pages continue to
+// typecheck and render during Phase 0. Slated for removal during Phase 1
+// retrofit once all callers migrate to the compound API. See plan T12
+// amendment (2026-04-23).
+// ---------------------------------------------------------------------------
+
+function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="card-header"
+      className={cn(
+        "@container/card-header grid auto-rows-min grid-rows-[auto_auto] items-start gap-2 px-6 has-data-[slot=card-action]:grid-cols-[1fr_auto] [.border-b]:pb-6",
+        className
+      )}
+      {...props}
+    />
+  );
+}
+
+function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="card-title"
+      className={cn("leading-none font-semibold", className)}
+      {...props}
+    />
+  );
+}
+
+function CardDescription({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="card-description"
+      className={cn("text-muted-foreground text-sm", className)}
+      {...props}
+    />
+  );
+}
+
+function CardAction({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="card-action"
+      className={cn(
+        "col-start-2 row-span-2 row-start-1 self-start justify-self-end",
+        className
+      )}
+      {...props}
+    />
+  );
+}
+
+function CardFooter({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="card-footer"
+      className={cn("flex items-center px-6 [.border-t]:pt-6", className)}
+      {...props}
+    />
+  );
+}
+
+export { CardHeader, CardTitle, CardDescription, CardAction, CardFooter };
 ```
 
 - [ ] **Step 4: Run tests, verify PASS**
