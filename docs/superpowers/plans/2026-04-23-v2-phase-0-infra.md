@@ -1948,6 +1948,24 @@ git commit -m "feat(ui): Badge with semantic tone prop (+ V1 variant shim)"
 
 **Why:** V1 scatters "No data" / "No records" strings. Spec §6.7 requires a single primitive with serif title + guiding body + CTA.
 
+> **Amendment 2026-04-25:** Code-quality review caught 4 fixable issues
+> in the as-shipped greenfield primitive (no behavior regression risk).
+> Applied in same commit: (1) `secondaryAction` is now strictly
+> subordinate — guard tightened from `(primary || secondary) &&` to
+> `primary &&`, plus JSDoc note. Prevents accidental "lone secondary CTA"
+> renders. (2) Added optional `headingLevel?: 2 | 3 | 4` prop (default 3)
+> rendered via `const Heading = \`h${headingLevel}\` as const` — fixes
+> a11y when EmptyState is route-level content. (3) Added component-level
+> JSDoc explicitly forbidding generic "No data" copy (the rule was in
+> the plan but not in the code). (4) Replaced the redundant smoke test
+> #3 with 4 substantive tests: no-action-row negative, secondary-without-
+> primary negative, icon `aria-hidden` wrapper, className merge,
+> headingLevel default+override. Test count 3 → 7. Deferred to Phase 1:
+> body uses `text-text-secondary` (Card uses `text-text-muted` — design
+> call), `[&_svg]:size-8` only sizes svg children (lucide-only convention),
+> `Props` type not exported (matches Card/Badge), `max-w-sm` on whole
+> inner stack (cosmetic).
+
 - [ ] **Step 1: Write failing tests**
 
 ```tsx
@@ -1974,10 +1992,50 @@ describe("EmptyState", () => {
     expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
   });
 
-  it("requires a title (typed error at compile, runtime check)", () => {
-    // Runtime: empty string falls through, body must be provided — covered by TS types.
-    render(<EmptyState title="x" body="y" />);
-    expect(screen.getByText("x")).toBeInTheDocument();
+  it("renders no action row when no actions provided", () => {
+    const { container } = render(<EmptyState title="t" body="b" />);
+    expect(container.querySelectorAll("button")).toHaveLength(0);
+    expect(container.querySelector(".mt-2")).toBeNull();
+  });
+
+  it("does NOT render secondaryAction without primaryAction (subordinate semantics)", () => {
+    render(
+      <EmptyState
+        title="t"
+        body="b"
+        secondaryAction={<button>SecondaryOnly</button>}
+      />
+    );
+    expect(screen.queryByRole("button", { name: "SecondaryOnly" })).toBeNull();
+  });
+
+  it("marks the icon wrapper as decorative (aria-hidden)", () => {
+    const { container } = render(
+      <EmptyState title="t" body="b" icon={<svg data-testid="i" />} />
+    );
+    const wrapper = container.querySelector("[aria-hidden]");
+    expect(wrapper).toBeTruthy();
+    expect(wrapper?.querySelector('[data-testid="i"]')).toBeTruthy();
+  });
+
+  it("merges className via cn() preserving base classes", () => {
+    const { container } = render(
+      <EmptyState title="t" body="b" className="custom-extra" />
+    );
+    expect(container.firstChild).toHaveClass("custom-extra");
+    expect(container.firstChild).toHaveClass("text-center");
+  });
+
+  it("renders configurable headingLevel (default h3, supports h2/h4)", () => {
+    const { container, rerender } = render(<EmptyState title="t" body="b" />);
+    expect(container.querySelector("h3")).toBeTruthy();
+
+    rerender(<EmptyState title="t" body="b" headingLevel={2} />);
+    expect(container.querySelector("h2")).toBeTruthy();
+    expect(container.querySelector("h3")).toBeNull();
+
+    rerender(<EmptyState title="t" body="b" headingLevel={4} />);
+    expect(container.querySelector("h4")).toBeTruthy();
   });
 });
 ```
@@ -1996,20 +2054,37 @@ type Props = {
   title: string;
   /** Required. One sentence guiding the next action. "No data" is not acceptable. */
   body: string;
+  /** Heading level for the title. Default 3 — bump to 2 (or 1) when EmptyState is the sole content of a route. */
+  headingLevel?: 2 | 3 | 4;
   primaryAction?: React.ReactNode;
+  /** Only rendered alongside `primaryAction`. Pass a sole CTA as `primaryAction` instead. */
   secondaryAction?: React.ReactNode;
   className?: string;
 };
 
-export function EmptyState({ icon, title, body, primaryAction, secondaryAction, className }: Props) {
+/**
+ * Standardised "no data" surface. Consumers MUST pass a specific, action-oriented
+ * `body` string (one sentence). Generic copy like "No data" / "Nothing here" is
+ * not acceptable per Phase 0 plan T14 — every empty state must guide the next move.
+ */
+export function EmptyState({
+  icon,
+  title,
+  body,
+  headingLevel = 3,
+  primaryAction,
+  secondaryAction,
+  className,
+}: Props) {
+  const Heading = `h${headingLevel}` as const;
   return (
     <div className={cn("flex flex-col items-center justify-center text-center gap-4 py-12 px-6", className)}>
       {icon && <div className="text-text-muted [&_svg]:size-8" aria-hidden>{icon}</div>}
       <div className="flex flex-col gap-2 max-w-sm">
-        <h3 className="text-display-md text-text-primary">{title}</h3>
+        <Heading className="text-display-md text-text-primary">{title}</Heading>
         <p className="text-body text-text-secondary">{body}</p>
       </div>
-      {(primaryAction || secondaryAction) && (
+      {primaryAction && (
         <div className="flex gap-2 mt-2">
           {primaryAction}
           {secondaryAction}
