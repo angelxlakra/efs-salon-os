@@ -2258,6 +2258,33 @@ git commit -m "feat(ui): Skeleton with named shapes (text/row/card/kpi)"
 
 **Why:** Spec §6.4 is the most complex primitive. Single source of truth for every list in V2 (Bills, Customers, Inventory, Purchases, Expenses). Mobile card fallback is *default*, not opt-in. Named `DataTable` to avoid conflict with existing low-level `<Table>` element primitive.
 
+> **Amendment 2026-04-29:** Code-quality review caught 3 Important issues
+> in the as-shipped greenfield primitive. Applied in the same commit:
+> (1) Row click was mouse-only — no `tabIndex`, no keyboard handler.
+> Real a11y regression on THE V2 list primitive. Fix: when `onRowClick`
+> is set, both desktop `<tr>` and mobile card `<div>` get `tabIndex={0}`,
+> an `onKeyDown` handler that activates on Enter/Space, plus
+> `focus:outline-none focus:bg-surface-row-hover` for visible focus
+> indication. Mobile card also gets `role="button"` (semantic since it's
+> a div); desktop tr keeps default `role="row"` (W3C-correct;
+> `role="button"` on tr is nonstandard). (2) Empty data with no
+> `emptyState` prop rendered broken table chrome (header row + empty
+> tbody) instead of nothing. Fix: rewrite empty branch to
+> `if (data.length === 0) return emptyState ? <>{emptyState}</> : null;`.
+> (3) 4 tests too thin for the primitive's importance. Added 6 tests:
+> keyboard-Enter+Space activation, negative tabIndex without onRowClick,
+> rowAction stopPropagation, mobileCard override, density variants
+> (dense → h-8, comfort → h-11), null-empty fallback. Test count 4 → 10.
+>
+> Also documented (not fixed): `format="money"` without `align="right"`
+> renders left-aligned with tabular nums — caller bug, not enforced.
+> `Props<T>` not exported (matches Card/Badge convention). Mobile cards
+> don't render `rowAction` (current spec choice; revisit at first
+> mobile-with-actions call site). Vitest dual-render JSDOM idiom: tests
+> for any responsive primitive must use `getAllByText` /
+> `getAllByRole` since both desktop and mobile DOM render simultaneously
+> (Tailwind class-based hide/show doesn't take effect in JSDOM).
+
 - [ ] **Step 1: Write failing tests**
 
 ```tsx
