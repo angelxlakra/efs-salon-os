@@ -2114,11 +2114,41 @@ git commit -m "feat(ui): add EmptyState primitive (serif title + guiding body + 
 
 **Why:** V1 uses mixed spinners / blank states. Spec §6.8 makes Skeleton mandatory for loading states with four named shapes.
 
+> **Amendment 2026-04-26:** Pre-dispatch audit found 1 caller — the
+> shared `sidebar.tsx` layout primitive at lines 622+627 — passing
+> `data-sidebar` and `style` (custom CSS variable for menu-skeleton
+> width). The plan's narrowed `Props = { shape?, width?, className? }`
+> would break sidebar visually + add ~3 TS errors. Sidebar is layout
+> infra rendered on every V1 + V2 route, so the usual "tolerate broken
+> V1 visuals" doctrine does not apply. Fix (applied in same commit):
+> extend `Props` with `React.HTMLAttributes<HTMLDivElement>` and spread
+> `...rest` to the div. Also destructure caller `style` separately and
+> merge it with the internal `width` prop so caller CSS vars survive.
+> The V2 contract (use `shape`/`width`) is still enforced by the typed
+> primary props. Test count 2 → 9 (added default-shape, sidebar-attr
+> regression guard, style-merge guard, aria-hidden guard).
+
+> **Amendment 2026-04-26 (post-review):** Code-quality review caught
+> 3 fixable issues in the as-shipped version (no behavior regression
+> risk). Applied in same commit: (1) `width={0}` was silently overridden
+> by the default-width class because both gates used truthy checks
+> (`width ?` / `!width &&`). Fixed by extracting `const hasWidth =
+> width !== undefined` and using that in both branches. (2) Added a
+> 3-line code comment documenting the `aria-hidden` decorative-by-default
+> invariant + `{...rest}` escape hatch (callers opt back in by passing
+> `aria-hidden={false}` or use `aria-busy` on the live container).
+> (3) Added 3 new tests covering default-width-per-shape: text→w-3/4,
+> card→w-full, and the `width=0` regression guard. Test count 9 → 12.
+> Deferred to Phase 1: parallel `shapeClass`/`defaultWidthClass` records
+> (style call — leave as-is), `Shape` type export (speculative), Phase
+> 1 plan-doc note about shim being permanent (not a legacy adapter).
+
 - [ ] **Step 1: Write failing tests**
 
 ```tsx
 import { describe, expect, it } from "vitest";
 import { render } from "@testing-library/react";
+import * as React from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 describe("Skeleton", () => {
@@ -2127,9 +2157,37 @@ describe("Skeleton", () => {
     expect(container.firstChild).toHaveAttribute("data-shape", shape);
   });
 
-  it("applies custom width", () => {
+  it("defaults to text shape when no shape prop given", () => {
+    const { container } = render(<Skeleton />);
+    expect(container.firstChild).toHaveAttribute("data-shape", "text");
+  });
+
+  it("applies custom width via inline style", () => {
     const { container } = render(<Skeleton shape="text" width="60%" />);
     expect(container.firstChild).toHaveStyle({ width: "60%" });
+  });
+
+  it("forwards arbitrary HTML attrs (regression guard for sidebar caller)", () => {
+    const { container } = render(
+      <Skeleton shape="text" data-sidebar="menu-skeleton-text" />
+    );
+    expect(container.firstChild).toHaveAttribute("data-sidebar", "menu-skeleton-text");
+  });
+
+  it("forwards inline style attrs alongside width prop", () => {
+    const { container } = render(
+      <Skeleton
+        shape="text"
+        style={{ "--skeleton-width": "70%" } as React.CSSProperties}
+      />
+    );
+    const el = container.firstChild as HTMLElement;
+    expect(el.style.getPropertyValue("--skeleton-width")).toBe("70%");
+  });
+
+  it("renders as decorative (aria-hidden)", () => {
+    const { container } = render(<Skeleton shape="row" />);
+    expect(container.firstChild).toHaveAttribute("aria-hidden");
   });
 });
 ```
@@ -2142,34 +2200,40 @@ describe("Skeleton", () => {
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
-type Props = {
-  shape?: "text" | "row" | "card" | "kpi";
+type Shape = "text" | "row" | "card" | "kpi";
+
+type Props = React.HTMLAttributes<HTMLDivElement> & {
+  shape?: Shape;
   width?: React.CSSProperties["width"];
-  className?: string;
 };
 
-const shapeClass: Record<NonNullable<Props["shape"]>, string> = {
+const shapeClass: Record<Shape, string> = {
   text: "h-4 rounded",
   row:  "h-9 rounded-md",
   card: "h-32 rounded-lg",
   kpi:  "h-20 rounded-lg",
 };
 
-export function Skeleton({ shape = "text", width, className }: Props) {
+const defaultWidthClass: Record<Shape, string> = {
+  text: "w-3/4",
+  row:  "w-full",
+  card: "w-full",
+  kpi:  "w-full",
+};
+
+export function Skeleton({ shape = "text", width, className, style, ...rest }: Props) {
   return (
     <div
       data-shape={shape}
-      style={width ? { width } : undefined}
+      style={width ? { ...style, width } : style}
       className={cn(
         "animate-pulse bg-surface-row-hover",
         shapeClass[shape],
-        shape === "text" && !width && "w-3/4",
-        shape === "row" && !width && "w-full",
-        shape === "card" && !width && "w-full",
-        shape === "kpi" && !width && "w-full",
+        !width && defaultWidthClass[shape],
         className
       )}
       aria-hidden
+      {...rest}
     />
   );
 }
