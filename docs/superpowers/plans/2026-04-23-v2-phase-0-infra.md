@@ -2704,6 +2704,20 @@ git commit -m "feat(ui): FilterBar with Search/Pills/Actions compound API"
 
 **Why:** Sidebar, bottom-nav, and (later) ⌘K palette all render the same conceptual NavItem. Centralising it prevents the three-ways-to-render-navigation drift that bit V1.
 
+> **Amendment 2026-04-29:** Plan code set `data-active` (for styling)
+> but no ARIA attribute on the active item. NavItem renders on every
+> V2 route (sidebar, bottom-nav, future ⌘K palette), so missing
+> `aria-current="page"` is a real screen-reader regression. Fix
+> (applied in same commit): add `aria-current={active ? "page" :
+> undefined}` on the `<Link>`. Same `|| undefined` pattern as
+> `data-active` so the attribute is omitted (not "false") when
+> inactive. Added 1 test asserting both `data-active="true"` AND
+> `aria-current="page"` are set on active, plus 1 test asserting
+> both are OMITTED when inactive (locks the contract). Test count
+> 3 → 5. Deferred: badge silently dropped for `rail`/`bottom`
+> variants (plan choice — JSDoc note would help; revisit at first
+> mobile-nav call site).
+
 - [ ] **Step 1: Write failing tests**
 
 ```tsx
