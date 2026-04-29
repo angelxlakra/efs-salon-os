@@ -2813,6 +2813,17 @@ git commit -m "feat(ui): NavItem primitive for sidebar/rail/bottom-nav"
 
 **Why:** Command palette, keyboard-shortcut hints in tooltips, empty states mentioning `⌘K` — all render keyboard chords. One component.
 
+> **Amendment 2026-04-29:** Pre-dispatch audit found two plan defects.
+> (1) `role="kbd-chord"` on the wrapper `<span>` is not a valid ARIA
+> role — axe-core / eslint-jsx-a11y will flag it. The native `<kbd>`
+> element is already semantically correct; no wrapper role is needed.
+> Fix: drop the `role` attribute entirely. (2) Plan test #1 had no
+> `expect()` assertions — it passed vacuously regardless of
+> implementation. Fix: rewrite to assert `container.querySelectorAll("kbd")`
+> returns 2 elements with the correct text content in order.
+> Both fixes applied in same commit. Implementation and other test
+> are otherwise verbatim.
+
 - [ ] **Step 1: Write failing tests**
 
 ```tsx
@@ -2821,12 +2832,12 @@ import { render, screen } from "@testing-library/react";
 import { Kbd } from "@/components/ui/kbd";
 
 describe("Kbd", () => {
-  it("renders each key as its own <kbd> in a sequence", () => {
-    render(<Kbd keys={["⌘", "K"]} />);
-    const kbds = screen.getAllByRole("kbd-chord").flatMap((el) =>
-      Array.from(el.querySelectorAll("kbd"))
-    );
-    // Not using testing-library roles; fallback to direct DOM
+  it("renders each key as its own <kbd> element in order", () => {
+    const { container } = render(<Kbd keys={["⌘", "K"]} />);
+    const kbdElements = container.querySelectorAll("kbd");
+    expect(kbdElements).toHaveLength(2);
+    expect(kbdElements[0]).toHaveTextContent("⌘");
+    expect(kbdElements[1]).toHaveTextContent("K");
   });
 
   it("renders the keys' text content", () => {
@@ -2852,7 +2863,7 @@ type Props = {
 
 export function Kbd({ keys, className }: Props) {
   return (
-    <span role="kbd-chord" className={cn("inline-flex items-center gap-0.5 font-mono text-[10px]", className)}>
+    <span className={cn("inline-flex items-center gap-0.5 font-mono text-[10px]", className)}>
       {keys.map((k, i) => (
         <kbd
           key={`${k}-${i}`}
