@@ -2892,8 +2892,23 @@ git commit -m "feat(ui): Kbd primitive for keyboard-shortcut chords"
 
 **Files:**
 - Modify: `frontend/src/components/ui/sonner.tsx`
+- Modify: `frontend/src/app/layout.tsx` (added 2026-04-29 — see amendment)
 
 **Why:** Sonner is the existing toast lib. We re-skin it via tokens and set policy defaults: success = auto-dismiss 4s, warning/danger = persistent.
+
+> **Amendment 2026-04-29:** Plan listed only `frontend/src/components/ui/sonner.tsx`
+> as the modified file, but `app/layout.tsx:2` imported `Toaster` from
+> `'sonner'` directly — bypassing the wrapper entirely. Shipping the
+> rewrite alone would have left V2 token styling unreachable at runtime
+> (the wrapper would be dead code). Fix (applied in same commit): also
+> flip `app/layout.tsx:2` to `import { Toaster } from '@/components/ui/sonner'`.
+> Toaster is shared chrome that renders on every route, so this is
+> analogous to the T15 sidebar argument — visual breakage on shared
+> infra ≠ tolerated V1 page breakage. Duration policy ("success = 4s,
+> warning/danger = persistent" from the Why section above) cannot be
+> enforced in the Toaster config — must be applied at
+> `toast.success(...)` / `toast.error(...)` call sites. Deferred to
+> Phase 1 retrofit.
 
 - [ ] **Step 1: Read the current `frontend/src/components/ui/sonner.tsx`, then rewrite**
 
