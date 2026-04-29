@@ -2521,7 +2521,21 @@ git commit -m "feat(ui): DataTable primitive with mobile card fallback"
 
 **Why:** Same filter strip across Bills, Inventory, Customers, Purchases, Expenses, Appointments. Compound API per §6.9.
 
-- [ ] **Step 1: Write failing tests**
+> **Amendment 2026-04-29:** Plan code had an internal contradiction —
+> the implementation set `role="tab"` on each pill button while the test
+> queried `getByRole("button", ...)`. Explicit `role="tab"` overrides
+> the `<button>`'s implicit `role="button"`, so the verbatim plan would
+> fail tests #2 and #3. Fix (applied in same commit): drop `role="tab"`
+> AND `role="tablist"` (a tablist must contain tabs; without them the
+> wrapper role is a lie). Use proper toggle-button semantics:
+> `aria-pressed={active}` on each pill, `role="group" aria-label="Filters"`
+> on the wrapper. `aria-selected` (which the implementer initially
+> retained) is invalid ARIA on a `button` role — only valid on
+> `tab`/`option`/`row`/etc. Filter pills filter a list in place rather
+> than swapping content panels, so toggle-button is the correct pattern.
+> Added a 4th test asserting `aria-pressed` is set AND `aria-selected`
+> is NOT set, locking the contract.
+
 
 ```tsx
 import { describe, expect, it, vi } from "vitest";
