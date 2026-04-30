@@ -3056,6 +3056,15 @@ git commit -m "chore(lint): migrate to ESLint 9 flat config"
 
 **Why:** Structurally prevents V1's 1.02-contrast regression. Rejects any `text-gray-*` / `bg-gray-*` / `border-gray-*` plus `zinc`/`slate`/`stone`/`neutral` variants in app code.
 
+> **Amendment 2026-04-30:** Plan's Step 6 showed a "full eslint.config.mjs"
+> using FlatCompat to load `next/core-web-vitals` — but T21 replaced
+> FlatCompat with direct flat-config imports (commit `75c55db`). The
+> additive diff in this task adds `import salon from "./eslint-plugin-salon/index.js"`
+> + a new files-scoped config block, merged into the T21 config. Step 8
+> ("next lint --dir src") is stale and was skipped — T21 already changed
+> the lint script to `"eslint ."`. Plugin tests run via `node tests/...`
+> (ESLint's RuleTester, not vitest).
+
 - [ ] **Step 1: Create the plugin package**
 
 `frontend/eslint-plugin-salon/package.json`:
@@ -3197,23 +3206,20 @@ import salon from "./eslint-plugin-salon/index.js";
 },
 ```
 
-Full config after change:
+Full config after change (matches T21-shipped flat-config — direct imports, no FlatCompat):
 
 ```js
 import js from "@eslint/js";
 import ts from "typescript-eslint";
-import { FlatCompat } from "@eslint/eslintrc";
-import path from "node:path";
-import url from "node:url";
+import nextCoreWebVitals from "eslint-config-next/core-web-vitals";
+import nextTypescript from "eslint-config-next/typescript";
 import salon from "./eslint-plugin-salon/index.js";
-
-const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
-const compat = new FlatCompat({ baseDirectory: __dirname });
 
 export default [
   js.configs.recommended,
   ...ts.configs.recommended,
-  ...compat.extends("next/core-web-vitals", "next/typescript"),
+  ...nextCoreWebVitals,
+  ...nextTypescript,
   {
     ignores: [".next/**", "node_modules/**", "eslint-plugin-salon/**", "scripts/**"],
   },
