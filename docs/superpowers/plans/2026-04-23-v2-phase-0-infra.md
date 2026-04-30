@@ -2962,6 +2962,27 @@ git commit -m "feat(ui): restyle Toast (sonner) to V2 tokens"
 
 **Why:** The legacy `.eslintrc.json` format doesn't support local plugin paths cleanly. Migrating to flat config is a prerequisite for Task 22's custom plugin.
 
+> **Amendment 2026-04-30:** Two plan deviations applied during execution.
+> (1) Plan's Step 2 used `FlatCompat` to load `next/core-web-vitals` and
+> `next/typescript` via `compat.extends(...)`. That crashed with
+> `TypeError: Converting circular structure to JSON` because Next 16's
+> `eslint-config-next` ships native flat configs (CJS modules exporting
+> `Linter.Config[]`), not legacy presets. Fix: import the flat-config
+> arrays directly via `eslint-config-next/core-web-vitals` and
+> `eslint-config-next/typescript`, dropping `FlatCompat`. The `@eslint/eslintrc`
+> dep is now unused but kept installed (forward-useful, harmless).
+> (2) Risk #1 fired: `next lint` is removed in Next 16 — running it produced
+> "Invalid project directory provided" because Next tried to lint a
+> nonexistent `lint/` dir. Fix: changed `package.json` lint script from
+> `"next lint"` to `"eslint ."`. Both fixes in same commit. (3) Adding
+> `js.configs.recommended` introduced 1 new lint error in `cn.test.ts:9`
+> — the test deliberately uses `false && "hidden"` to verify `cn()` drops
+> falsy conditional classes. Suppressed via inline
+> `// eslint-disable-next-line no-constant-binary-expression`. The 38
+> pre-existing errors and 208 warnings surfaced by the new lint run were
+> always present but masked by the broken `next lint` toolchain — Phase 0
+> doctrine accepts them.
+
 - [ ] **Step 1: Install flat-config helpers**
 
 ```bash
