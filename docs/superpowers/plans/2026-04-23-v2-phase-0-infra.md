@@ -3505,6 +3505,19 @@ git commit -m "feat(lint): add salon/no-h-screen rule"
 
 **Why:** Enforces the Phase 1 `@modal` invariant structurally. Files at `src/app/dashboard/<entity>/page.tsx` that both import a `*DetailsDialog` and hold a matching ID in `useState` are flagged.
 
+> **Amendment 2026-05-01:** Plan's `walkForId` AST traversal as written
+> crashed with `RangeError: Invalid array length` because it iterated
+> `Object.keys(n)` and spread every array-valued property, including
+> `parent` (cyclic back-references), `tokens` (huge token arrays
+> attached to Program/Function nodes), `comments`, `loc`, and `range`.
+> Fix (applied in same commit): (1) skip those 5 keys during descent;
+> (2) push items individually instead of spreading, with `item.type`
+> truthy filter as defense against absurdly large arrays. The fix
+> preserves externally observable behavior — test passes verbatim, and
+> the predicted real-world offender `bills/page.tsx:53` surfaces as the
+> 1 expected warning. Update the Step 2 code block in the plan to
+> match the shipped rule.
+
 - [ ] **Step 1: Rule test**
 
 `frontend/eslint-plugin-salon/tests/no-list-owned-detail-state.test.js`:
