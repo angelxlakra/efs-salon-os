@@ -24,6 +24,7 @@ export default [
     rules: {
       "salon/no-raw-grays": "warn",
       "salon/no-hex-literals-in-classname": "warn",
+      "salon/no-h-screen": "warn",
     },
   },
   {
