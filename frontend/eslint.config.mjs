@@ -15,6 +15,7 @@ export default [
       "node_modules/**",
       "eslint-plugin-salon/**",
       "scripts/**",
+      "storybook-static/**",
     ],
   },
   {

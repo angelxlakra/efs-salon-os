@@ -3781,6 +3781,8 @@ git commit -m "build(storybook): bootstrap Storybook 8 with theme decorator"
 
 ## Task 27: Storybook stories for every primitive
 
+> **Amendment 2026-05-01:** Three story files (`currency-input`, `combobox`, `filter-bar`) call `useState` inside the `render` arrow. ESLint's `react-hooks/rules-of-hooks` rejects this because the inline arrow has no PascalCase name. Fixed by extracting each `render` body into a named `function DefaultDemo()` component and rendering it as `<DefaultDemo />`. Same behaviour, lint baseline preserved at 38 errors.
+
 **Files:**
 - Create: `frontend/src/components/ui/button.stories.tsx`
 - Create: `frontend/src/components/ui/input.stories.tsx`
