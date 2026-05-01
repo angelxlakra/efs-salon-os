@@ -9,6 +9,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { usePalette } from "@/components/command-palette/use-palette";
+import { NavigationProvider } from "@/components/command-palette/providers/navigation";
 
 /**
  * Root command palette. T8–T10 will mount providers (navigation actions,
@@ -42,7 +43,7 @@ export function CommandPalette() {
             <Command.Empty className="px-3 py-6 text-center text-text-muted text-body-sm">
               No results.
             </Command.Empty>
-            {/* Provider groups slot in here — T8/T9/T10/T11. */}
+            <NavigationProvider />
           </Command.List>
         </Command>
       </DialogContent>

@@ -3,6 +3,10 @@ import { render, screen, act } from "@testing-library/react";
 import { CommandPalette } from "@/components/command-palette/command-palette";
 import { PaletteProvider } from "@/components/command-palette/use-palette";
 
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn() }),
+}));
+
 beforeEach(() => {
   if (typeof Element !== "undefined") {
     Element.prototype.scrollIntoView = vi.fn();
