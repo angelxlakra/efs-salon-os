@@ -3689,6 +3689,8 @@ git commit -m "feat(lint): add salon/no-list-owned-detail-state rule"
 
 **Why:** Visual ground truth for every primitive. Light + dark decorator shows regressions instantly. No visual-regression service (Chromatic) this phase — that's a follow-up. Storybook alone is still worth it for dev loop and manual review.
 
+> **Amendment 2026-05-01**: Storybook 8 (`@storybook/nextjs`) does NOT support Next.js 16 — peer dep is capped at `^15`, init fails with ERESOLVE. Falling through to Storybook 9 also failed via `init` because Storybook 9's auto-installer pulls `@storybook/nextjs-vite@^10` (latest) which conflicts with `storybook@9`. Resolved by manually installing pinned-to-9 set: `storybook@^9 @storybook/nextjs-vite@^9 @storybook/addon-themes@^9 @storybook/addon-docs@^9`. Switched framework from `@storybook/nextjs` (Webpack) to `@storybook/nextjs-vite` (Vite) — Storybook 9 + Next 16 is Vite-only. Replaced `webpackFinal` alias config with `viteFinal` equivalent. Replaced `@storybook/addon-essentials` (deprecated in 9, controls/actions/viewport now in core) with `@storybook/addon-docs`. Build verified via `npm run build-storybook` (passes; "no story files" is expected — T27 adds them). Skipped auto-init entirely; configs hand-written, no example `src/stories/` artifacts to clean up.
+
 - [ ] **Step 1: Install Storybook**
 
 ```bash
