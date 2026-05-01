@@ -4228,7 +4228,19 @@ git commit -m "docs(storybook): add stories for every V2 primitive"
 - [ ] **Step 2: Run the full check locally**
 
 Run: `cd frontend && npm run check`
-Expected: all four checks pass. `build-storybook` takes 30–60s; acceptable.
+
+> **Amendment 2026-05-01:** Plan said "Expected: all four checks pass" but
+> reality is `npm run lint` fails with 38 pre-existing errors carried in
+> from V1 code (`react/no-unescaped-entities`, `@typescript-eslint/no-empty-object-type`,
+> `react-hooks/purity` from Next 16's eslint-config-next, plus a handful
+> in V1 dashboard pages). These are ERRORS not warnings, so they short-
+> circuit the `&&` chain before `build-storybook` runs. Phase 0 doctrine
+> accepts this — Phase 1 retrofit brings lint to 0 errors. Until then,
+> `npm run check` is informational only; CI gating happens in Phase 1.
+> Contrast (3 ms) + tests (~3 s, all passing) + storybook build (~3 s
+> when run alone) are individually green. The `check` chain is preserved
+> as-is so Phase 1 retrofit's progress is measurable by which stage it
+> reaches.
 
 Fix any failures before continuing. Common failures:
 - Contrast: a token shifted during review — rerun Task 3's values.

@@ -14,6 +14,7 @@
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "check:contrast": "node scripts/check-contrast.mjs",
+    "check": "npm run check:contrast && npm test -- --run && npm run lint && npm run build-storybook",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build"
   },
