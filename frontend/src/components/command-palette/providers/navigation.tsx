@@ -5,6 +5,7 @@ import { Command } from "cmdk";
 import { useRouter } from "next/navigation";
 import { SHELL_SECTIONS } from "@/components/shell/section-config";
 import { usePalette } from "@/components/command-palette/use-palette";
+import { recordCommand } from "@/components/command-palette/history";
 
 export function NavigationProvider() {
   const router = useRouter();
@@ -18,6 +19,7 @@ export function NavigationProvider() {
             key={item.href}
             value={`go-${item.label.toLowerCase()}`}
             onSelect={() => {
+              recordCommand({ id: `go-${item.label.toLowerCase()}`, label: item.label, href: item.href });
               router.push(item.href);
               close();
             }}
