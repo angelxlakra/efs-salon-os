@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Search, Filter, Download, Eye, Printer, RotateCcw, XCircle, Loader2, FileText, FileSpreadsheet, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -13,7 +14,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { apiClient } from '@/lib/api-client';
 import { toast } from 'sonner';
-import { BillDetailsDialog } from '@/components/bills/bill-details-dialog';
 import { titleCase } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth-store';
 
@@ -50,8 +50,7 @@ export default function BillsPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
-  const [selectedBillId, setSelectedBillId] = useState<string | null>(null);
-  const [showBillDetails, setShowBillDetails] = useState(false);
+  const router = useRouter();
   const [searchDebounced, setSearchDebounced] = useState('');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
@@ -148,8 +147,7 @@ export default function BillsPage() {
     bill.total_paid + (bill.write_off_amount ?? 0) < bill.rounded_total;
 
   const handleViewBill = (billId: string) => {
-    setSelectedBillId(billId);
-    setShowBillDetails(true);
+    router.push(`/dashboard/bills/${billId}`);
   };
 
   const handleReprintReceipt = async (billId: string) => {
@@ -183,7 +181,6 @@ export default function BillsPage() {
       });
       toast.success('Bill voided successfully');
       fetchBills(); // Refresh the list
-      setShowBillDetails(false); // Close dialog if open
     } catch (error: unknown) {
       console.error('Error voiding bill:', error);
       const msg = error instanceof Error ? error.message : 'Failed to void bill';
@@ -413,7 +410,7 @@ export default function BillsPage() {
                     <button
                       type="button"
                       className="text-xs text-text-secondary hover:text-text-primary transition-colors"
-                      onClick={() => { setSelectedBillId(bill.id); setShowBillDetails(true); }}
+                      onClick={() => handleViewBill(bill.id)}
                     >
                       View
                     </button>
@@ -549,15 +546,6 @@ export default function BillsPage() {
         </CardContent>
       </Card>
 
-      {/* Bill Details Dialog */}
-      <BillDetailsDialog
-        billId={selectedBillId}
-        open={showBillDetails}
-        onOpenChange={setShowBillDetails}
-        onVoid={handleVoidBill}
-        onRefund={handleRefund}
-        onReprint={handleReprintReceipt}
-      />
     </div>
   );
 }
