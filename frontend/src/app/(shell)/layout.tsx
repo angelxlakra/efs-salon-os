@@ -20,7 +20,9 @@ function ShellChrome({ children, modal }: { children: React.ReactNode; modal: Re
       <div className="flex-1 flex flex-col min-w-0">
         <TopBar />
         {/* pb-16 reserves space for BottomTabNav on mobile (T18 adds safe-area inset). */}
-        <main className="flex-1 pb-16 md:pb-0">{children}</main>
+        <main className="flex-1 pb-[calc(theme(spacing.16)+env(safe-area-inset-bottom))] md:pb-0">
+          {children}
+        </main>
       </div>
       {/* Mobile bottom nav. */}
       <BottomTabNav />

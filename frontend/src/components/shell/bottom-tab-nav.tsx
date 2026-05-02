@@ -21,7 +21,8 @@ export function BottomTabNav({ className }: { className?: string }) {
     <>
       <nav
         className={cn(
-          "md:hidden fixed bottom-0 inset-x-0 z-30 h-14 bg-surface-card border-t border-border-subtle flex items-stretch",
+          "md:hidden fixed bottom-0 inset-x-0 z-30 bg-surface-card border-t border-border-subtle flex items-stretch",
+          "h-[calc(theme(spacing.14)+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)]",
           className,
         )}
         aria-label="Primary mobile navigation"
