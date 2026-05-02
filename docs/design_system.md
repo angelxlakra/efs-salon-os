@@ -610,6 +610,34 @@ The detail component is shared. Only the shell differs.
 4. **Loading & error states live in the detail component**, not the shell. Both shells render the same skeleton.
 5. **Which entities qualify:** anything searchable from the palette or linkable from other surfaces. Current list: `bills`, `customers`, `invoices`, `inventory` (SKUs), `purchases`, `appointments`. `users`, `services`, `expenses`, `cash-drawer-sessions` can follow as they mature — no entity is locked out, but none should ship without its canonical route.
 
+#### §7.5.1 — Implementation template (Phase 1)
+
+Phase 1 ships the route group `(shell)` that owns the parallel `@modal` slot. The actual file layout used in production:
+
+```
+frontend/src/app/(shell)/dashboard/<entity>/[id]/page.tsx        — canonical full page
+frontend/src/app/(shell)/@modal/(.)dashboard/<entity>/[id]/page.tsx — intercepted modal
+frontend/src/components/<entity>/<entity>-detail.tsx              — shared body
+```
+
+**Behaviour:**
+
+- Cold URL or palette navigation → renders the canonical page.
+- Click from a list row inside `/dashboard/<entity>` → Next intercepts, slots the body into `@modal`, list URL stays.
+- Browser back → closes the modal (because `router.back()` unwinds the URL).
+- Deep link (WhatsApp, copy URL) → renders the canonical page (no list context to intercept).
+
+**Detail body contract:**
+
+- Single component named `<Entity>Detail` (`BillDetail`, `CustomerDetail`, etc.).
+- Accepts `{ id }` only. Fetches its own data with cleanup-aware `useEffect`.
+- Renders Skeleton (Phase 0 T15) while loading; danger token text on error.
+- No URL knowledge — same body works in modal and full-page.
+
+**Lint enforcement (Phase 0 T25):** `salon/no-list-owned-detail-state` flags any list page that imports a `*DetailDialog` AND holds a `selected*Id` in `useState`. List pages must instead push to the entity URL (`router.push(\`/dashboard/<entity>/\${id}\`)`) and let the `@modal` slot handle rendering.
+
+**Reference implementation:** see `frontend/src/app/(shell)/dashboard/bills/[id]/page.tsx`, `frontend/src/app/(shell)/@modal/(.)dashboard/bills/[id]/page.tsx`, and `frontend/src/components/bills/bill-detail.tsx` (Phase 1 T13).
+
 ---
 
 ## 8. Page patterns
