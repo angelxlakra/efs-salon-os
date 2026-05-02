@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { usePalette } from "@/components/command-palette/use-palette";
 import { NavigationProvider } from "@/components/command-palette/providers/navigation";
+import { ActionsProvider } from "@/components/command-palette/providers/actions";
 import { CustomersProvider } from "@/components/command-palette/providers/customers";
 import { BillsProvider } from "@/components/command-palette/providers/bills";
 import { SkusProvider } from "@/components/command-palette/providers/skus";
@@ -47,6 +48,7 @@ export function CommandPalette() {
               No results.
             </Command.Empty>
             <NavigationProvider />
+            <ActionsProvider />
             <CustomersProvider query={query} />
             <BillsProvider query={query} />
             <SkusProvider query={query} />
