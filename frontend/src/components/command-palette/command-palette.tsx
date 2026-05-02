@@ -10,6 +10,9 @@ import {
 } from "@/components/ui/dialog";
 import { usePalette } from "@/components/command-palette/use-palette";
 import { NavigationProvider } from "@/components/command-palette/providers/navigation";
+import { CustomersProvider } from "@/components/command-palette/providers/customers";
+import { BillsProvider } from "@/components/command-palette/providers/bills";
+import { SkusProvider } from "@/components/command-palette/providers/skus";
 
 /**
  * Root command palette. T8–T10 will mount providers (navigation actions,
@@ -44,6 +47,9 @@ export function CommandPalette() {
               No results.
             </Command.Empty>
             <NavigationProvider />
+            <CustomersProvider query={query} />
+            <BillsProvider query={query} />
+            <SkusProvider query={query} />
           </Command.List>
         </Command>
       </DialogContent>
