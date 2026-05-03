@@ -33,7 +33,6 @@ type TimeGridProps = {
 export function TimeGrid({ children, className }: TimeGridProps) {
   return (
     <div className={cn("flex overflow-y-auto", className)}>
-      {/* Hour labels axis — sticky on horizontal scroll */}
       <div className="sticky left-0 z-10 w-14 shrink-0 bg-surface-card border-r border-border-subtle select-none">
         {HOURS.map((h) => (
           <div
@@ -48,13 +47,11 @@ export function TimeGrid({ children, className }: TimeGridProps) {
         ))}
       </div>
 
-      {/* Grid body */}
       <div
         data-testid="grid-body"
         className="relative flex-1"
         style={{ minHeight: GRID_HEIGHT }}
       >
-        {/* Hour dividers */}
         {HOURS.map((h) => (
           <div
             key={h}
@@ -63,7 +60,6 @@ export function TimeGrid({ children, className }: TimeGridProps) {
             aria-hidden
           />
         ))}
-        {/* Quarter-hour sub-lines */}
         {HOURS.flatMap((h) =>
           [1, 2, 3].map((q) => (
             <div
