@@ -9,6 +9,7 @@ import {
   timeToTopOffset,
   getServiceColor,
   snapToSlot,
+  buildISO,
 } from "@/components/calendar/utils";
 
 describe("calendar utils", () => {
@@ -67,6 +68,20 @@ describe("calendar utils", () => {
 
   it("snapToSlot snaps a datetime string to 15-min boundary", () => {
     const snapped = snapToSlot("2026-05-05T08:07:00+05:30");
-    expect(snapped).toMatch(/T08:00:00/);
+    expect(snapped).toBe("2026-05-05T08:00:00+05:30");
+  });
+
+  it("snapToSlot preserves the timezone suffix", () => {
+    const snapped = snapToSlot("2026-05-05T08:07:00+05:30");
+    expect(snapped).toBe("2026-05-05T08:00:00+05:30");
+  });
+
+  it("buildISO formats single-digit hours and minutes with padding", () => {
+    expect(buildISO("2026-05-05", 8, 0)).toBe("2026-05-05T08:00:00");
+    expect(buildISO("2026-05-05", 9, 5)).toBe("2026-05-05T09:05:00");
+  });
+
+  it("pxToMinutes returns 0 for 0 px input", () => {
+    expect(pxToMinutes(0)).toBe(0);
   });
 });

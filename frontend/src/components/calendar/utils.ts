@@ -13,11 +13,12 @@ export function pxToMinutes(px: number): number {
 }
 
 export function timeToTopOffset(iso: string): number {
-  // Parse hour and minute directly from the ISO string to avoid timezone conversion issues
-  const timePart = iso.split("T")[1]; // "10:00:00+05:30" or "10:00:00Z"
-  const [hourStr, minuteStr] = timePart.split(":");
-  const hour = parseInt(hourStr, 10);
-  const minute = parseInt(minuteStr, 10);
+  // Parse wall-clock hour/minute from the ISO string directly — new Date() uses UTC which shifts position for non-local timezone offsets.
+  const tIdx = iso.indexOf("T");
+  if (tIdx === -1) return 0;
+  const timePart = iso.substring(tIdx + 1);
+  const hour = parseInt(timePart.substring(0, 2), 10);
+  const minute = parseInt(timePart.substring(3, 5), 10);
   const minutesSinceStart = (hour - DAY_START_HOUR) * 60 + minute;
   return Math.max(0, Math.min(minutesToPx(minutesSinceStart), GRID_HEIGHT));
 }
@@ -34,13 +35,16 @@ export function getServiceColor(serviceId: string): string {
 }
 
 export function snapToSlot(iso: string): string {
-  // Parse the time part directly to avoid timezone conversion issues
-  const [datePart, timePart] = iso.split("T");
-  const [hourStr, minuteStr] = timePart.split(":");
-  const hour = parseInt(hourStr, 10);
-  const minute = parseInt(minuteStr, 10);
+  // Use fixed-position parsing so the timezone suffix (+05:30, Z, etc.) is preserved in the output.
+  const tIdx = iso.indexOf("T");
+  if (tIdx === -1) return iso;
+  const datePart = iso.substring(0, tIdx);
+  const timePart = iso.substring(tIdx + 1); // "08:07:00+05:30" or "08:07:00Z" or "08:07:00"
+  const hour = parseInt(timePart.substring(0, 2), 10);
+  const minute = parseInt(timePart.substring(3, 5), 10);
   const snappedMinutes = Math.floor(minute / 15) * 15;
-  return `${datePart}T${String(hour).padStart(2, "0")}:${String(snappedMinutes).padStart(2, "0")}:00`;
+  const tzSuffix = timePart.substring(8); // "+05:30", "Z", or ""
+  return `${datePart}T${String(hour).padStart(2, "0")}:${String(snappedMinutes).padStart(2, "0")}:00${tzSuffix}`;
 }
 
 export function buildISO(dateStr: string, hour: number, minute: number): string {
