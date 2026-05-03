@@ -35,7 +35,7 @@ export function AppointmentBlock({
       aria-label={`${appointment.customer_name} — ${serviceName}`}
       data-conflict={isConflict || undefined}
       data-status={appointment.status}
-      onClick={() => onClick(appointment)}
+      onClick={(e) => { e.stopPropagation(); onClick(appointment); }}
       onKeyDown={(e) => e.key === "Enter" && onClick(appointment)}
       className={cn(
         "absolute left-0.5 right-0.5 rounded-md px-2 py-1 cursor-pointer select-none overflow-hidden",

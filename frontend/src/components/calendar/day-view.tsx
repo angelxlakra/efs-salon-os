@@ -87,10 +87,14 @@ export function DayView({
     return ids;
   }, [apptByColumn]);
 
+  const headerScrollRef = React.useRef<HTMLDivElement>(null);
+  const bodyScrollRef = React.useRef<HTMLDivElement>(null);
+
   const resizeRef = React.useRef<{
     apptId: string;
     startY: number;
     startDuration: number;
+    currentDuration: number;
   } | null>(null);
 
   const handleResizeStart = React.useCallback(
@@ -100,6 +104,7 @@ export function DayView({
         apptId: appt.id,
         startY: e.clientY,
         startDuration: appt.duration_minutes,
+        currentDuration: appt.duration_minutes,
       };
     },
     []
@@ -108,13 +113,16 @@ export function DayView({
   React.useEffect(() => {
     const onMouseMove = (e: MouseEvent) => {
       if (!resizeRef.current) return;
-      const { apptId, startY, startDuration } = resizeRef.current;
+      const { startY, startDuration } = resizeRef.current;
       const deltaY = e.clientY - startY;
       const deltaMins = Math.round(((deltaY / HOUR_HEIGHT) * 60) / 15) * 15;
-      const newDuration = Math.max(15, startDuration + deltaMins);
-      onAppointmentUpdate(apptId, { duration_minutes: newDuration });
+      resizeRef.current.currentDuration = Math.max(15, startDuration + deltaMins);
     };
     const onMouseUp = () => {
+      if (resizeRef.current) {
+        const { apptId, currentDuration } = resizeRef.current;
+        onAppointmentUpdate(apptId, { duration_minutes: currentDuration });
+      }
       resizeRef.current = null;
     };
     window.addEventListener("mousemove", onMouseMove);
@@ -124,6 +132,15 @@ export function DayView({
       window.removeEventListener("mouseup", onMouseUp);
     };
   }, [onAppointmentUpdate]);
+
+  React.useEffect(() => {
+    const body = bodyScrollRef.current;
+    const header = headerScrollRef.current;
+    if (!body || !header) return;
+    const syncHeader = () => { header.scrollLeft = body.scrollLeft; };
+    body.addEventListener("scroll", syncHeader, { passive: true });
+    return () => body.removeEventListener("scroll", syncHeader);
+  }, []);
 
   const handleSlotClick = (colId: string | null, e: React.MouseEvent<HTMLDivElement>) => {
     const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
@@ -138,7 +155,7 @@ export function DayView({
     <div className="flex flex-col h-full">
       <div className="flex border-b border-border-default bg-surface-card sticky top-0 z-20">
         <div className="w-14 shrink-0 border-r border-border-subtle" />
-        <div className="flex overflow-x-auto">
+        <div ref={headerScrollRef} className="flex overflow-x-auto">
           {columns.map((col) => (
             <div
               key={col.id ?? "unassigned"}
@@ -153,7 +170,7 @@ export function DayView({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto overflow-x-auto">
+      <div ref={bodyScrollRef} className="flex-1 overflow-y-auto overflow-x-auto">
         <TimeGrid>
           <div className="flex absolute inset-0">
             {columns.map((col) => {
