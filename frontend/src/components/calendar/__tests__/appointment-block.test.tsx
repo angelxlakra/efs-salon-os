@@ -65,6 +65,7 @@ describe("AppointmentBlock", () => {
       />
     );
     expect(container.firstChild).toHaveAttribute("data-conflict", "true");
+    expect(container.firstChild).toHaveClass("ring-danger-fg");
   });
 
   it("calls onClick when clicked", async () => {
@@ -80,6 +81,7 @@ describe("AppointmentBlock", () => {
     );
     await userEvent.click(screen.getByText("Priya Sharma"));
     expect(onClick).toHaveBeenCalledOnce();
+    expect(onClick).toHaveBeenCalledWith(base);
   });
 
   it("renders a resize handle div", () => {
