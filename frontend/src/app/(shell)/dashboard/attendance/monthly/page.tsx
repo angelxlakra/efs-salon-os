@@ -165,7 +165,7 @@ export default function MonthlyAttendancePage() {
             </p>
           </div>
         </div>
-        <Button onClick={handleExport} variant="outline">
+        <Button onClick={handleExport} variant="secondary">
           <Download className="h-4 w-4 mr-2" />
           Export
         </Button>

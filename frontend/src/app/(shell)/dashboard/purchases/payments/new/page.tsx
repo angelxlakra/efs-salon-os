@@ -1,5 +1,6 @@
 'use client';
 
+import { Suspense } from 'react';
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, DollarSign, Save } from 'lucide-react';
@@ -12,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { purchaseApi, SupplierListItem, PurchaseInvoice } from '@/lib/api/purchases';
 import { toast } from 'sonner';
 
-export default function RecordPaymentPage() {
+function RecordPaymentPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const invoiceIdParam = searchParams.get('invoice_id');
@@ -377,5 +378,13 @@ export default function RecordPaymentPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function RecordPaymentPage() {
+  return (
+    <Suspense>
+      <RecordPaymentPageInner />
+    </Suspense>
   );
 }

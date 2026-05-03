@@ -21,11 +21,25 @@ const buttonVariants = cva(
           "bg-danger-fg text-text-inverse hover:opacity-90",
         icon:
           "text-text-secondary hover:bg-surface-row-hover hover:text-text-primary",
+        /** @deprecated V1 compat shim — use "secondary" in new code. */
+        outline:
+          "bg-surface-card text-text-primary border border-border-default hover:bg-surface-row-hover",
+        /** @deprecated V1 compat shim — use "primary" in new code. */
+        default:
+          "bg-accent text-accent-fg hover:bg-accent-hover active:bg-accent-active",
+        /** @deprecated V1 compat shim — use "danger" in new code. */
+        destructive:
+          "bg-danger-fg text-text-inverse hover:opacity-90",
+        /** @deprecated V1 compat shim — use "ghost" + underline class in new code. */
+        link:
+          "text-accent underline-offset-4 hover:underline",
       },
       size: {
         sm: "h-7 px-3 text-[13px]",
         md: "h-9 px-4 text-sm",
         lg: "h-11 px-6 text-base",
+        /** @deprecated V1 compat shim — use variant="icon" + a size in new code. */
+        icon: "h-9 w-9 p-0",
       },
       fullWidth: {
         true: "w-full",
