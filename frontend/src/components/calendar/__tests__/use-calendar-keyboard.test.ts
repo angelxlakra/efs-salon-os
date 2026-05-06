@@ -84,4 +84,42 @@ describe("useCalendarKeyboard", () => {
     expect(handlers.onNew).not.toHaveBeenCalled();
     document.body.removeChild(input);
   });
+
+  it("does not fire when metaKey is held", () => {
+    const handlers = makeHandlers();
+    renderHook(() => useCalendarKeyboard(handlers));
+    fireEvent.keyDown(window, { key: "n", metaKey: true });
+    expect(handlers.onNew).not.toHaveBeenCalled();
+  });
+
+  it("does not fire view change if chord times out before second key", () => {
+    vi.useFakeTimers();
+    const handlers = makeHandlers();
+    renderHook(() => useCalendarKeyboard(handlers));
+    fireEvent.keyDown(window, { key: "g" });
+    vi.advanceTimersByTime(801);
+    fireEvent.keyDown(window, { key: "d" });
+    expect(handlers.onSetView).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
+  it("does not fire any handler for an unknown chord key (g then x)", () => {
+    const handlers = makeHandlers();
+    renderHook(() => useCalendarKeyboard(handlers));
+    fireEvent.keyDown(window, { key: "g" });
+    fireEvent.keyDown(window, { key: "x" });
+    expect(handlers.onSetView).not.toHaveBeenCalled();
+    expect(handlers.onNew).not.toHaveBeenCalled();
+  });
+
+  it("does not fire when a textarea is focused", () => {
+    const handlers = makeHandlers();
+    renderHook(() => useCalendarKeyboard(handlers));
+    const textarea = document.createElement("textarea");
+    document.body.appendChild(textarea);
+    textarea.focus();
+    fireEvent.keyDown(window, { key: "n" });
+    expect(handlers.onNew).not.toHaveBeenCalled();
+    document.body.removeChild(textarea);
+  });
 });

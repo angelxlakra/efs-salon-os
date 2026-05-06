@@ -12,6 +12,15 @@ type Handlers = {
   onSetView: (view: CalendarView) => void;
 };
 
+function isEditable(el: Element | null): boolean {
+  return (
+    el instanceof HTMLInputElement ||
+    el instanceof HTMLTextAreaElement ||
+    el instanceof HTMLSelectElement ||
+    (el instanceof HTMLElement && el.isContentEditable)
+  );
+}
+
 /**
  * Registers keyboard shortcuts for the appointments calendar.
  *
@@ -25,29 +34,28 @@ type Handlers = {
  *   g then m   → month view
  */
 export function useCalendarKeyboard(handlers: Handlers) {
-  const pending = useRef<string | null>(null); // for chord (g then d/w/m)
+  // Sync latest handlers each render so the stable listener always calls current callbacks.
+  const handlersRef = useRef(handlers);
+  useEffect(() => { handlersRef.current = handlers; });
+
+  const pending = useRef<string | null>(null);
   const chordTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    const isEditable = (el: Element | null) =>
-      el instanceof HTMLInputElement ||
-      el instanceof HTMLTextAreaElement ||
-      el instanceof HTMLSelectElement ||
-      (el instanceof HTMLElement && el.isContentEditable);
-
     const onKeyDown = (e: KeyboardEvent) => {
       if (isEditable(document.activeElement)) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
 
       const key = e.key;
+      const h = handlersRef.current;
 
       // Chord: g + d/w/m
       if (pending.current === "g") {
         pending.current = null;
         if (chordTimer.current) clearTimeout(chordTimer.current);
-        if (key === "d") { e.preventDefault(); handlers.onSetView("day"); return; }
-        if (key === "w") { e.preventDefault(); handlers.onSetView("week"); return; }
-        if (key === "m") { e.preventDefault(); handlers.onSetView("month"); return; }
+        if (key === "d") { e.preventDefault(); h.onSetView("day"); return; }
+        if (key === "w") { e.preventDefault(); h.onSetView("week"); return; }
+        if (key === "m") { e.preventDefault(); h.onSetView("month"); return; }
       }
 
       if (key === "g") {
@@ -57,10 +65,10 @@ export function useCalendarKeyboard(handlers: Handlers) {
       }
 
       switch (key) {
-        case "n": e.preventDefault(); handlers.onNew(); break;
-        case "ArrowLeft": e.preventDefault(); handlers.onPrev(); break;
-        case "ArrowRight": e.preventDefault(); handlers.onNext(); break;
-        case "t": e.preventDefault(); handlers.onGoToday(); break;
+        case "n":          e.preventDefault(); h.onNew(); break;
+        case "ArrowLeft":  e.preventDefault(); h.onPrev(); break;
+        case "ArrowRight": e.preventDefault(); h.onNext(); break;
+        case "t":          e.preventDefault(); h.onGoToday(); break;
       }
     };
 
@@ -69,5 +77,5 @@ export function useCalendarKeyboard(handlers: Handlers) {
       window.removeEventListener("keydown", onKeyDown);
       if (chordTimer.current) clearTimeout(chordTimer.current);
     };
-  }, [handlers]);
+  }, []); // stable — registered once for the component lifetime
 }
