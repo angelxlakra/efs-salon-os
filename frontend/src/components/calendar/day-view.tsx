@@ -10,11 +10,42 @@ import {
   minutesToPx,
   timeToTopOffset,
   buildISO,
+  pxToMinutes,
 } from "@/components/calendar/utils";
 import type { Appointment, StaffMember, ServiceItem } from "@/lib/api/appointments";
 import { format } from "date-fns";
+import { DndContext, type DragEndEvent, pointerWithin } from "@dnd-kit/core";
+import { useDroppable } from "@dnd-kit/core";
+import { cn } from "@/lib/utils";
 
 const COLUMN_MIN_WIDTH = 120;
+
+function DroppableSlot({
+  id,
+  children,
+  style,
+  className,
+  onClick,
+}: {
+  id: string;
+  children: React.ReactNode;
+  style?: React.CSSProperties;
+  className?: string;
+  onClick?: (e: React.MouseEvent<HTMLDivElement>) => void;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id });
+  return (
+    <div
+      ref={setNodeRef}
+      data-testid="grid-slot"
+      className={cn(className, isOver && "bg-accent/5")}
+      style={style}
+      onClick={onClick}
+    >
+      {children}
+    </div>
+  );
+}
 
 type DayViewProps = {
   appointments: Appointment[];
@@ -151,8 +182,31 @@ export function DayView({
     onSlotClick(colId, buildISO(dateStr, h, m));
   };
 
+  const handleDragEnd = React.useCallback(
+    (event: DragEndEvent) => {
+      const { active, over, delta } = event;
+      if (!over || !active.data.current) return;
+      const appt: Appointment = active.data.current.appointment;
+
+      // Compute new time from original position + vertical drag delta
+      const originalTop = timeToTopOffset(appt.scheduled_at);
+      const newTop = Math.max(0, originalTop + delta.y);
+      const snappedMins = pxToMinutes(newTop); // minutes from grid start, snapped to 15
+      const totalMins = DAY_START_HOUR * 60 + snappedMins;
+      const newHour = Math.floor(totalMins / 60);
+      const newMin = totalMins % 60;
+      // Use substring(0,10) to extract date timezone-safely
+      const dayStr = appt.scheduled_at.substring(0, 10);
+      const newScheduledAt = `${buildISO(dayStr, newHour, newMin)}+05:30`;
+
+      onAppointmentUpdate(appt.id, { scheduled_at: newScheduledAt });
+    },
+    [onAppointmentUpdate]
+  );
+
   return (
-    <div className="flex flex-col h-full">
+    <DndContext collisionDetection={pointerWithin} onDragEnd={handleDragEnd}>
+      <div className="flex flex-col h-full">
       <div className="flex border-b border-border-default bg-surface-card sticky top-0 z-20">
         <div className="w-14 shrink-0 border-r border-border-subtle" />
         <div ref={headerScrollRef} className="flex overflow-x-auto">
@@ -176,9 +230,9 @@ export function DayView({
             {columns.map((col) => {
               const colAppts = apptByColumn.get(col.id) ?? [];
               return (
-                <div
+                <DroppableSlot
                   key={col.id ?? "unassigned"}
-                  data-testid="grid-slot"
+                  id={col.id ?? "null"}
                   className="relative border-r border-border-subtle"
                   style={{ minWidth: COLUMN_MIN_WIDTH, height: GRID_HEIGHT }}
                   onClick={(e) => handleSlotClick(col.id, e)}
@@ -195,12 +249,13 @@ export function DayView({
                       onResizeStart={handleResizeStart}
                     />
                   ))}
-                </div>
+                </DroppableSlot>
               );
             })}
           </div>
         </TimeGrid>
       </div>
     </div>
+    </DndContext>
   );
 }

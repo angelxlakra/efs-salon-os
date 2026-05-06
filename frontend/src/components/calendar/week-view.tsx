@@ -3,6 +3,7 @@
 import * as React from "react";
 import { TimeGrid } from "@/components/calendar/time-grid";
 import { AppointmentBlock } from "@/components/calendar/appointment-block";
+import { DndContext } from "@dnd-kit/core";
 import {
   GRID_HEIGHT,
   minutesToPx,
@@ -77,7 +78,8 @@ export function WeekView({
   );
 
   return (
-    <div className="flex flex-col h-full">
+    <DndContext>
+      <div className="flex flex-col h-full">
       <div className="flex border-b border-border-default bg-surface-card sticky top-0 z-20">
         <div className="w-14 shrink-0 border-r border-border-subtle" />
         <div ref={headerScrollRef} className="flex overflow-x-hidden">
@@ -125,6 +127,7 @@ export function WeekView({
                       top={timeToTopOffset(appt.scheduled_at)}
                       height={minutesToPx(appt.duration_minutes)}
                       onClick={onAppointmentClick}
+                      isDraggable={false}
                     />
                   ))}
                 </div>
@@ -134,5 +137,6 @@ export function WeekView({
         </TimeGrid>
       </div>
     </div>
+    </DndContext>
   );
 }
