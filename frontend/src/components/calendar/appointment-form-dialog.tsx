@@ -61,18 +61,6 @@ export function AppointmentFormDialog({
 }: Props) {
   const isEdit = !!appointment;
 
-  const defaultDate = defaultDatetime
-    ? defaultDatetime.substring(0, 10)
-    : appointment
-    ? appointment.scheduled_at.substring(0, 10)
-    : format(new Date(), "yyyy-MM-dd");
-
-  const defaultTime = defaultDatetime
-    ? defaultDatetime.substring(11, 16)
-    : appointment
-    ? appointment.scheduled_at.substring(11, 16)
-    : "10:00";
-
   const {
     register,
     handleSubmit,
@@ -87,38 +75,58 @@ export function AppointmentFormDialog({
       customer_phone: appointment?.customer_phone ?? "",
       service_id: appointment?.service_id ?? "",
       assigned_staff_id: appointment?.assigned_staff_id ?? defaultStaffId ?? "",
-      date: defaultDate,
-      time: defaultTime,
+      date: defaultDatetime
+        ? defaultDatetime.substring(0, 10)
+        : appointment
+        ? appointment.scheduled_at.substring(0, 10)
+        : format(new Date(), "yyyy-MM-dd"),
+      time: defaultDatetime
+        ? defaultDatetime.substring(11, 16)
+        : appointment
+        ? appointment.scheduled_at.substring(11, 16)
+        : "10:00",
       duration_minutes: appointment?.duration_minutes ?? 30,
       booking_notes: appointment?.booking_notes ?? "",
     },
   });
 
   const selectedServiceId = watch("service_id");
+  const selectedStaffId = watch("assigned_staff_id");
 
   // Auto-fill duration when a service is chosen
   React.useEffect(() => {
-    if (!selectedServiceId) return;
+    if (!selectedServiceId || isEdit) return;
     const svc = services.find((s) => s.id === selectedServiceId);
     if (svc) setValue("duration_minutes", svc.duration_minutes);
-  }, [selectedServiceId, services, setValue]);
+  }, [selectedServiceId, services, setValue, isEdit]);
 
   // Reset form when dialog opens with new defaults
   React.useEffect(() => {
-    if (open) reset({
+    if (!open) return;
+    const d = defaultDatetime
+      ? defaultDatetime.substring(0, 10)
+      : appointment
+      ? appointment.scheduled_at.substring(0, 10)
+      : format(new Date(), "yyyy-MM-dd");
+    const t = defaultDatetime
+      ? defaultDatetime.substring(11, 16)
+      : appointment
+      ? appointment.scheduled_at.substring(11, 16)
+      : "10:00";
+    reset({
       customer_name: appointment?.customer_name ?? "",
       customer_phone: appointment?.customer_phone ?? "",
       service_id: appointment?.service_id ?? "",
       assigned_staff_id: appointment?.assigned_staff_id ?? defaultStaffId ?? "",
-      date: defaultDate,
-      time: defaultTime,
+      date: d,
+      time: t,
       duration_minutes: appointment?.duration_minutes ?? 30,
       booking_notes: appointment?.booking_notes ?? "",
     });
-  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, defaultDatetime, defaultStaffId, appointment, reset]);
 
   const onSubmit = async (values: FormValues) => {
-    const scheduled_at = `${values.date}T${values.time}:00`;
+    const scheduled_at = `${values.date}T${values.time}:00+05:30`;
     try {
       let saved: Appointment;
       if (isEdit && appointment) {
@@ -169,8 +177,7 @@ export function AppointmentFormDialog({
 
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4 mt-2">
           {!isEdit && (
-            <>
-              <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1">
                   <Label htmlFor="customer_name">Customer name *</Label>
                   <Input id="customer_name" {...register("customer_name")} placeholder="Priya Sharma" />
@@ -178,18 +185,17 @@ export function AppointmentFormDialog({
                 </div>
                 <div className="flex flex-col gap-1">
                   <Label htmlFor="customer_phone">Phone *</Label>
-                  <Input id="customer_phone" {...register("customer_phone")} placeholder="9876543210" />
+                  <Input id="customer_phone" type="tel" {...register("customer_phone")} placeholder="9876543210" />
                   {errors.customer_phone && <p className="text-[11px] text-danger-fg">{errors.customer_phone.message}</p>}
                 </div>
               </div>
-            </>
           )}
 
           <div className="flex flex-col gap-1">
             <Label>Service *</Label>
             <Combobox
               options={serviceOptions}
-              value={watch("service_id")}
+              value={selectedServiceId}
               onChange={(v) => setValue("service_id", v ?? "", { shouldValidate: true })}
               placeholder="Search services…"
             />
@@ -200,7 +206,7 @@ export function AppointmentFormDialog({
             <Label>Staff</Label>
             <Combobox
               options={staffOptions}
-              value={watch("assigned_staff_id") ?? ""}
+              value={selectedStaffId ?? ""}
               onChange={(v) => setValue("assigned_staff_id", v ?? "")}
               placeholder="Any staff"
             />
@@ -214,12 +220,13 @@ export function AppointmentFormDialog({
             </div>
             <div className="flex flex-col gap-1">
               <Label htmlFor="time">Time *</Label>
-              <Input id="time" type="time" {...register("time")} step="900" />
+              <Input id="time" type="time" {...register("time")} step={900} />
               {errors.time && <p className="text-[11px] text-danger-fg">{errors.time.message}</p>}
             </div>
             <div className="flex flex-col gap-1">
               <Label htmlFor="duration_minutes">Duration (min)</Label>
               <Input id="duration_minutes" type="number" min={15} max={480} step={15} {...register("duration_minutes")} />
+              {errors.duration_minutes && <p className="text-[11px] text-danger-fg">{errors.duration_minutes.message}</p>}
             </div>
           </div>
 
