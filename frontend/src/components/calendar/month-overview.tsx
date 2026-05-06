@@ -28,27 +28,29 @@ export function MonthOverview({
   onDayClick,
   selectedDate,
 }: MonthOverviewProps) {
-  const monthStart = startOfMonth(month);
-  const monthEnd = endOfMonth(month);
-  const gridStart = startOfWeek(monthStart, { weekStartsOn: 1 });
-  const gridEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
+  const days = React.useMemo(() => {
+    const monthStart = startOfMonth(month);
+    const monthEnd = endOfMonth(month);
+    const gridStart = startOfWeek(monthStart, { weekStartsOn: 1 });
+    const gridEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
+    const result: Date[] = [];
+    let d = gridStart;
+    while (d <= gridEnd) {
+      result.push(d);
+      d = addDays(d, 1);
+    }
+    return result;
+  }, [month]);
 
   // Count appointments per day
   const countByDay = React.useMemo(() => {
     const map = new Map<string, number>();
     appointments.forEach((a) => {
-      const key = format(new Date(a.scheduled_at), "yyyy-MM-dd");
+      const key = a.scheduled_at.substring(0, 10);
       map.set(key, (map.get(key) ?? 0) + 1);
     });
     return map;
   }, [appointments]);
-
-  const days: Date[] = [];
-  let d = gridStart;
-  while (d <= gridEnd) {
-    days.push(d);
-    d = addDays(d, 1);
-  }
 
   return (
     <div className="p-4">
@@ -85,7 +87,7 @@ export function MonthOverview({
             >
               <span>{format(day, "d")}</span>
               {count > 0 && (
-                <span className="mt-0.5 h-1.5 w-1.5 rounded-full bg-accent" aria-label={`${count} appointments`} />
+                <span className="mt-0.5 h-1.5 w-1.5 rounded-full bg-accent" aria-label={`${count} ${count === 1 ? "appointment" : "appointments"}`} />
               )}
             </button>
           );

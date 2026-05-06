@@ -45,7 +45,7 @@ export function WeekView({
     const map = new Map<string, Appointment[]>();
     days.forEach((d) => map.set(format(d, "yyyy-MM-dd"), []));
     appointments.forEach((a) => {
-      const key = format(new Date(a.scheduled_at), "yyyy-MM-dd");
+      const key = a.scheduled_at.substring(0, 10);
       map.get(key)?.push(a);
     });
     return map;

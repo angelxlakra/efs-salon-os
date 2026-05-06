@@ -6,7 +6,7 @@ import type { Appointment } from "@/lib/api/appointments";
 
 // May 2026 in IST — month has 31 days, starts on Friday
 // Grid: Mon 27 Apr … Sun 31 May = 5 rows × 7 = 35 days
-const MAY_2026 = new Date("2026-05-01T00:00:00+05:30");
+const MAY_2026 = new Date(2026, 4, 1);
 
 const baseAppointment: Appointment = {
   id: "01APPT000001",
@@ -55,8 +55,7 @@ describe("MonthOverview", () => {
     );
 
     const buttons = screen.getAllByRole("button");
-    expect(buttons.length).toBeGreaterThanOrEqual(28);
-    expect(buttons.length).toBeLessThanOrEqual(42);
+    expect(buttons.length).toBe(35);
   });
 
   it("shows a dot with aria-label for a day that has an appointment", () => {
@@ -69,9 +68,9 @@ describe("MonthOverview", () => {
     );
 
     // The dot span has aria-label matching "N appointments"
-    const dot = screen.getByLabelText(/\d+ appointments/);
+    const dot = screen.getByLabelText(/\d+ appointments?/);
     expect(dot).toBeInTheDocument();
-    expect(dot).toHaveAttribute("aria-label", "1 appointments");
+    expect(dot).toHaveAttribute("aria-label", "1 appointment");
   });
 
   it("calls onDayClick with the correct Date when a day button is clicked", async () => {
