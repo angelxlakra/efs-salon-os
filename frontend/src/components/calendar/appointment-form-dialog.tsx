@@ -29,7 +29,7 @@ const schema = z.object({
   assigned_staff_id: z.string().optional(),
   date: z.string().min(1, "Select a date"),
   time: z.string().min(1, "Select a time"),
-  duration_minutes: z.coerce.number().min(15).max(480),
+  duration_minutes: z.number().min(15).max(480),
   booking_notes: z.string().optional(),
 });
 
@@ -225,7 +225,7 @@ export function AppointmentFormDialog({
             </div>
             <div className="flex flex-col gap-1">
               <Label htmlFor="duration_minutes">Duration (min)</Label>
-              <Input id="duration_minutes" type="number" min={15} max={480} step={15} {...register("duration_minutes")} />
+              <Input id="duration_minutes" type="number" min={15} max={480} step={15} {...register("duration_minutes", { valueAsNumber: true })} />
               {errors.duration_minutes && <p className="text-[11px] text-danger-fg">{errors.duration_minutes.message}</p>}
             </div>
           </div>
