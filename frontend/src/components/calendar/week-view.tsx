@@ -31,7 +31,10 @@ export function WeekView({
   onAppointmentClick,
   onSlotClick,
 }: WeekViewProps) {
-  const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  const days = React.useMemo(
+    () => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)),
+    [weekStart]
+  );
 
   const serviceMap = React.useMemo(
     () => new Map(services.map((s) => [s.id, s])),
