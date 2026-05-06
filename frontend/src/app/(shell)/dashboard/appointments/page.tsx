@@ -56,40 +56,51 @@ export default function AppointmentsPage() {
       .catch(() => toast.error("Failed to load staff or services"));
   }, []);
 
-  // -- Appointments (re-fetch when date or view changes) --------------------
-  const fetchAppointments = React.useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      let dates: string[] = [];
-      if (view === "day") {
-        dates = [format(date, "yyyy-MM-dd")];
-      } else if (view === "week") {
-        const ws = startOfWeek(date, { weekStartsOn: 1 });
-        dates = Array.from({ length: 7 }, (_, i) =>
-          format(addDays(ws, i), "yyyy-MM-dd")
-        );
-      } else {
-        const ms = startOfMonth(date);
-        const days = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
-        dates = Array.from({ length: days }, (_, i) =>
-          format(addDays(ms, i), "yyyy-MM-dd")
-        );
-      }
-      const results = await Promise.all(dates.map(listAppointments));
-      // Deduplicate by id (each call is a day, no overlap expected)
-      const seen = new Set<string>();
-      const all: Appointment[] = [];
-      results.flat().forEach((a) => { if (!seen.has(a.id)) { seen.add(a.id); all.push(a); } });
-      setAppointments(all);
-    } catch {
-      setError("Failed to load appointments");
-    } finally {
-      setLoading(false);
-    }
-  }, [date, view]);
+  // ── Appointments (re-fetch when date or view changes) ─────────────────────
+  const refetchRef = React.useRef<() => void>(() => {});
 
-  React.useEffect(() => { fetchAppointments(); }, [fetchAppointments]);
+  React.useEffect(() => {
+    let cancelled = false;
+
+    const run = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        let dates: string[];
+        if (view === "day") {
+          dates = [format(date, "yyyy-MM-dd")];
+        } else if (view === "week") {
+          const ws = startOfWeek(date, { weekStartsOn: 1 });
+          dates = Array.from({ length: 7 }, (_, i) =>
+            format(addDays(ws, i), "yyyy-MM-dd")
+          );
+        } else {
+          // TODO: replace with a single date-range endpoint to avoid 28-31 concurrent requests.
+          const ms = startOfMonth(date);
+          const days = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+          dates = Array.from({ length: days }, (_, i) =>
+            format(addDays(ms, i), "yyyy-MM-dd")
+          );
+        }
+        const results = await Promise.all(dates.map(listAppointments));
+        if (cancelled) return;
+        const seen = new Set<string>();
+        const all: Appointment[] = [];
+        results.flat().forEach((a) => {
+          if (!seen.has(a.id)) { seen.add(a.id); all.push(a); }
+        });
+        setAppointments(all);
+      } catch {
+        if (!cancelled) setError("Failed to load appointments");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    refetchRef.current = run;
+    run();
+    return () => { cancelled = true; };
+  }, [date, view]);
 
   // -- Navigation helpers ---------------------------------------------------
   const navigate = (dir: "prev" | "next") => {
@@ -110,25 +121,23 @@ export default function AppointmentsPage() {
   // -- Optimistic appointment update ----------------------------------------
   const handleAppointmentUpdate = React.useCallback(
     async (id: string, patch: { scheduled_at?: string; duration_minutes?: number }) => {
-      setAppointments((prev) =>
-        prev.map((a) => (a.id === id ? { ...a, ...patch } : a))
-      );
+      setAppointments((prev) => prev.map((a) => (a.id === id ? { ...a, ...patch } : a)));
       try {
         const updated = await updateAppointment(id, patch);
         setAppointments((prev) => prev.map((a) => (a.id === id ? updated : a)));
       } catch {
         toast.error("Failed to update appointment");
-        fetchAppointments();
+        refetchRef.current();
       }
     },
-    [fetchAppointments]
+    []
   );
 
   // -- Form interactions ----------------------------------------------------
   const openNewForm = (staffId?: string, datetime?: string) => {
     setSelectedAppt(undefined);
     setDefaultStaffId(staffId ?? undefined);
-    setDefaultDatetime(datetime ?? `${format(date, "yyyy-MM-dd")}T10:00:00`);
+    setDefaultDatetime(datetime ?? `${format(new Date(), "yyyy-MM-dd")}T10:00:00`);
     setFormOpen(true);
   };
 
