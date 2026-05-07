@@ -176,8 +176,8 @@ export default function AppointmentsPage() {
     <div className="flex flex-col h-[calc(100dvh-3rem)] overflow-hidden">
       {/* Topbar */}
       <div className="flex items-center justify-between gap-3 px-4 py-2 border-b border-border-subtle bg-surface-card shrink-0">
-        {/* View switcher */}
-        <div className="flex rounded-md border border-border-default overflow-hidden">
+        {/* View switcher — hidden on mobile (day view only per spec) */}
+        <div className="hidden sm:flex rounded-md border border-border-default overflow-hidden">
           {(["day", "week", "month"] as CalendarView[]).map((v) => (
             <button
               key={v}
