@@ -216,7 +216,7 @@ export function DayView({
       <div className="flex flex-col h-full">
       <div className="flex border-b border-border-default bg-surface-card sticky top-0 z-20">
         <div className="w-14 shrink-0 border-r border-border-subtle" />
-        <div ref={headerScrollRef} className="flex overflow-x-auto">
+        <div ref={headerScrollRef} className="flex overflow-x-hidden">
           {columns.map((col) => (
             <div
               key={col.id ?? "unassigned"}
