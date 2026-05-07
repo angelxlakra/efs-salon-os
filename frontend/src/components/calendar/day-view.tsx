@@ -38,7 +38,7 @@ function DroppableSlot({
     <div
       ref={setNodeRef}
       data-testid="grid-slot"
-      className={cn(className, isOver && "bg-accent/5")}
+      className={cn(className, isOver && "bg-accent-bg-soft/40")}
       style={style}
       onClick={onClick}
     >
@@ -173,24 +173,31 @@ export function DayView({
     return () => body.removeEventListener("scroll", syncHeader);
   }, []);
 
-  const handleSlotClick = (colId: string | null, e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
-    const relY = e.clientY - rect.top;
-    const totalMinutes = DAY_START_HOUR * 60 + Math.round(((relY / HOUR_HEIGHT) * 60) / 15) * 15;
-    const h = Math.floor(totalMinutes / 60);
-    const m = totalMinutes % 60;
-    onSlotClick(colId, buildISO(dateStr, h, m));
-  };
+  const handleSlotClick = React.useCallback(
+    (colId: string | null, e: React.MouseEvent<HTMLDivElement>) => {
+      const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+      const relY = e.clientY - rect.top;
+      const totalMinutes = DAY_START_HOUR * 60 + Math.round(((relY / HOUR_HEIGHT) * 60) / 15) * 15;
+      const h = Math.floor(totalMinutes / 60);
+      const m = totalMinutes % 60;
+      onSlotClick(colId, buildISO(dateStr, h, m));
+    },
+    [dateStr, onSlotClick]
+  );
 
   const handleDragEnd = React.useCallback(
     (event: DragEndEvent) => {
       const { active, over, delta } = event;
       if (!over || !active.data.current) return;
       const appt: Appointment = active.data.current.appointment;
+      // Never reschedule a cancelled appointment
+      if (appt.status === "cancelled") return;
 
       // Compute new time from original position + vertical drag delta
       const originalTop = timeToTopOffset(appt.scheduled_at);
-      const newTop = Math.max(0, originalTop + delta.y);
+      // Clamp: not before grid start, not past last slot that fits the block
+      const maxTop = GRID_HEIGHT - minutesToPx(appt.duration_minutes);
+      const newTop = Math.max(0, Math.min(maxTop, originalTop + delta.y));
       const snappedMins = pxToMinutes(newTop); // minutes from grid start, snapped to 15
       const totalMins = DAY_START_HOUR * 60 + snappedMins;
       const newHour = Math.floor(totalMins / 60);
@@ -246,6 +253,7 @@ export function DayView({
                       height={minutesToPx(appt.duration_minutes)}
                       onClick={onAppointmentClick}
                       isConflict={conflictIds.has(appt.id)}
+                      isDraggable={appt.status !== "cancelled"}
                       onResizeStart={handleResizeStart}
                     />
                   ))}

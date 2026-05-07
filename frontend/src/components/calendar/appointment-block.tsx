@@ -63,7 +63,7 @@ export function AppointmentBlock({
         height: Math.max(height, 24),
         borderLeftColor: color,
         backgroundColor: `color-mix(in srgb, ${color} 15%, transparent)`,
-        transform: CSS.Translate.toString(transform),
+        transform: CSS.Translate.toString(transform) ?? undefined,
       }}
     >
       <p className="text-[11px] font-semibold text-text-primary truncate leading-tight">
