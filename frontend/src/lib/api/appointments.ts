@@ -125,6 +125,22 @@ export async function listActiveStaff(): Promise<StaffMember[]> {
 }
 
 export async function listServices(): Promise<ServiceItem[]> {
-  const { data } = await apiClient.get<ServiceItem[]>("/catalog/services");
-  return data;
+  const { data } = await apiClient.get<{
+    services: Array<{
+      id: string;
+      name: string;
+      base_price: number;
+      duration_minutes: number;
+      category: { id: string; name: string } | null;
+    }>;
+    total: number;
+  }>("/catalog/services");
+  // Backend returns { services: [...], total: N } — unwrap and normalise to ServiceItem
+  return data.services.map((s) => ({
+    id: s.id,
+    name: s.name,
+    base_price: s.base_price,
+    duration_minutes: s.duration_minutes,
+    category_name: s.category?.name ?? "Uncategorized",
+  }));
 }
