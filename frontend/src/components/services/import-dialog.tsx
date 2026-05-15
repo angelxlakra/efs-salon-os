@@ -167,7 +167,7 @@ service,Hair Color & Treatment,Highlights,Partial highlights,1800,90,2`;
             className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
               dragActive
                 ? 'border-primary bg-primary/5'
-                : 'border-gray-300 hover:border-gray-400'
+                : 'border-border-strong hover:border-border-strong'
             }`}
             onDragEnter={handleDrag}
             onDragLeave={handleDrag}
@@ -178,8 +178,8 @@ service,Hair Color & Treatment,Highlights,Partial highlights,1800,90,2`;
               <div className="flex items-center justify-center gap-3">
                 <FileText className="h-8 w-8 text-primary" />
                 <div className="text-left">
-                  <p className="font-medium text-gray-900">{file.name}</p>
-                  <p className="text-sm text-gray-500">
+                  <p className="font-medium text-text-primary">{file.name}</p>
+                  <p className="text-sm text-text-muted">
                     {(file.size / 1024).toFixed(2)} KB
                   </p>
                 </div>
@@ -198,8 +198,8 @@ service,Hair Color & Treatment,Highlights,Partial highlights,1800,90,2`;
               </div>
             ) : (
               <>
-                <Upload className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-                <p className="text-gray-600 mb-2">
+                <Upload className="h-12 w-12 mx-auto text-text-disabled mb-4" />
+                <p className="text-text-secondary mb-2">
                   Drag and drop your CSV file here, or click to browse
                 </p>
                 <input

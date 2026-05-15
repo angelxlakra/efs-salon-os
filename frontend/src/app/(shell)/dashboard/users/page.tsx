@@ -95,7 +95,7 @@ export default function UsersPage() {
       {/* Header Section */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900">Users & Staff</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-text-primary">Users & Staff</h1>
           <p className="text-muted-foreground mt-1">
             Manage system access, permissions, and staff profiles.
           </p>
@@ -118,41 +118,41 @@ export default function UsersPage() {
 
       {/* Metrics Section - Simulated for now as we might not have all endpoints */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="shadow-sm border-none bg-gradient-to-br from-white to-gray-50/50">
+        <Card className="shadow-sm border-none bg-gradient-to-br from-white to-surface-page/50">
           <CardContent className="p-6">
             <div className="flex items-center gap-4">
               <div className="p-3 bg-blue-50 text-blue-600 rounded-lg">
                 <UserCog className="h-6 w-6" />
               </div>
               <div>
-                <p className="text-sm font-medium text-gray-500">System Users</p>
-                <h3 className="text-2xl font-bold text-gray-900">{users.length}</h3>
+                <p className="text-sm font-medium text-text-muted">System Users</p>
+                <h3 className="text-2xl font-bold text-text-primary">{users.length}</h3>
               </div>
             </div>
           </CardContent>
         </Card>
-        <Card className="shadow-sm border-none bg-gradient-to-br from-white to-gray-50/50">
+        <Card className="shadow-sm border-none bg-gradient-to-br from-white to-surface-page/50">
           <CardContent className="p-6">
             <div className="flex items-center gap-4">
               <div className="p-3 bg-purple-50 text-purple-600 rounded-lg">
                 <User className="h-6 w-6" />
               </div>
               <div>
-                <p className="text-sm font-medium text-gray-500">Staff Profiles</p>
-                <h3 className="text-2xl font-bold text-gray-900">{staff.length}</h3>
+                <p className="text-sm font-medium text-text-muted">Staff Profiles</p>
+                <h3 className="text-2xl font-bold text-text-primary">{staff.length}</h3>
               </div>
             </div>
           </CardContent>
         </Card>
-        <Card className="shadow-sm border-none bg-gradient-to-br from-white to-gray-50/50">
+        <Card className="shadow-sm border-none bg-gradient-to-br from-white to-surface-page/50">
           <CardContent className="p-6">
             <div className="flex items-center gap-4">
               <div className="p-3 bg-green-50 text-green-600 rounded-lg">
                 <CheckCircle2 className="h-6 w-6" />
               </div>
               <div>
-                <p className="text-sm font-medium text-gray-500">Active Users</p>
-                <h3 className="text-2xl font-bold text-gray-900">
+                <p className="text-sm font-medium text-text-muted">Active Users</p>
+                <h3 className="text-2xl font-bold text-text-primary">
                   {users.filter(u => u.is_active).length}
                 </h3>
               </div>
@@ -198,7 +198,7 @@ export default function UsersPage() {
                         <div className="bg-muted/50 p-4 rounded-full mb-4">
                             <UserCog className="h-8 w-8 text-muted-foreground" />
                         </div>
-                        <h3 className="text-lg font-semibold text-gray-900">No users found</h3>
+                        <h3 className="text-lg font-semibold text-text-primary">No users found</h3>
                         <p className="text-muted-foreground max-w-[384px] mt-2">
                             {searchQuery ? `No users matching "${searchQuery}"` : "Get started by adding a new system user."}
                         </p>
@@ -212,18 +212,18 @@ export default function UsersPage() {
                 ) : (
                     <>
                     {/* Mobile Card View */}
-                    <div className="block md:hidden divide-y divide-gray-100">
+                    <div className="block md:hidden divide-y divide-border-subtle">
                         {filteredData.map((u) => (
                             <div key={u.id} className="p-4 space-y-2">
                                 <div className="flex items-start justify-between gap-2">
                                     <div className="flex items-center gap-3 min-w-0">
-                                        <Avatar className="h-9 w-9 border border-gray-200 shrink-0">
+                                        <Avatar className="h-9 w-9 border border-border-default shrink-0">
                                             <AvatarFallback className="bg-primary/5 text-primary text-xs font-medium">
                                                 {getInitials(u.full_name)}
                                             </AvatarFallback>
                                         </Avatar>
                                         <div className="min-w-0">
-                                            <div className="font-medium text-gray-900 truncate">{u.full_name}</div>
+                                            <div className="font-medium text-text-primary truncate">{u.full_name}</div>
                                             <div className="text-xs text-muted-foreground">@{u.username}</div>
                                         </div>
                                     </div>
@@ -240,16 +240,16 @@ export default function UsersPage() {
                                     </div>
                                 </div>
                                 <div className="flex items-center justify-between">
-                                    <div className="text-sm text-gray-600 flex items-center gap-1.5">
-                                        <Phone className="h-3 w-3 text-gray-400" />
+                                    <div className="text-sm text-text-secondary flex items-center gap-1.5">
+                                        <Phone className="h-3 w-3 text-text-disabled" />
                                         {u.phone}
                                     </div>
                                     {isOwner && (
                                         <div className="flex gap-1">
-                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-500" onClick={() => setUserDialog({ open: true, user: u })}>
+                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-text-muted" onClick={() => setUserDialog({ open: true, user: u })}>
                                                 <Edit2 className="h-3.5 w-3.5" />
                                             </Button>
-                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-500" onClick={() => setPasswordDialog({ open: true, user: u })}>
+                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-text-muted" onClick={() => setPasswordDialog({ open: true, user: u })}>
                                                 <KeyRound className="h-3.5 w-3.5" />
                                             </Button>
                                         </div>
@@ -262,7 +262,7 @@ export default function UsersPage() {
                     {/* Desktop Table View */}
                     <div className="hidden md:block overflow-x-auto">
                         <table className="w-full">
-                            <thead className="bg-gray-50/50 border-b">
+                            <thead className="bg-surface-page/50 border-b">
                                 <tr>
                                     <th className="px-6 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">User</th>
                                     <th className="px-6 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Role</th>
@@ -271,18 +271,18 @@ export default function UsersPage() {
                                     {isOwner && <th className="px-6 py-4 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider">Actions</th>}
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-100 bg-white">
+                            <tbody className="divide-y divide-border-subtle bg-white">
                                 {filteredData.map((u) => (
-                                    <tr key={u.id} className="hover:bg-gray-50/60 transition-colors">
+                                    <tr key={u.id} className="hover:bg-surface-page/60 transition-colors">
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <div className="flex items-center gap-3">
-                                                <Avatar className="h-9 w-9 border border-gray-200">
+                                                <Avatar className="h-9 w-9 border border-border-default">
                                                     <AvatarFallback className="bg-primary/5 text-primary text-xs font-medium">
                                                         {getInitials(u.full_name)}
                                                     </AvatarFallback>
                                                 </Avatar>
                                                 <div>
-                                                    <div className="font-medium text-gray-900">{u.full_name}</div>
+                                                    <div className="font-medium text-text-primary">{u.full_name}</div>
                                                     <div className="text-xs text-muted-foreground">@{u.username}</div>
                                                 </div>
                                             </div>
@@ -294,12 +294,12 @@ export default function UsersPage() {
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <div className="space-y-1">
-                                                <div className="text-sm text-gray-700 flex items-center gap-2">
-                                                    <Mail className="h-3 w-3 text-gray-400" />
+                                                <div className="text-sm text-text-secondary flex items-center gap-2">
+                                                    <Mail className="h-3 w-3 text-text-disabled" />
                                                     {u.email || '-'}
                                                 </div>
-                                                <div className="text-sm text-gray-700 flex items-center gap-2">
-                                                    <Phone className="h-3 w-3 text-gray-400" />
+                                                <div className="text-sm text-text-secondary flex items-center gap-2">
+                                                    <Phone className="h-3 w-3 text-text-disabled" />
                                                     {u.phone}
                                                 </div>
                                             </div>
@@ -315,10 +315,10 @@ export default function UsersPage() {
                                         {isOwner && (
                                             <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
                                                 <div className="flex justify-end gap-1">
-                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-500 hover:text-blue-600" onClick={() => setUserDialog({ open: true, user: u })}>
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-text-muted hover:text-blue-600" onClick={() => setUserDialog({ open: true, user: u })}>
                                                         <Edit2 className="h-4 w-4" />
                                                     </Button>
-                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-500 hover:text-orange-600" onClick={() => setPasswordDialog({ open: true, user: u })}>
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-text-muted hover:text-orange-600" onClick={() => setPasswordDialog({ open: true, user: u })}>
                                                         <KeyRound className="h-4 w-4" />
                                                     </Button>
                                                 </div>
@@ -348,7 +348,7 @@ export default function UsersPage() {
                         <div className="bg-muted/50 p-4 rounded-full mb-4">
                             <User className="h-8 w-8 text-muted-foreground" />
                         </div>
-                        <h3 className="text-lg font-semibold text-gray-900">No staff profiles found</h3>
+                        <h3 className="text-lg font-semibold text-text-primary">No staff profiles found</h3>
                         <p className="text-muted-foreground max-w-[384px] mt-2">
                              {searchQuery ? `No staff matching "${searchQuery}"` : "Create staff profiles to assign services and appointments."}
                         </p>
@@ -362,20 +362,20 @@ export default function UsersPage() {
                 ) : (
                     <>
                     {/* Mobile Card View */}
-                    <div className="block md:hidden divide-y divide-gray-100">
+                    <div className="block md:hidden divide-y divide-border-subtle">
                         {filteredData.map((s) => (
                             <div key={s.id} className="p-4 space-y-2">
                                 <div className="flex items-start justify-between gap-2">
                                     <div className="flex items-center gap-3 min-w-0">
-                                        <Avatar className="h-9 w-9 border border-gray-200 shrink-0">
+                                        <Avatar className="h-9 w-9 border border-border-default shrink-0">
                                             <AvatarFallback className="bg-purple-50 text-purple-600 text-xs font-medium">
                                                 {getInitials(s.display_name)}
                                             </AvatarFallback>
                                         </Avatar>
                                         <div className="min-w-0">
-                                            <div className="font-medium text-gray-900 truncate">{s.display_name}</div>
+                                            <div className="font-medium text-text-primary truncate">{s.display_name}</div>
                                             <div className="text-xs text-muted-foreground">
-                                                {s.user ? `@${s.user.username}` : <span className="italic text-gray-400">No account</span>}
+                                                {s.user ? `@${s.user.username}` : <span className="italic text-text-disabled">No account</span>}
                                             </div>
                                         </div>
                                     </div>
@@ -387,7 +387,7 @@ export default function UsersPage() {
                                             {s.is_active ? 'Active' : 'Inactive'}
                                         </Badge>
                                         {(isOwner || user?.role === 'receptionist') && (
-                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-500" onClick={() => setStaffDialog({ open: true, staff: s })}>
+                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-text-muted" onClick={() => setStaffDialog({ open: true, staff: s })}>
                                                 <Edit2 className="h-3.5 w-3.5" />
                                             </Button>
                                         )}
@@ -396,7 +396,7 @@ export default function UsersPage() {
                                 <div className="flex flex-wrap items-center gap-1.5">
                                     <Badge
                                         variant="outline"
-                                        className={`font-normal text-xs ${s.is_service_provider ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-gray-50 text-gray-500 border-gray-200'}`}
+                                        className={`font-normal text-xs ${s.is_service_provider ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-surface-page text-text-muted border-border-default'}`}
                                     >
                                         {s.is_service_provider ? 'Provider' : 'Non-Provider'}
                                     </Badge>
@@ -404,7 +404,7 @@ export default function UsersPage() {
                                         <Badge key={i} variant="secondary" className="text-xs font-normal">{spec}</Badge>
                                     ))}
                                     {s.specialization && s.specialization.length > 2 && (
-                                        <Badge variant="outline" className="text-xs text-gray-500">+{s.specialization.length - 2}</Badge>
+                                        <Badge variant="outline" className="text-xs text-text-muted">+{s.specialization.length - 2}</Badge>
                                     )}
                                 </div>
                             </div>
@@ -414,7 +414,7 @@ export default function UsersPage() {
                     {/* Desktop Table View */}
                     <div className="hidden md:block overflow-x-auto">
                         <table className="w-full">
-                            <thead className="bg-gray-50/50 border-b">
+                            <thead className="bg-surface-page/50 border-b">
                                 <tr>
                                     <th className="px-6 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Staff Member</th>
                                     <th className="px-6 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Linked Account</th>
@@ -425,54 +425,54 @@ export default function UsersPage() {
                                     {(isOwner || user?.role === 'receptionist') && <th className="px-6 py-4 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider">Actions</th>}
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-100 bg-white">
+                            <tbody className="divide-y divide-border-subtle bg-white">
                                 {filteredData.map((s) => (
-                                    <tr key={s.id} className="hover:bg-gray-50/60 transition-colors">
+                                    <tr key={s.id} className="hover:bg-surface-page/60 transition-colors">
                                         <td className="px-6 py-4 whitespace-nowrap">
                                              <div className="flex items-center gap-3">
-                                                <Avatar className="h-9 w-9 border border-gray-200">
+                                                <Avatar className="h-9 w-9 border border-border-default">
                                                     <AvatarFallback className="bg-purple-50 text-purple-600 text-xs font-medium">
                                                         {getInitials(s.display_name)}
                                                     </AvatarFallback>
                                                 </Avatar>
                                                 <div>
-                                                    <div className="font-medium text-gray-900">{s.display_name}</div>
+                                                    <div className="font-medium text-text-primary">{s.display_name}</div>
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-text-muted">
                                             {s.user ? (
                                                 <div className="flex items-center gap-1.5">
                                                     <div className="w-2 h-2 rounded-full bg-green-500"></div>
                                                     @{s.user.username}
                                                 </div>
                                             ) : (
-                                                <span className="text-gray-400 italic">No account linked</span>
+                                                <span className="text-text-disabled italic">No account linked</span>
                                             )}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <div className="flex flex-wrap gap-1 max-w-[200px]">
                                                 {s.specialization && s.specialization.length > 0 ? (
                                                     s.specialization.slice(0, 2).map((spec: string, i: number) => (
-                                                        <Badge key={i} variant="secondary" className="text-xs font-normal border-gray-200">
+                                                        <Badge key={i} variant="secondary" className="text-xs font-normal border-border-default">
                                                             {spec}
                                                         </Badge>
                                                     ))
                                                 ) : (
-                                                    <span className="text-gray-400 text-sm">-</span>
+                                                    <span className="text-text-disabled text-sm">-</span>
                                                 )}
                                                 {s.specialization && s.specialization.length > 2 && (
-                                                    <Badge variant="outline" className="text-xs text-gray-500">+{s.specialization.length - 2}</Badge>
+                                                    <Badge variant="outline" className="text-xs text-text-muted">+{s.specialization.length - 2}</Badge>
                                                 )}
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700">
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-text-secondary">
                                             ₹{((s.current_drawer_balance || 0) / 100).toFixed(2)}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <Badge
                                                 variant="outline"
-                                                className={`font-normal ${s.is_service_provider ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-gray-50 text-gray-500 border-gray-200'}`}
+                                                className={`font-normal ${s.is_service_provider ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-surface-page text-text-muted border-border-default'}`}
                                             >
                                                 {s.is_service_provider ? 'Service Provider' : 'Non-Provider'}
                                             </Badge>
@@ -487,7 +487,7 @@ export default function UsersPage() {
                                         </td>
                                         {(isOwner || user?.role === 'receptionist') && (
                                             <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-500 hover:text-blue-600" onClick={() => setStaffDialog({ open: true, staff: s })}>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-text-muted hover:text-blue-600" onClick={() => setStaffDialog({ open: true, staff: s })}>
                                                     <Edit2 className="h-4 w-4" />
                                                 </Button>
                                             </td>

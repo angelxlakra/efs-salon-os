@@ -44,19 +44,19 @@ export function ExpenseApprovalDialog({ expense, onClose, onSuccess }: ExpenseAp
         </DialogHeader>
 
         <DialogBody className="space-y-4">
-          <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+          <div className="bg-surface-page p-4 rounded-lg space-y-2">
             <div className="flex justify-between">
-              <span className="text-sm text-gray-600">Category:</span>
+              <span className="text-sm text-text-secondary">Category:</span>
               <span className="text-sm font-medium">
                 {expense.category.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-sm text-gray-600">Amount:</span>
+              <span className="text-sm text-text-secondary">Amount:</span>
               <span className="text-sm font-bold">{formatCurrency(expense.amount)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-sm text-gray-600">Description:</span>
+              <span className="text-sm text-text-secondary">Description:</span>
               <span className="text-sm">{expense.description}</span>
             </div>
           </div>

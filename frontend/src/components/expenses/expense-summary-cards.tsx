@@ -16,8 +16,8 @@ export function ExpenseSummaryCards({ summary }: ExpenseSummaryCardsProps) {
       <Card className="p-6">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-medium text-gray-600">Total Expenses</p>
-            <p className="text-2xl font-bold text-gray-900 mt-2">
+            <p className="text-sm font-medium text-text-secondary">Total Expenses</p>
+            <p className="text-2xl font-bold text-text-primary mt-2">
               {formatCurrency(summary.total_amount)}
             </p>
           </div>
@@ -30,7 +30,7 @@ export function ExpenseSummaryCards({ summary }: ExpenseSummaryCardsProps) {
       <Card className="p-6">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-medium text-gray-600">Approved</p>
+            <p className="text-sm font-medium text-text-secondary">Approved</p>
             <p className="text-2xl font-bold text-green-600 mt-2">
               {summary.approved_count}
             </p>
@@ -44,7 +44,7 @@ export function ExpenseSummaryCards({ summary }: ExpenseSummaryCardsProps) {
       <Card className="p-6">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-medium text-gray-600">Pending</p>
+            <p className="text-sm font-medium text-text-secondary">Pending</p>
             <p className="text-2xl font-bold text-yellow-600 mt-2">
               {summary.pending_count}
             </p>
@@ -58,7 +58,7 @@ export function ExpenseSummaryCards({ summary }: ExpenseSummaryCardsProps) {
       <Card className="p-6">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-medium text-gray-600">Rejected</p>
+            <p className="text-sm font-medium text-text-secondary">Rejected</p>
             <p className="text-2xl font-bold text-red-600 mt-2">
               {summary.rejected_count}
             </p>

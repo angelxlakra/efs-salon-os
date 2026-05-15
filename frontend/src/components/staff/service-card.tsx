@@ -72,7 +72,7 @@ export function ServiceCard({
       case 'cancelled':
         return 'bg-red-50 border-red-200';
       default:
-        return 'bg-gray-50 border-gray-200';
+        return 'bg-surface-page border-border-default';
     }
   };
 
@@ -123,7 +123,7 @@ export function ServiceCard({
         {/* Customer Info - Compact */}
         <div className="bg-white/60 rounded-md p-2">
           <div className="flex items-center gap-2">
-            <User className="h-3.5 w-3.5 text-gray-500 flex-shrink-0" />
+            <User className="h-3.5 w-3.5 text-text-muted flex-shrink-0" />
             <div className="min-w-0 flex-1">
               <p className="font-medium text-sm truncate">{titleCase(service.customer_name)}</p>
               <p className="text-xs text-muted-foreground">{service.customer_phone}</p>

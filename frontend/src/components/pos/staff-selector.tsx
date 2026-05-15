@@ -149,7 +149,7 @@ export function StaffSelector({
           <SelectItem key={s.id} value={s.id} className="cursor-pointer">
             <div className="flex items-center justify-between w-full gap-2">
               <div className="flex items-center gap-2">
-                <User className="h-4 w-4 text-gray-500" />
+                <User className="h-4 w-4 text-text-muted" />
                 <span>{s.display_name}</span>
               </div>
               <div className="flex items-center gap-2">

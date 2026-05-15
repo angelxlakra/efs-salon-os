@@ -46,7 +46,7 @@ export function ServiceDistributionChart({
 
   if (services.length === 0) {
     return (
-      <div className="flex items-center justify-center h-64 text-gray-500">
+      <div className="flex items-center justify-center h-64 text-text-muted">
         <p className="text-sm">No service data available</p>
       </div>
     );
@@ -65,8 +65,8 @@ export function ServiceDistributionChart({
           onClick={() => setView(id)}
           className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors ${
             view === id
-              ? 'bg-gray-900 text-white'
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              ? 'bg-accent text-accent-fg'
+              : 'bg-surface-row-hover text-text-secondary hover:bg-border-subtle'
           }`}
         >
           <Icon className="h-3 w-3" />
@@ -81,11 +81,11 @@ export function ServiceDistributionChart({
     if (!active || !payload?.length) return null;
     const d = payload[0].payload;
     return (
-      <div className="bg-white p-3 rounded-lg shadow-lg border border-gray-200 text-xs">
-        <p className="font-semibold text-gray-900 mb-1">{d.name}</p>
-        <p className="text-gray-600">Revenue: <span className="font-medium">{formatRevenue(d.value)}</span></p>
-        <p className="text-gray-600">Count: <span className="font-medium">{d.count}</span></p>
-        <p className="text-gray-600">Share: <span className="font-medium">{d.percentage}%</span></p>
+      <div className="bg-white p-3 rounded-lg shadow-lg border border-border-default text-xs">
+        <p className="font-semibold text-text-primary mb-1">{d.name}</p>
+        <p className="text-text-secondary">Revenue: <span className="font-medium">{formatRevenue(d.value)}</span></p>
+        <p className="text-text-secondary">Count: <span className="font-medium">{d.count}</span></p>
+        <p className="text-text-secondary">Share: <span className="font-medium">{d.percentage}%</span></p>
       </div>
     );
   };
@@ -121,8 +121,8 @@ export function ServiceDistributionChart({
           {/* Centred label — absolutely positioned over the SVG */}
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <div className="text-center">
-              <div className="text-2xl font-bold text-gray-900">{total}</div>
-              <div className="text-[10px] text-gray-500 leading-tight">Services</div>
+              <div className="text-2xl font-bold text-text-primary">{total}</div>
+              <div className="text-[10px] text-text-muted leading-tight">Services</div>
             </div>
           </div>
         </div>
@@ -133,9 +133,9 @@ export function ServiceDistributionChart({
             <li key={i} className="flex items-center justify-between text-xs">
               <div className="flex items-center gap-2">
                 <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: d.fill }} />
-                <span className="text-gray-700 truncate max-w-[120px]">{d.name}</span>
+                <span className="text-text-secondary truncate max-w-[120px]">{d.name}</span>
               </div>
-              <span className="text-gray-500 tabular-nums">{d.count}×</span>
+              <span className="text-text-muted tabular-nums">{d.count}×</span>
             </li>
           ))}
         </ul>
@@ -190,18 +190,18 @@ export function ServiceDistributionChart({
             />
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between text-xs mb-0.5">
-                <span className="font-medium text-gray-800 truncate">{d.name}</span>
-                <span className="text-gray-500 tabular-nums ml-2 flex-shrink-0">{d.count}× · {formatRevenue(d.value)}</span>
+                <span className="font-medium text-text-primary truncate">{d.name}</span>
+                <span className="text-text-muted tabular-nums ml-2 flex-shrink-0">{d.count}× · {formatRevenue(d.value)}</span>
               </div>
               {/* Progress bar */}
-              <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+              <div className="h-1.5 w-full bg-surface-row-hover rounded-full overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all"
                   style={{ width: `${d.percentage}%`, backgroundColor: d.fill }}
                 />
               </div>
             </div>
-            <span className="text-[10px] text-gray-400 tabular-nums w-8 text-right flex-shrink-0">
+            <span className="text-[10px] text-text-disabled tabular-nums w-8 text-right flex-shrink-0">
               {d.percentage}%
             </span>
           </div>
@@ -209,9 +209,9 @@ export function ServiceDistributionChart({
       </div>
 
       {/* Footer summary */}
-      <div className="mt-3 pt-3 border-t flex items-center justify-between text-xs text-gray-500">
+      <div className="mt-3 pt-3 border-t flex items-center justify-between text-xs text-text-muted">
         <span>{services.length} service types</span>
-        <span className="font-medium text-gray-700">
+        <span className="font-medium text-text-secondary">
           {formatRevenue(services.reduce((s, d) => s + d.total_revenue, 0))} total
         </span>
       </div>

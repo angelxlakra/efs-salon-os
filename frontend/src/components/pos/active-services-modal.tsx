@@ -147,10 +147,10 @@ export function ActiveServicesModal({
         <DialogBody>
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+            <Loader2 className="h-8 w-8 animate-spin text-text-disabled" />
           </div>
         ) : services.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">
+          <div className="text-center py-12 text-text-muted">
             <p>No active services found</p>
           </div>
         ) : (

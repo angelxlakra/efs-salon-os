@@ -165,8 +165,8 @@ export default function StaffDashboard() {
     return (
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-gray-400 mx-auto mb-2" />
-          <p className="text-sm text-gray-500">Loading your services...</p>
+          <Loader2 className="h-8 w-8 animate-spin text-text-disabled mx-auto mb-2" />
+          <p className="text-sm text-text-muted">Loading your services...</p>
         </div>
       </div>
     );
@@ -240,7 +240,7 @@ export default function StaffDashboard() {
       {services.length === 0 ? (
         <Card>
           <CardContent className="p-8 sm:p-12 text-center">
-            <Briefcase className="h-10 w-10 sm:h-12 sm:w-12 text-gray-300 mx-auto mb-3 sm:mb-4" />
+            <Briefcase className="h-10 w-10 sm:h-12 sm:w-12 text-text-disabled mx-auto mb-3 sm:mb-4" />
             <h3 className="text-base sm:text-lg font-semibold mb-2">No Services Today</h3>
             <p className="text-sm text-muted-foreground">
               You don't have any services assigned yet today.
