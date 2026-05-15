@@ -91,11 +91,11 @@ export default function UsersPage() {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="p-4 space-y-4">
       {/* Header Section */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-text-primary">Users & Staff</h1>
+          <h1 className="text-xl font-semibold text-text-primary">Users & Staff</h1>
           <p className="text-muted-foreground mt-1">
             Manage system access, permissions, and staff profiles.
           </p>
@@ -264,17 +264,17 @@ export default function UsersPage() {
                         <table className="w-full">
                             <thead className="bg-surface-page/50 border-b">
                                 <tr>
-                                    <th className="px-6 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">User</th>
-                                    <th className="px-6 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Role</th>
-                                    <th className="px-6 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Contact</th>
-                                    <th className="px-6 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
-                                    {isOwner && <th className="px-6 py-4 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider">Actions</th>}
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">User</th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Role</th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Contact</th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
+                                    {isOwner && <th className="px-4 py-3 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider">Actions</th>}
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-border-subtle bg-white">
                                 {filteredData.map((u) => (
                                     <tr key={u.id} className="hover:bg-surface-page/60 transition-colors">
-                                        <td className="px-6 py-4 whitespace-nowrap">
+                                        <td className="px-4 py-3 whitespace-nowrap">
                                             <div className="flex items-center gap-3">
                                                 <Avatar className="h-9 w-9 border border-border-default">
                                                     <AvatarFallback className="bg-primary/5 text-primary text-xs font-medium">
@@ -287,12 +287,12 @@ export default function UsersPage() {
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
+                                        <td className="px-4 py-3 whitespace-nowrap">
                                             <Badge variant="outline" className="capitalize font-normal">
                                                 {u.role?.name?.toLowerCase().replace('_', ' ')}
                                             </Badge>
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
+                                        <td className="px-4 py-3 whitespace-nowrap">
                                             <div className="space-y-1">
                                                 <div className="text-sm text-text-secondary flex items-center gap-2">
                                                     <Mail className="h-3 w-3 text-text-disabled" />
@@ -304,7 +304,7 @@ export default function UsersPage() {
                                                 </div>
                                             </div>
                                         </td>
-                                            <td className="px-6 py-4 whitespace-nowrap">
+                                            <td className="px-4 py-3 whitespace-nowrap">
                                             <Badge
                                                 variant={u.is_active ? 'default' : 'destructive'}
                                                 className={`font-normal ${u.is_active ? 'bg-green-50 text-green-700 hover:bg-green-100 hover:text-green-800 border-green-200' : ''}`}
@@ -313,7 +313,7 @@ export default function UsersPage() {
                                             </Badge>
                                         </td>
                                         {isOwner && (
-                                            <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
+                                            <td className="px-4 py-3 whitespace-nowrap text-right text-sm">
                                                 <div className="flex justify-end gap-1">
                                                     <Button variant="ghost" size="icon" className="h-8 w-8 text-text-muted hover:text-blue-600" onClick={() => setUserDialog({ open: true, user: u })}>
                                                         <Edit2 className="h-4 w-4" />
@@ -416,19 +416,19 @@ export default function UsersPage() {
                         <table className="w-full">
                             <thead className="bg-surface-page/50 border-b">
                                 <tr>
-                                    <th className="px-6 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Staff Member</th>
-                                    <th className="px-6 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Linked Account</th>
-                                    <th className="px-6 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Specialization</th>
-                                    <th className="px-6 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Expected Cash</th>
-                                    <th className="px-6 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Type</th>
-                                    <th className="px-6 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
-                                    {(isOwner || user?.role === 'receptionist') && <th className="px-6 py-4 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider">Actions</th>}
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Staff Member</th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Linked Account</th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Specialization</th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Expected Cash</th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Type</th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
+                                    {(isOwner || user?.role === 'receptionist') && <th className="px-4 py-3 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider">Actions</th>}
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-border-subtle bg-white">
                                 {filteredData.map((s) => (
                                     <tr key={s.id} className="hover:bg-surface-page/60 transition-colors">
-                                        <td className="px-6 py-4 whitespace-nowrap">
+                                        <td className="px-4 py-3 whitespace-nowrap">
                                              <div className="flex items-center gap-3">
                                                 <Avatar className="h-9 w-9 border border-border-default">
                                                     <AvatarFallback className="bg-purple-50 text-purple-600 text-xs font-medium">
@@ -440,7 +440,7 @@ export default function UsersPage() {
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-text-muted">
+                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-text-muted">
                                             {s.user ? (
                                                 <div className="flex items-center gap-1.5">
                                                     <div className="w-2 h-2 rounded-full bg-green-500"></div>
@@ -450,7 +450,7 @@ export default function UsersPage() {
                                                 <span className="text-text-disabled italic">No account linked</span>
                                             )}
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
+                                        <td className="px-4 py-3 whitespace-nowrap">
                                             <div className="flex flex-wrap gap-1 max-w-[200px]">
                                                 {s.specialization && s.specialization.length > 0 ? (
                                                     s.specialization.slice(0, 2).map((spec: string, i: number) => (
@@ -466,10 +466,10 @@ export default function UsersPage() {
                                                 )}
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-text-secondary">
+                                        <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-text-secondary">
                                             ₹{((s.current_drawer_balance || 0) / 100).toFixed(2)}
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
+                                        <td className="px-4 py-3 whitespace-nowrap">
                                             <Badge
                                                 variant="outline"
                                                 className={`font-normal ${s.is_service_provider ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-surface-page text-text-muted border-border-default'}`}
@@ -477,7 +477,7 @@ export default function UsersPage() {
                                                 {s.is_service_provider ? 'Service Provider' : 'Non-Provider'}
                                             </Badge>
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
+                                        <td className="px-4 py-3 whitespace-nowrap">
                                             <Badge
                                                 variant={s.is_active ? 'default' : 'destructive'}
                                                 className={`font-normal ${s.is_active ? 'bg-green-50 text-green-700 hover:bg-green-100 hover:text-green-800 border-green-200' : ''}`}
@@ -486,7 +486,7 @@ export default function UsersPage() {
                                             </Badge>
                                         </td>
                                         {(isOwner || user?.role === 'receptionist') && (
-                                            <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                            <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
                                                 <Button variant="ghost" size="icon" className="h-8 w-8 text-text-muted hover:text-blue-600" onClick={() => setStaffDialog({ open: true, staff: s })}>
                                                     <Edit2 className="h-4 w-4" />
                                                 </Button>

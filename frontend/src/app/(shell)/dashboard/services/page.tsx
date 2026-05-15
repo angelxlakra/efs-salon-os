@@ -161,11 +161,11 @@ export default function ServicesPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="p-4 space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-text-primary">Services Management</h1>
+          <h1 className="text-xl font-semibold text-text-primary">Services Management</h1>
           <p className="text-sm text-text-muted mt-1">
             Manage your salon's service catalog and categories
           </p>
@@ -199,19 +199,19 @@ export default function ServicesPage() {
         <Card>
           <CardHeader className="pb-3">
             <CardDescription>Total Categories</CardDescription>
-            <CardTitle className="text-3xl">{catalog.categories.length}</CardTitle>
+            <CardTitle className="text-2xl font-bold">{catalog.categories.length}</CardTitle>
           </CardHeader>
         </Card>
         <Card>
           <CardHeader className="pb-3">
             <CardDescription>Total Services</CardDescription>
-            <CardTitle className="text-3xl">{catalog.services.length}</CardTitle>
+            <CardTitle className="text-2xl font-bold">{catalog.services.length}</CardTitle>
           </CardHeader>
         </Card>
         <Card>
           <CardHeader className="pb-3">
             <CardDescription>Active Services</CardDescription>
-            <CardTitle className="text-3xl">
+            <CardTitle className="text-2xl font-bold">
               {catalog.services.filter((s) => s.is_active).length}
             </CardTitle>
           </CardHeader>

@@ -144,13 +144,13 @@ export default function SuppliersPage() {
 
   if (view === 'form') {
     return (
-      <div className="p-4 md:p-6 space-y-4 md:space-y-6">
+      <div className="p-4 space-y-4">
         <div className="flex items-center gap-3 md:gap-4">
           <Button variant="ghost" size="icon" onClick={handleCloseForm}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div className="min-w-0 flex-1">
-            <h1 className="text-2xl md:text-3xl font-bold truncate">{editingSupplier ? 'Edit Supplier' : 'Add New Supplier'}</h1>
+            <h1 className="text-xl font-semibold truncate">{editingSupplier ? 'Edit Supplier' : 'Add New Supplier'}</h1>
             <p className="text-sm md:text-base text-muted-foreground truncate">
               {editingSupplier ? `Updating ${editingSupplier.name}` : 'Create a new supplier profile'}
             </p>
@@ -275,11 +275,11 @@ export default function SuppliersPage() {
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-4 md:space-y-6">
+    <div className="p-4 space-y-4">
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="min-w-0 flex-1">
-          <h1 className="text-2xl md:text-3xl font-bold">Suppliers</h1>
+          <h1 className="text-xl font-semibold">Suppliers</h1>
           <p className="text-sm md:text-base text-muted-foreground">Manage your suppliers and vendors</p>
         </div>
         <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">

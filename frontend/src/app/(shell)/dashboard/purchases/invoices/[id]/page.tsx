@@ -121,7 +121,7 @@ export default function InvoiceDetailPage() {
   }
 
   return (
-    <div className="space-y-4 md:space-y-6">
+    <div className="p-4 space-y-4">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
@@ -129,7 +129,7 @@ export default function InvoiceDetailPage() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div className="min-w-0">
-            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold truncate">{invoice.invoice_number}</h1>
+            <h1 className="text-xl font-semibold truncate">{invoice.invoice_number}</h1>
             <p className="text-sm text-muted-foreground">Purchase Invoice Details</p>
           </div>
         </div>

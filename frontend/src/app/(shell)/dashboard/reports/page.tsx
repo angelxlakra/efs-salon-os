@@ -44,9 +44,9 @@ export default function ReportsPage() {
   ];
 
   return (
-    <div className="p-6 space-y-6 bg-surface-page min-h-full">
+    <div className="p-4 space-y-4 bg-surface-page min-h-full">
       <div>
-        <h1 className="text-2xl font-bold text-text-primary">Reports</h1>
+        <h1 className="text-xl font-semibold text-text-primary">Reports</h1>
         <p className="text-text-secondary">
           Access financial and operational reports for your salon
         </p>

@@ -200,11 +200,11 @@ export default function MyServicesPage() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="p-4 space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-text-primary">My Services</h1>
+          <h1 className="text-xl font-semibold text-text-primary">My Services</h1>
           <p className="text-sm text-text-muted mt-1">
             Manage your assigned services for today
           </p>

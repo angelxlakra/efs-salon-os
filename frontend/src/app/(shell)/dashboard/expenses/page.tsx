@@ -54,13 +54,13 @@ export default function ExpensesPage() {
 
   if (view === 'form') {
     return (
-      <div className="space-y-6">
+      <div className="p-4 space-y-4">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={() => setView('list')}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold text-text-primary">
+            <h1 className="text-xl font-semibold text-text-primary">
               {editingExpense ? 'Edit Expense' : 'New Expense'}
             </h1>
             <p className="text-sm text-text-secondary mt-1">
@@ -88,11 +88,11 @@ export default function ExpensesPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="p-4 space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-text-primary">Expenses</h1>
+          <h1 className="text-xl font-semibold text-text-primary">Expenses</h1>
           <p className="text-sm text-text-secondary mt-1">
             Track and manage business expenses
           </p>

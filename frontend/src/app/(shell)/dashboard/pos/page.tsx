@@ -63,7 +63,7 @@ export default function POSPage() {
           <div className="mb-4">
             <div className="flex items-center justify-between">
               <div className="flex-1">
-                <h1 className="text-2xl font-bold text-text-primary">Point of Sale</h1>
+                <h1 className="text-xl font-semibold text-text-primary">Point of Sale</h1>
                 <p className="text-sm text-text-secondary mt-1">
                   Select services or products and process payments
                 </p>

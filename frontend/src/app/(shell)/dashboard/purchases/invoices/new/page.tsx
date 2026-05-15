@@ -371,14 +371,14 @@ export default function NewPurchaseInvoicePage() {
   const { totalTaxable, totalCgst, totalSgst } = autoCalc ? getAutoCalcSummary() : { totalTaxable: 0, totalCgst: 0, totalSgst: 0 };
 
   return (
-    <div className="p-4 md:p-6 space-y-4 md:space-y-6">
+    <div className="p-4 space-y-4">
       {/* Header */}
       <div className="flex items-center gap-3 md:gap-4">
         <Button variant="ghost" size="icon" onClick={() => router.back()}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div className="min-w-0 flex-1">
-          <h1 className="text-2xl md:text-3xl font-bold truncate">New Purchase Invoice</h1>
+          <h1 className="text-xl font-semibold truncate">New Purchase Invoice</h1>
           <p className="text-sm md:text-base text-muted-foreground truncate">Create a new supplier invoice</p>
         </div>
       </div>

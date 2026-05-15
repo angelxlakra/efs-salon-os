@@ -190,11 +190,11 @@ export default function CustomersPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="p-4 space-y-4">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold text-text-primary">Customers</h1>
+          <h1 className="text-xl font-semibold text-text-primary">Customers</h1>
           <p className="text-sm text-text-secondary mt-1">
             Manage customer database and track visit history
           </p>
@@ -212,31 +212,31 @@ export default function CustomersPage() {
         <Card>
           <CardHeader className="pb-3">
             <CardDescription>{excludeWalkins ? 'Registered Customers' : 'Total Customers'}</CardDescription>
-            <CardTitle className="text-3xl">{stats.total_customers}</CardTitle>
+            <CardTitle className="text-2xl font-bold">{stats.total_customers}</CardTitle>
           </CardHeader>
         </Card>
         <Card>
           <CardHeader className="pb-3">
             <CardDescription>Active This Month</CardDescription>
-            <CardTitle className="text-3xl">{stats.active_this_month}</CardTitle>
+            <CardTitle className="text-2xl font-bold">{stats.active_this_month}</CardTitle>
           </CardHeader>
         </Card>
         <Card>
           <CardHeader className="pb-3">
             <CardDescription>Total Visits</CardDescription>
-            <CardTitle className="text-3xl">{stats.total_visits}</CardTitle>
+            <CardTitle className="text-2xl font-bold">{stats.total_visits}</CardTitle>
           </CardHeader>
         </Card>
         <Card>
           <CardHeader className="pb-3">
             <CardDescription>Total Revenue</CardDescription>
-            <CardTitle className="text-3xl">{formatPrice(stats.total_revenue)}</CardTitle>
+            <CardTitle className="text-2xl font-bold">{formatPrice(stats.total_revenue)}</CardTitle>
           </CardHeader>
         </Card>
         <Card>
           <CardHeader className="pb-3">
             <CardDescription>Pending Balance</CardDescription>
-            <CardTitle className="text-3xl text-red-400">{formatPrice(stats.total_pending)}</CardTitle>
+            <CardTitle className="text-2xl font-bold text-red-400">{formatPrice(stats.total_pending)}</CardTitle>
           </CardHeader>
         </Card>
       </div>
@@ -300,26 +300,26 @@ export default function CustomersPage() {
               <table className="w-full">
                 <thead className="bg-surface-page border-b border-border-subtle">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
+                    <th className="px-4 py-2.5 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
                       Customer
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
+                    <th className="px-4 py-2.5 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
                       Contact
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
+                    <th className="px-4 py-2.5 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
                       Visits
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
+                    <th className="px-4 py-2.5 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
                       Total Spent
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
+                    <th className="px-4 py-2.5 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
                       Pending
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
+                    <th className="px-4 py-2.5 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
                       Last Visit
                     </th>
                     {canEdit && (
-                      <th className="px-6 py-3 text-right text-xs font-medium text-text-secondary uppercase tracking-wider">
+                      <th className="px-4 py-2.5 text-right text-xs font-medium text-text-secondary uppercase tracking-wider">
                         Actions
                       </th>
                     )}
@@ -328,7 +328,7 @@ export default function CustomersPage() {
                 <tbody className="bg-surface-card divide-y divide-border-subtle">
                   {customers.map((customer) => (
                     <tr key={customer.id} className="hover:bg-surface-row">
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-4 py-3 whitespace-nowrap">
                         <div>
                           <div className="text-sm font-medium text-text-primary">
                             {titleCase(customer.first_name)} {titleCase(customer.last_name || '')}
@@ -340,7 +340,7 @@ export default function CustomersPage() {
                           )}
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-4 py-3 whitespace-nowrap">
                         <div>
                           <div className="text-sm text-text-primary">
                             {formatPhone(customer.phone)}
@@ -350,15 +350,15 @@ export default function CustomersPage() {
                           )}
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-4 py-3 whitespace-nowrap">
                         <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-500/40 text-blue-400">
                           {customer.total_visits}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-text-primary">
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-text-primary">
                         {formatPrice(customer.total_spent)}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-4 py-3 whitespace-nowrap">
                         <div className="flex items-center gap-2">
                           {customer.pending_balance > 0 ? (
                             <span className="text-red-400 font-medium text-sm">
@@ -378,11 +378,11 @@ export default function CustomersPage() {
                           </Button>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-text-secondary">
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-text-secondary">
                         {formatDate(customer.last_visit_at)}
                       </td>
                       {canEdit && (
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
                           <div className="flex justify-end gap-2">
                             {customer.pending_balance > 0 && (
                               <Button
@@ -542,7 +542,7 @@ export default function CustomersPage() {
 
             {/* Pagination */}
             {totalPages > 1 && (
-              <div className="px-6 py-4 border-t border-border-subtle flex items-center justify-between">
+              <div className="px-4 py-3 border-t border-border-subtle flex items-center justify-between">
                 <div className="text-sm text-text-secondary">
                   Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, totalCustomers)} of {totalCustomers} customers
                 </div>

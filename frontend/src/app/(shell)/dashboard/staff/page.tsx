@@ -173,10 +173,10 @@ export default function StaffDashboard() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="p-4 space-y-4">
       {/* Header - Mobile Optimized */}
       <div>
-        <h1 className="text-2xl md:text-3xl font-bold">My Services</h1>
+        <h1 className="text-xl font-semibold">My Services</h1>
         <p className="text-sm text-muted-foreground mt-1">
           {new Date().toLocaleDateString('en-IN', {
             weekday: 'short',
@@ -199,7 +199,7 @@ export default function StaffDashboard() {
               <div className="h-8 w-8 sm:h-10 sm:w-10 bg-blue-100 rounded-full flex items-center justify-center mb-2">
                 <Briefcase className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
               </div>
-              <p className="text-2xl sm:text-3xl font-bold">{upcomingCount}</p>
+              <p className="text-2xl font-bold">{upcomingCount}</p>
               <p className="text-xs sm:text-sm font-medium text-muted-foreground mt-1">
                 Upcoming
               </p>
@@ -213,7 +213,7 @@ export default function StaffDashboard() {
               <div className="h-8 w-8 sm:h-10 sm:w-10 bg-amber-100 rounded-full flex items-center justify-center mb-2">
                 <Clock className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600" />
               </div>
-              <p className="text-2xl sm:text-3xl font-bold">{inProgressCount}</p>
+              <p className="text-2xl font-bold">{inProgressCount}</p>
               <p className="text-xs sm:text-sm font-medium text-muted-foreground mt-1">
                 In Progress
               </p>
@@ -227,7 +227,7 @@ export default function StaffDashboard() {
               <div className="h-8 w-8 sm:h-10 sm:w-10 bg-green-100 rounded-full flex items-center justify-center mb-2">
                 <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" />
               </div>
-              <p className="text-2xl sm:text-3xl font-bold">{completedCount}</p>
+              <p className="text-2xl font-bold">{completedCount}</p>
               <p className="text-xs sm:text-sm font-medium text-muted-foreground mt-1">
                 Completed
               </p>

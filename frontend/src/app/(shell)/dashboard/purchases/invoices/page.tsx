@@ -76,11 +76,11 @@ export default function PurchaseInvoicesPage() {
   const filteredInvoices = invoices;
 
   return (
-    <div className="space-y-4 md:space-y-6">
+    <div className="p-4 space-y-4">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold">Purchase Invoices</h1>
+          <h1 className="text-xl font-semibold">Purchase Invoices</h1>
           <p className="text-text-secondary text-sm">Track and manage supplier invoices</p>
         </div>
         <div className="flex gap-2">

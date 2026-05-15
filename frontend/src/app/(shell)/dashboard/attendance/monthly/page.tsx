@@ -148,7 +148,7 @@ export default function MonthlyAttendancePage() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
@@ -159,7 +159,7 @@ export default function MonthlyAttendancePage() {
             </Button>
           </Link>
           <div>
-            <h1 className="text-3xl font-bold">Monthly Attendance Report</h1>
+            <h1 className="text-xl font-semibold">Monthly Attendance Report</h1>
             <p className="text-muted-foreground mt-1">
               View attendance summary and calendar view
             </p>

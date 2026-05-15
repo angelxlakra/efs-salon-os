@@ -162,10 +162,10 @@ export default function ReconciliationPage() {
   const isExact = cashDifference === 0 && report.reconciled;
 
   return (
-    <div className="space-y-6">
+    <div className="p-4 space-y-4">
       {/* Header */}
       <div>
-        <h1 className="text-2xl md:text-3xl font-bold">End of Day Reconciliation</h1>
+        <h1 className="text-xl font-semibold">End of Day Reconciliation</h1>
         <p className="text-sm text-muted-foreground mt-1">
           Daily cash counting and reconciliation
         </p>

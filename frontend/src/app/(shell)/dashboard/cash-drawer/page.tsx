@@ -196,10 +196,10 @@ export default function CashDrawerPage() {
   const isExact = variance === 0 && !isDrawerOpen && summary.closing_counted !== null
 
   return (
-    <div className="space-y-6">
+    <div className="p-4 space-y-4">
       {/* Header */}
       <div>
-        <h1 className="text-2xl md:text-3xl font-bold">Cash Drawer Management</h1>
+        <h1 className="text-xl font-semibold">Cash Drawer Management</h1>
         <p className="text-sm text-muted-foreground mt-1">Open and close cash drawer with denomination tracking</p>
       </div>
 

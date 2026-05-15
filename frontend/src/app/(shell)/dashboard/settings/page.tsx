@@ -278,7 +278,7 @@ export default function SettingsPage() {
 
   if (!isOwner) {
     return (
-      <div className="space-y-8">
+      <div className="p-4 space-y-4">
         <Alert>
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
@@ -299,12 +299,12 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="space-y-6 pb-10">
+    <div className="p-4 space-y-4 pb-10">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-text-primary flex items-center gap-2">
-            <Settings className="h-8 w-8" />
+          <h1 className="text-xl font-semibold text-text-primary flex items-center gap-2">
+            <Settings className="h-5 w-5" />
             Salon Settings
           </h1>
           <p className="text-text-secondary mt-1">

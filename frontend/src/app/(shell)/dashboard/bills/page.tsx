@@ -265,10 +265,10 @@ export default function BillsPage() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="p-4 space-y-4">
       {/* Header */}
       <div>
-        <h1 className="text-2xl md:text-3xl font-bold">Bills & Transactions</h1>
+        <h1 className="text-xl font-semibold">Bills & Transactions</h1>
         <p className="text-sm text-text-secondary mt-1">
           View and manage all sales transactions
         </p>
