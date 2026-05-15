@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Users, Cake } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { apiClient } from '@/lib/api-client';
@@ -338,7 +338,7 @@ export default function DashboardPage() {
       )}
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
         <StatCard
           title="Today's Revenue"
           value={formatPrice(stats.today_revenue)}
@@ -370,27 +370,19 @@ export default function DashboardPage() {
       </div>
 
       {/* Active Customers Section */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {/* Main - Active Customers */}
         <div className="lg:col-span-2">
           <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Active Customers</CardTitle>
-                  <CardDescription>
-                    Customers currently receiving services
-                  </CardDescription>
-                </div>
-                <Badge variant="secondary" className="text-lg px-3 py-1">
-                  {activeSessions.length} Active
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent>
+            <Card.Header
+              title="Active Customers"
+              description="Customers currently receiving services"
+              action={<Badge variant="secondary">{activeSessions.length} Active</Badge>}
+            />
+            <Card.Body>
               {activeSessions.length === 0 ? (
-                <div className="text-center py-12">
-                  <Users className="h-12 w-12 text-text-muted mx-auto mb-3" />
+                <div className="text-center py-8">
+                  <Users className="h-10 w-10 text-text-muted mx-auto mb-3" />
                   <p className="text-text-secondary">No active customers right now</p>
                   <p className="text-sm text-text-muted mt-1">
                     Customers in service will appear here
@@ -408,18 +400,16 @@ export default function DashboardPage() {
                   ))}
                 </div>
               )}
-            </CardContent>
+            </Card.Body>
           </Card>
         </div>
 
         {/* Sidebar - Goals & Quick Actions */}
-        <div className="space-y-6">
+        <div className="space-y-4">
           {/* Daily Goals */}
           <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Daily Goals</CardTitle>
-            </CardHeader>
-            <CardContent>
+            <Card.Header title="Daily Goals" />
+            <Card.Body>
               <DualRadialGoals
                 revenueTarget={settings.daily_revenue_target_paise}
                 currentRevenue={stats.today_revenue}
@@ -436,7 +426,7 @@ export default function DashboardPage() {
                   </span>
                 </div>
               </div>
-            </CardContent>
+            </Card.Body>
           </Card>
 
           <ServiceQueue sessions={activeSessions} />
@@ -444,15 +434,15 @@ export default function DashboardPage() {
       </div>
 
       {/* Analytics & Trends Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
         {/* Hourly Revenue Trend */}
         <div className="lg:col-span-2">
           <Card>
-            <CardHeader>
-              <CardTitle>Hourly Revenue Trend</CardTitle>
-              <CardDescription>Revenue breakdown by hour of the day</CardDescription>
-            </CardHeader>
-            <CardContent>
+            <Card.Header
+              title="Hourly Revenue Trend"
+              description="Revenue breakdown by hour of the day"
+            />
+            <Card.Body>
               {hourlyData.length > 0 ? (
                 <HourlyTrendChart data={hourlyData} peakHour={peakHour} />
               ) : (
@@ -460,18 +450,18 @@ export default function DashboardPage() {
                   <p className="text-sm">Loading hourly data...</p>
                 </div>
               )}
-            </CardContent>
+            </Card.Body>
           </Card>
         </div>
 
         {/* Service Distribution */}
         <div>
           <Card>
-            <CardHeader>
-              <CardTitle>Top Services</CardTitle>
-              <CardDescription>Revenue by service type</CardDescription>
-            </CardHeader>
-            <CardContent>
+            <Card.Header
+              title="Top Services"
+              description="Revenue by service type"
+            />
+            <Card.Body>
               {topServices.length > 0 ? (
                 <ServiceDistributionChart
                   services={topServices}
@@ -482,7 +472,7 @@ export default function DashboardPage() {
                   <p className="text-sm">No service data available</p>
                 </div>
               )}
-            </CardContent>
+            </Card.Body>
           </Card>
         </div>
       </div>
