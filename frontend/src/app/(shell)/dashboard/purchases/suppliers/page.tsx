@@ -360,7 +360,7 @@ export default function SuppliersPage() {
 
                 {!supplier.is_active && (
                   <div className="pt-2">
-                    <span className="inline-block px-2 py-1 text-xs font-medium bg-gray-100 text-gray-600 rounded">
+                    <span className="inline-block px-2 py-1 text-xs font-medium bg-surface-row-hover text-text-secondary rounded">
                       Inactive
                     </span>
                   </div>

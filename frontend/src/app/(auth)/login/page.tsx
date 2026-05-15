@@ -82,13 +82,13 @@ export default function LoginPage() {
           <h1 className="text-6xl font-extrabold tracking-tight leading-tight max-w-[768px] mb-8" style={{ fontFamily: 'var(--font-heading)' }}>
             {settings?.salon_tagline || 'The Operating System for Modern Salons.'}
           </h1>
-          <p className="text-2xl text-gray-300 font-light leading-relaxed">
+          <p className="text-2xl text-text-disabled font-light leading-relaxed">
             Manage appointments, inventory, and point-of-sale in one unified, beautiful interface. Designed for speed and elegance.
           </p>
         </div>
 
         <div className="relative z-10">
-           <div className="flex gap-8 text-sm font-medium text-gray-400 uppercase tracking-widest">
+           <div className="flex gap-8 text-sm font-medium text-text-disabled uppercase tracking-widest">
              <span>Speed</span>
              <span>Security</span>
              <span>Simplicity</span>
@@ -97,11 +97,11 @@ export default function LoginPage() {
       </div>
 
       {/* Right Column - Login Form - 50% width */}
-      <div className="flex-1 flex flex-col justify-center px-12 lg:px-24 xl:px-32 bg-white text-gray-900">
+      <div className="flex-1 flex flex-col justify-center px-12 lg:px-24 xl:px-32 bg-white text-text-primary">
         <div className="w-full">
            <div className="mb-10">
-             <h2 className="text-4xl font-bold tracking-tight text-gray-900 mb-3" style={{ fontFamily: 'var(--font-heading)' }}>Welcome back</h2>
-             <p className="text-xl text-gray-500">Please enter your details to sign in.</p>
+             <h2 className="text-4xl font-bold tracking-tight text-text-primary mb-3" style={{ fontFamily: 'var(--font-heading)' }}>Welcome back</h2>
+             <p className="text-xl text-text-muted">Please enter your details to sign in.</p>
            </div>
 
            <form onSubmit={handleSubmit} className="space-y-8">
@@ -114,7 +114,7 @@ export default function LoginPage() {
 
             <div className="space-y-6">
               <div className="space-y-2">
-                <Label htmlFor="username" className="text-base font-semibold text-gray-900">Email or Username</Label>
+                <Label htmlFor="username" className="text-base font-semibold text-text-primary">Email or Username</Label>
                 <Input
                   id="username"
                   type="text"
@@ -123,14 +123,14 @@ export default function LoginPage() {
                   onChange={(e) => setUsername(e.target.value)}
                   required
                   autoFocus
-                  className="h-14 px-4 text-lg bg-gray-50 border-gray-200 focus:border-black focus:ring-black rounded-xl"
+                  className="h-14 px-4 text-lg bg-surface-page border-border-default focus:border-black focus:ring-black rounded-xl"
                 />
               </div>
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="password" className="text-base font-semibold text-gray-900">Password</Label>
-                  <a href="#" className="text-sm font-medium text-gray-600 hover:text-black">Forgot password?</a>
+                  <Label htmlFor="password" className="text-base font-semibold text-text-primary">Password</Label>
+                  <a href="#" className="text-sm font-medium text-text-secondary hover:text-black">Forgot password?</a>
                 </div>
                 <Input
                   id="password"
@@ -139,14 +139,14 @@ export default function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  className="h-14 px-4 text-lg bg-gray-50 border-gray-200 focus:border-black focus:ring-black rounded-xl"
+                  className="h-14 px-4 text-lg bg-surface-page border-border-default focus:border-black focus:ring-black rounded-xl"
                 />
               </div>
             </div>
 
             <Button 
               type="submit" 
-              className="w-full h-14 text-lg font-bold bg-black text-white hover:bg-gray-800 rounded-xl transition-all shadow-xl hover:shadow-2xl hover:-translate-y-1" 
+              className="w-full h-14 text-lg font-bold bg-black text-white hover:bg-neutral-800 rounded-xl transition-all shadow-xl hover:shadow-2xl hover:-translate-y-1" 
               disabled={isLoading}
             >
               {isLoading ? (
@@ -158,7 +158,7 @@ export default function LoginPage() {
             </Button>
           </form>
 
-          <p className="mt-10 text-center text-gray-500">
+          <p className="mt-10 text-center text-text-muted">
             Don't have an account? <a href="#" className="font-semibold text-black hover:underline">Contact Owner</a>
           </p>
         </div>

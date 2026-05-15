@@ -198,7 +198,7 @@ export default function TransfersPage() {
                   </thead>
                   <tbody>
                     {transfers.map((t) => (
-                      <tr key={t.id} className="border-b hover:bg-gray-50">
+                      <tr key={t.id} className="border-b hover:bg-surface-row-hover">
                         <td className="py-3 px-4 text-sm text-muted-foreground">
                           {new Date(t.initiated_at).toLocaleDateString('en-IN')}
                         </td>

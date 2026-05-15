@@ -36,7 +36,7 @@ export const BillContributionsDisplay: React.FC<BillContributionsDisplayProps> =
     return (
       <div className="ml-6 mt-2 space-y-1 text-sm">
         {sortedContributions.map((contrib) => (
-          <div key={contrib.id} className="flex justify-between text-gray-600">
+          <div key={contrib.id} className="flex justify-between text-text-secondary">
             <span>
               {contrib.sequence_order}. {contrib.role_in_service}
             </span>
@@ -50,10 +50,10 @@ export const BillContributionsDisplay: React.FC<BillContributionsDisplayProps> =
   }
 
   return (
-    <div className="ml-6 mt-3 bg-gray-50 rounded-lg p-4 border border-gray-200">
+    <div className="ml-6 mt-3 bg-surface-page rounded-lg p-4 border border-border-default">
       <div className="flex items-center gap-2 mb-3">
         <svg
-          className="w-5 h-5 text-gray-600"
+          className="w-5 h-5 text-text-secondary"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -65,7 +65,7 @@ export const BillContributionsDisplay: React.FC<BillContributionsDisplayProps> =
             d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
           />
         </svg>
-        <h4 className="font-semibold text-gray-900">Staff Contributions</h4>
+        <h4 className="font-semibold text-text-primary">Staff Contributions</h4>
       </div>
 
       <div className="space-y-3">
@@ -73,7 +73,7 @@ export const BillContributionsDisplay: React.FC<BillContributionsDisplayProps> =
           <div
             key={contrib.id}
             className={`${
-              index !== sortedContributions.length - 1 ? 'pb-3 border-b border-gray-200' : ''
+              index !== sortedContributions.length - 1 ? 'pb-3 border-b border-border-default' : ''
             }`}
           >
             <div className="flex items-start justify-between">
@@ -83,11 +83,11 @@ export const BillContributionsDisplay: React.FC<BillContributionsDisplayProps> =
                 </span>
 
                 <div className="flex-1 min-w-0">
-                  <div className="font-medium text-gray-900">
+                  <div className="font-medium text-text-primary">
                     {contrib.role_in_service}
                   </div>
 
-                  <div className="text-sm text-gray-600 mt-1">
+                  <div className="text-sm text-text-secondary mt-1">
                     {contrib.contribution_split_type === 'hybrid' ? (
                       <span>Hybrid calculation</span>
                     ) : contrib.contribution_split_type === 'percentage' ? (
@@ -108,7 +108,7 @@ export const BillContributionsDisplay: React.FC<BillContributionsDisplayProps> =
                       contrib.skill_component) && (
                       <div className="mt-2 text-xs space-y-1">
                         {contrib.base_percent_component && (
-                          <div className="flex justify-between text-gray-600">
+                          <div className="flex justify-between text-text-secondary">
                             <span>Base ({contrib.contribution_percent}%):</span>
                             <span>
                               ₹{(contrib.base_percent_component / 100).toFixed(2)}
@@ -116,7 +116,7 @@ export const BillContributionsDisplay: React.FC<BillContributionsDisplayProps> =
                           </div>
                         )}
                         {contrib.time_component && (
-                          <div className="flex justify-between text-gray-600">
+                          <div className="flex justify-between text-text-secondary">
                             <span>Time-based:</span>
                             <span>
                               ₹{(contrib.time_component / 100).toFixed(2)}
@@ -124,7 +124,7 @@ export const BillContributionsDisplay: React.FC<BillContributionsDisplayProps> =
                           </div>
                         )}
                         {contrib.skill_component && (
-                          <div className="flex justify-between text-gray-600">
+                          <div className="flex justify-between text-text-secondary">
                             <span>Skill-based:</span>
                             <span>
                               ₹{(contrib.skill_component / 100).toFixed(2)}
@@ -135,7 +135,7 @@ export const BillContributionsDisplay: React.FC<BillContributionsDisplayProps> =
                     )}
 
                   {contrib.notes && (
-                    <div className="mt-2 text-xs text-gray-500 italic">
+                    <div className="mt-2 text-xs text-text-muted italic">
                       "{contrib.notes}"
                     </div>
                   )}
@@ -153,10 +153,10 @@ export const BillContributionsDisplay: React.FC<BillContributionsDisplayProps> =
       </div>
 
       {/* Total Verification */}
-      <div className="mt-4 pt-3 border-t border-gray-300 flex items-center justify-between">
-        <span className="font-semibold text-gray-900">Total</span>
+      <div className="mt-4 pt-3 border-t border-border-strong flex items-center justify-between">
+        <span className="font-semibold text-text-primary">Total</span>
         <div className="text-right">
-          <div className="text-lg font-bold text-gray-900">
+          <div className="text-lg font-bold text-text-primary">
             ₹{(totalContribution / 100).toFixed(2)}
           </div>
           {!isAccurate && (

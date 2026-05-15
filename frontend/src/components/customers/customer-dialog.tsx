@@ -234,7 +234,7 @@ export function CustomerDialog({ open, customer, initialPhone, onClose, onSucces
               disabled={isSubmitting}
             />
             {errors.phone && <p className="text-sm text-red-600">{errors.phone.message}</p>}
-            <p className="text-xs text-gray-500">10-digit mobile number without +91</p>
+            <p className="text-xs text-text-muted">10-digit mobile number without +91</p>
           </div>
 
           {/* Email */}

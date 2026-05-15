@@ -192,8 +192,8 @@ export default function MyServicesPage() {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-10rem)]">
         <div className="text-center">
-          <div className="h-12 w-12 rounded-full border-4 border-gray-200 border-t-black animate-spin mb-3 mx-auto" />
-          <p className="text-gray-500">Loading your services...</p>
+          <div className="h-12 w-12 rounded-full border-4 border-border-subtle border-t-black animate-spin mb-3 mx-auto" />
+          <p className="text-text-muted">Loading your services...</p>
         </div>
       </div>
     );
@@ -204,8 +204,8 @@ export default function MyServicesPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">My Services</h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <h1 className="text-2xl font-bold text-text-primary">My Services</h1>
+          <p className="text-sm text-text-muted mt-1">
             Manage your assigned services for today
           </p>
         </div>
@@ -249,7 +249,7 @@ export default function MyServicesPage() {
 
                 {/* Service Selection */}
                 <div className="flex-1 p-6 overflow-hidden">
-                  <h3 className="text-sm font-semibold text-gray-700 mb-4">Select Service</h3>
+                  <h3 className="text-sm font-semibold text-text-secondary mb-4">Select Service</h3>
                   <ScrollArea className="h-full">
                     <ServiceGrid
                       onServiceSelect={(serviceId, serviceName, price, duration, staffId) => {
@@ -271,7 +271,7 @@ export default function MyServicesPage() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-500">Pending</p>
+                <p className="text-sm text-text-muted">Pending</p>
                 <p className="text-2xl font-bold mt-1">{pendingServices.length}</p>
               </div>
               <Clock className="h-8 w-8 text-orange-500" />
@@ -283,7 +283,7 @@ export default function MyServicesPage() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-500">In Progress</p>
+                <p className="text-sm text-text-muted">In Progress</p>
                 <p className="text-2xl font-bold mt-1">{inProgressServices.length}</p>
               </div>
               <PlayCircle className="h-8 w-8 text-blue-500" />
@@ -295,7 +295,7 @@ export default function MyServicesPage() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-500">Completed</p>
+                <p className="text-sm text-text-muted">Completed</p>
                 <p className="text-2xl font-bold mt-1">{completedServices.length}</p>
               </div>
               <CheckCircle className="h-8 w-8 text-green-500" />
@@ -322,8 +322,8 @@ export default function MyServicesPage() {
           {pendingServices.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center">
-                <Clock className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-500">No pending services</p>
+                <Clock className="h-12 w-12 text-text-disabled mx-auto mb-3" />
+                <p className="text-text-muted">No pending services</p>
               </CardContent>
             </Card>
           ) : (
@@ -333,17 +333,17 @@ export default function MyServicesPage() {
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
-                        <h3 className="text-lg font-semibold text-gray-900">
+                        <h3 className="text-lg font-semibold text-text-primary">
                           {titleCase(service.customer_name)}
                         </h3>
                         {getStatusBadge(service.status)}
                         <Badge variant="outline">{service.ticket_number}</Badge>
                       </div>
 
-                      <div className="space-y-1 text-sm text-gray-600">
-                        <p className="font-medium text-gray-900">{service.service.name}</p>
+                      <div className="space-y-1 text-sm text-text-secondary">
+                        <p className="font-medium text-text-primary">{service.service.name}</p>
                         <p>{formatPrice(service.service.base_price)} • {service.service.duration_minutes} min</p>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-text-muted">
                           Checked in {getTimeSinceCheckIn(service.checked_in_at)}
                         </p>
                       </div>
@@ -369,8 +369,8 @@ export default function MyServicesPage() {
           {inProgressServices.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center">
-                <PlayCircle className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-500">No services in progress</p>
+                <PlayCircle className="h-12 w-12 text-text-disabled mx-auto mb-3" />
+                <p className="text-text-muted">No services in progress</p>
               </CardContent>
             </Card>
           ) : (
@@ -380,17 +380,17 @@ export default function MyServicesPage() {
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
-                        <h3 className="text-lg font-semibold text-gray-900">
+                        <h3 className="text-lg font-semibold text-text-primary">
                           {titleCase(service.customer_name)}
                         </h3>
                         {getStatusBadge(service.status)}
                         <Badge variant="outline">{service.ticket_number}</Badge>
                       </div>
 
-                      <div className="space-y-1 text-sm text-gray-600">
-                        <p className="font-medium text-gray-900">{service.service.name}</p>
+                      <div className="space-y-1 text-sm text-text-secondary">
+                        <p className="font-medium text-text-primary">{service.service.name}</p>
                         <p>{formatPrice(service.service.base_price)} • {service.service.duration_minutes} min</p>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-text-muted">
                           Started at {formatTime(service.started_at)}
                         </p>
                       </div>
@@ -426,8 +426,8 @@ export default function MyServicesPage() {
           {completedServices.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center">
-                <CheckCircle className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-500">No completed services today</p>
+                <CheckCircle className="h-12 w-12 text-text-disabled mx-auto mb-3" />
+                <p className="text-text-muted">No completed services today</p>
               </CardContent>
             </Card>
           ) : (
@@ -437,23 +437,23 @@ export default function MyServicesPage() {
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
-                        <h3 className="text-lg font-semibold text-gray-900">
+                        <h3 className="text-lg font-semibold text-text-primary">
                           {titleCase(service.customer_name)}
                         </h3>
                         {getStatusBadge(service.status)}
                         <Badge variant="outline">{service.ticket_number}</Badge>
                       </div>
 
-                      <div className="space-y-1 text-sm text-gray-600">
-                        <p className="font-medium text-gray-900">{service.service.name}</p>
+                      <div className="space-y-1 text-sm text-text-secondary">
+                        <p className="font-medium text-text-primary">{service.service.name}</p>
                         <p>{formatPrice(service.service.base_price)} • {service.service.duration_minutes} min</p>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-text-muted">
                           Completed at {formatTime(service.completed_at)}
                         </p>
                         {service.service_notes && (
                           <div className="mt-2 p-2 bg-white rounded border">
-                            <p className="text-xs font-medium text-gray-700">Notes:</p>
-                            <p className="text-sm text-gray-600">{service.service_notes}</p>
+                            <p className="text-xs font-medium text-text-secondary">Notes:</p>
+                            <p className="text-sm text-text-secondary">{service.service_notes}</p>
                           </div>
                         )}
                       </div>
@@ -476,12 +476,12 @@ export default function MyServicesPage() {
 
             <div className="space-y-4">
               <div>
-                <p className="text-sm text-gray-600 mb-1">Customer</p>
+                <p className="text-sm text-text-secondary mb-1">Customer</p>
                 <p className="font-semibold">{titleCase(activeService.customer_name)}</p>
               </div>
 
               <div>
-                <p className="text-sm text-gray-600 mb-1">Service</p>
+                <p className="text-sm text-text-secondary mb-1">Service</p>
                 <p className="font-semibold">{activeService.service.name}</p>
               </div>
 

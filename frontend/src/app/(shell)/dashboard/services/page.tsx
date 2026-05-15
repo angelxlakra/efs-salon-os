@@ -153,8 +153,8 @@ export default function ServicesPage() {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-gray-400 mx-auto mb-2" />
-          <p className="text-sm text-gray-500">Loading services...</p>
+          <Loader2 className="h-8 w-8 animate-spin text-text-disabled mx-auto mb-2" />
+          <p className="text-sm text-text-muted">Loading services...</p>
         </div>
       </div>
     );
@@ -165,8 +165,8 @@ export default function ServicesPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Services Management</h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <h1 className="text-3xl font-bold text-text-primary">Services Management</h1>
+          <p className="text-sm text-text-muted mt-1">
             Manage your salon's service catalog and categories
           </p>
         </div>
@@ -221,7 +221,7 @@ export default function ServicesPage() {
       {/* Search */}
       {catalog.categories.length > 0 && (
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-disabled" />
           <Input
             type="text"
             placeholder="Search services..."
@@ -259,11 +259,11 @@ export default function ServicesPage() {
       {catalog.categories.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16">
-            <FolderPlus className="h-12 w-12 text-gray-300 mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+            <FolderPlus className="h-12 w-12 text-text-disabled mb-4" />
+            <h3 className="text-lg font-semibold text-text-primary mb-2">
               No categories yet
             </h3>
-            <p className="text-gray-500 text-center mb-4">
+            <p className="text-text-muted text-center mb-4">
               Create your first service category to get started
             </p>
             {canManageServices && (
@@ -276,7 +276,7 @@ export default function ServicesPage() {
         </Card>
       ) : filteredCategories.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center">
-          <p className="text-gray-500">No services found</p>
+          <p className="text-text-muted">No services found</p>
           {searchQuery && (
             <Button variant="link" onClick={() => setSearchQuery('')} className="mt-2">
               Clear search
@@ -331,7 +331,7 @@ export default function ServicesPage() {
                 </CardHeader>
                 <CardContent>
                   {services.length === 0 ? (
-                    <div className="text-center py-8 text-gray-500">
+                    <div className="text-center py-8 text-text-muted">
                       No services in this category yet
                     </div>
                   ) : (
@@ -339,11 +339,11 @@ export default function ServicesPage() {
                       {services.map((service) => (
                         <div
                           key={service.id}
-                          className="border rounded-lg p-4 hover:border-gray-400 transition-colors"
+                          className="border rounded-lg p-4 hover:border-border-strong transition-colors"
                         >
                           <div className="flex items-start justify-between mb-2">
                             <div className="flex-1">
-                              <h4 className="font-semibold text-gray-900">
+                              <h4 className="font-semibold text-text-primary">
                                 {service.name}
                               </h4>
                               {!service.is_active && (
@@ -382,15 +382,15 @@ export default function ServicesPage() {
                             )}
                           </div>
                           {service.description && (
-                            <p className="text-sm text-gray-500 mb-3">
+                            <p className="text-sm text-text-muted mb-3">
                               {service.description}
                             </p>
                           )}
                           <div className="flex items-center justify-between text-sm">
-                            <span className="font-semibold text-lg text-gray-900">
+                            <span className="font-semibold text-lg text-text-primary">
                               {formatPrice(service.base_price)}
                             </span>
-                            <span className="text-gray-500">
+                            <span className="text-text-muted">
                               {service.duration_minutes} min
                             </span>
                           </div>

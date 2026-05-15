@@ -343,7 +343,7 @@ export function BillDetailsDialog({
       case 'posted':
         return <Badge className="bg-green-500">Paid</Badge>;
       case 'void':
-        return <Badge variant="outline" className="text-gray-500">Voided</Badge>;
+        return <Badge variant="outline" className="text-text-muted">Voided</Badge>;
       case 'refunded':
         return <Badge variant="destructive">Refunded</Badge>;
       default:
@@ -379,7 +379,7 @@ export function BillDetailsDialog({
         <DialogBody>
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+            <Loader2 className="h-8 w-8 animate-spin text-text-disabled" />
           </div>
         ) : bill ? (
           <div className="space-y-6">
@@ -395,10 +395,10 @@ export function BillDetailsDialog({
             </div>
 
             {/* Customer Info */}
-            <div className="bg-gray-50 rounded-lg p-4">
+            <div className="bg-surface-page rounded-lg p-4">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
-                  <User className="h-4 w-4 text-gray-500" />
+                  <User className="h-4 w-4 text-text-muted" />
                   <span className="font-semibold text-sm">Customer</span>
                 </div>
                 {!bill.customer_phone && canAssignCustomer && !showAssignCustomer && (
@@ -456,18 +456,18 @@ export function BillDetailsDialog({
               </h4>
               <div className="border rounded-lg overflow-hidden overflow-x-auto">
                 <table className="w-full">
-                  <thead className="bg-gray-50 border-b">
+                  <thead className="bg-surface-page border-b">
                     <tr>
-                      <th className="px-3 sm:px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                      <th className="px-3 sm:px-4 py-2 text-left text-xs font-medium text-text-muted uppercase">
                         Service
                       </th>
-                      <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">
+                      <th className="px-4 py-2 text-center text-xs font-medium text-text-muted uppercase">
                         Qty
                       </th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">
+                      <th className="px-4 py-2 text-right text-xs font-medium text-text-muted uppercase">
                         Price
                       </th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">
+                      <th className="px-4 py-2 text-right text-xs font-medium text-text-muted uppercase">
                         Total
                       </th>
                     </tr>
@@ -485,10 +485,10 @@ export function BillDetailsDialog({
                           {/* Multi-staff contributions */}
                           {item.staff_contributions && item.staff_contributions.length > 0 && (
                             <div className="mt-2 space-y-1">
-                              <p className="text-xs text-gray-600 font-medium">Staff Team:</p>
+                              <p className="text-xs text-text-secondary font-medium">Staff Team:</p>
                               {item.staff_contributions.map((contrib, idx) => (
                                 <div key={idx} className="flex items-center justify-between text-xs">
-                                  <span className="text-gray-600">
+                                  <span className="text-text-secondary">
                                     {contrib.role_in_service}
                                   </span>
                                   <span className="font-medium">
@@ -524,18 +524,18 @@ export function BillDetailsDialog({
                 </h4>
                 <div className="border rounded-lg overflow-hidden">
                   <table className="w-full">
-                    <thead className="bg-gray-50 border-b">
+                    <thead className="bg-surface-page border-b">
                       <tr>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                        <th className="px-4 py-2 text-left text-xs font-medium text-text-muted uppercase">
                           Method
                         </th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                        <th className="px-4 py-2 text-left text-xs font-medium text-text-muted uppercase">
                           Reference
                         </th>
-                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">
+                        <th className="px-4 py-2 text-right text-xs font-medium text-text-muted uppercase">
                           Amount
                         </th>
-                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">
+                        <th className="px-4 py-2 text-right text-xs font-medium text-text-muted uppercase">
                           Actions
                         </th>
                       </tr>
@@ -591,7 +591,7 @@ export function BillDetailsDialog({
             )}
 
             {/* Pricing Summary */}
-            <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+            <div className="bg-surface-page rounded-lg p-4 space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Subtotal</span>
                 <span>{formatPrice(bill.subtotal)}</span>
@@ -677,7 +677,7 @@ export function BillDetailsDialog({
 
               {bill.status === 'draft' && canAddPayment && (
                 showAddPayment ? (
-                  <div className="w-full space-y-2 border rounded-lg p-3 bg-gray-50">
+                  <div className="w-full space-y-2 border rounded-lg p-3 bg-surface-page">
                     <p className="text-sm font-medium">
                       Add Payment
                       {bill.rounded_total - (bill.payments?.reduce((s, p) => s + p.amount, 0) ?? 0) - (bill.write_off_amount ?? 0) > 0 && (
@@ -752,7 +752,7 @@ export function BillDetailsDialog({
 
               {bill.status === 'draft' && canDiscount && (
                 showEditDiscount ? (
-                  <div className="w-full space-y-2 border rounded-lg p-3 bg-gray-50">
+                  <div className="w-full space-y-2 border rounded-lg p-3 bg-surface-page">
                     <p className="text-sm font-medium">Edit Discount</p>
                     <input
                       type="number"
@@ -806,7 +806,7 @@ export function BillDetailsDialog({
 
               {bill.status === 'posted' && canAddPayment && (bill.rounded_total - (bill.payments?.reduce((s, p) => s + p.amount, 0) ?? 0) - (bill.write_off_amount ?? 0)) > 0 && (
                 showCollectPayment ? (
-                  <div className="w-full space-y-2 border rounded-lg p-3 bg-gray-50">
+                  <div className="w-full space-y-2 border rounded-lg p-3 bg-surface-page">
                     <p className="text-sm font-medium">
                       Collect Payment
                       <span className="text-xs text-muted-foreground ml-2">
