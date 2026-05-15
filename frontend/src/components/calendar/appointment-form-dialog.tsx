@@ -4,16 +4,16 @@ import * as React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod/v4";
-import { format } from "date-fns";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogBody,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Combobox } from "@/components/ui/combobox";
 import { toast } from "sonner";
 import {
@@ -79,7 +79,7 @@ export function AppointmentFormDialog({
         ? defaultDatetime.substring(0, 10)
         : appointment
         ? appointment.scheduled_at.substring(0, 10)
-        : format(new Date(), "yyyy-MM-dd"),
+        : "",
       time: defaultDatetime
         ? defaultDatetime.substring(11, 16)
         : appointment
@@ -107,7 +107,7 @@ export function AppointmentFormDialog({
       ? defaultDatetime.substring(0, 10)
       : appointment
       ? appointment.scheduled_at.substring(0, 10)
-      : format(new Date(), "yyyy-MM-dd");
+      : "";
     const t = defaultDatetime
       ? defaultDatetime.substring(11, 16)
       : appointment
@@ -175,74 +175,91 @@ export function AppointmentFormDialog({
           <DialogTitle>{isEdit ? "Edit appointment" : "New appointment"}</DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4 mt-2">
-          {!isEdit && (
-            <div className="grid grid-cols-2 gap-3">
-                <div className="flex flex-col gap-1">
-                  <Label htmlFor="customer_name">Customer name *</Label>
-                  <Input id="customer_name" {...register("customer_name")} placeholder="Priya Sharma" />
-                  {errors.customer_name && <p className="text-[11px] text-danger-fg">{errors.customer_name.message}</p>}
-                </div>
-                <div className="flex flex-col gap-1">
-                  <Label htmlFor="customer_phone">Phone *</Label>
-                  <Input id="customer_phone" type="tel" {...register("customer_phone")} placeholder="9876543210" />
-                  {errors.customer_phone && <p className="text-[11px] text-danger-fg">{errors.customer_phone.message}</p>}
-                </div>
+        <form onSubmit={handleSubmit(onSubmit)}>
+          <DialogBody className="flex flex-col gap-4">
+            {!isEdit && (
+              <div className="grid grid-cols-2 gap-3">
+                <Input
+                  label="Customer name *"
+                  placeholder="Priya Sharma"
+                  error={errors.customer_name?.message}
+                  {...register("customer_name")}
+                />
+                <Input
+                  label="Phone *"
+                  type="tel"
+                  placeholder="9876543210"
+                  error={errors.customer_phone?.message}
+                  {...register("customer_phone")}
+                />
               </div>
-          )}
+            )}
 
-          <div className="flex flex-col gap-1">
-            <Label>Service *</Label>
-            <Combobox
-              options={serviceOptions}
-              value={selectedServiceId}
-              onChange={(v) => setValue("service_id", v ?? "", { shouldValidate: true })}
-              placeholder="Search services…"
+            {/* Service — Combobox has no built-in label prop; use design-system label style */}
+            <div className="flex flex-col gap-1">
+              <span className="text-heading-sm text-text-secondary">Service *</span>
+              <Combobox
+                options={serviceOptions}
+                value={selectedServiceId}
+                onChange={(v) => setValue("service_id", v ?? "", { shouldValidate: true })}
+                placeholder="Search services…"
+              />
+              {errors.service_id && (
+                <p className="text-body-sm text-danger-fg">{errors.service_id.message}</p>
+              )}
+            </div>
+
+            {/* Staff — same pattern */}
+            <div className="flex flex-col gap-1">
+              <span className="text-heading-sm text-text-secondary">Staff</span>
+              <Combobox
+                options={staffOptions}
+                value={selectedStaffId ?? ""}
+                onChange={(v) => setValue("assigned_staff_id", v ?? "")}
+                placeholder="Any staff"
+              />
+            </div>
+
+            <div className="grid grid-cols-3 gap-3">
+              <Input
+                label="Date *"
+                type="date"
+                error={errors.date?.message}
+                {...register("date")}
+              />
+              <Input
+                label="Time *"
+                type="time"
+                step={900}
+                error={errors.time?.message}
+                {...register("time")}
+              />
+              <Input
+                label="Duration (min)"
+                type="number"
+                min={15}
+                max={480}
+                step={15}
+                error={errors.duration_minutes?.message}
+                {...register("duration_minutes", { valueAsNumber: true })}
+              />
+            </div>
+
+            <Input
+              label="Notes"
+              placeholder="Any special requests…"
+              {...register("booking_notes")}
             />
-            {errors.service_id && <p className="text-[11px] text-danger-fg">{errors.service_id.message}</p>}
-          </div>
+          </DialogBody>
 
-          <div className="flex flex-col gap-1">
-            <Label>Staff</Label>
-            <Combobox
-              options={staffOptions}
-              value={selectedStaffId ?? ""}
-              onChange={(v) => setValue("assigned_staff_id", v ?? "")}
-              placeholder="Any staff"
-            />
-          </div>
-
-          <div className="grid grid-cols-3 gap-3">
-            <div className="flex flex-col gap-1">
-              <Label htmlFor="date">Date *</Label>
-              <Input id="date" type="date" {...register("date")} />
-              {errors.date && <p className="text-[11px] text-danger-fg">{errors.date.message}</p>}
-            </div>
-            <div className="flex flex-col gap-1">
-              <Label htmlFor="time">Time *</Label>
-              <Input id="time" type="time" {...register("time")} step={900} />
-              {errors.time && <p className="text-[11px] text-danger-fg">{errors.time.message}</p>}
-            </div>
-            <div className="flex flex-col gap-1">
-              <Label htmlFor="duration_minutes">Duration (min)</Label>
-              <Input id="duration_minutes" type="number" min={15} max={480} step={15} {...register("duration_minutes", { valueAsNumber: true })} />
-              {errors.duration_minutes && <p className="text-[11px] text-danger-fg">{errors.duration_minutes.message}</p>}
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <Label htmlFor="booking_notes">Notes</Label>
-            <Input id="booking_notes" {...register("booking_notes")} placeholder="Any special requests…" />
-          </div>
-
-          <div className="flex justify-end gap-2 pt-2">
+          <DialogFooter>
             <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
             <Button type="submit" loading={isSubmitting}>
               {isEdit ? "Save changes" : "Book appointment"}
             </Button>
-          </div>
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

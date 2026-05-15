@@ -96,9 +96,11 @@ export function DayView({
   }, [appointments, columns]);
 
   // O(n²) per column — acceptable for a salon's appointment count
+  // Unassigned (colKey === null) is a holding queue, not a person — overlaps there are not conflicts.
   const conflictIds = React.useMemo(() => {
     const ids = new Set<string>();
-    apptByColumn.forEach((colAppts) => {
+    apptByColumn.forEach((colAppts, colKey) => {
+      if (colKey === null) return;
       for (let i = 0; i < colAppts.length; i++) {
         for (let j = i + 1; j < colAppts.length; j++) {
           const a = colAppts[i];
@@ -172,6 +174,19 @@ export function DayView({
     body.addEventListener("scroll", syncHeader, { passive: true });
     return () => body.removeEventListener("scroll", syncHeader);
   }, []);
+
+  // Auto-scroll to current time on mount so staff can orient immediately
+  React.useEffect(() => {
+    const body = bodyScrollRef.current;
+    if (!body) return;
+    const now = new Date();
+    const h = now.getHours();
+    const m = now.getMinutes();
+    if (h < DAY_START_HOUR || h >= 21) return; // outside grid bounds
+    const nowPx = (h - DAY_START_HOUR) * HOUR_HEIGHT + (m / 60) * HOUR_HEIGHT;
+    // Scroll so "now" sits ~25% from the top of the visible area
+    body.scrollTop = Math.max(0, nowPx - body.clientHeight * 0.25);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSlotClick = React.useCallback(
     (colId: string | null, e: React.MouseEvent<HTMLDivElement>) => {

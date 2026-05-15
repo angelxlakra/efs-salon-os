@@ -137,7 +137,7 @@ export default function AppointmentsPage() {
   const openNewForm = (staffId?: string, datetime?: string) => {
     setSelectedAppt(undefined);
     setDefaultStaffId(staffId ?? undefined);
-    setDefaultDatetime(datetime ?? `${format(new Date(), "yyyy-MM-dd")}T10:00:00`);
+    setDefaultDatetime(datetime ?? `${format(date, "yyyy-MM-dd")}T10:00:00`);
     setFormOpen(true);
   };
 

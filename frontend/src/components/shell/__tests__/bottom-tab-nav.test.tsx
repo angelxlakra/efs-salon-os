@@ -11,8 +11,8 @@ describe("BottomTabNav", () => {
   it("renders the 3 fixed tabs + a More button", () => {
     render(<BottomTabNav />);
     expect(screen.getByRole("link", { name: /Today/ })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Appointments/ })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /POS/ })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Bills/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /More/i })).toBeInTheDocument();
   });
 

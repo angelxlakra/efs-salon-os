@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { getServiceColor } from "@/components/calendar/utils";
+import { getServiceColor, isOffHours, formatApptTime } from "@/components/calendar/utils";
 import type { Appointment } from "@/lib/api/appointments";
 import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
@@ -31,6 +31,8 @@ export function AppointmentBlock({
   onResizeStart,
 }: AppointmentBlockProps) {
   const color = getServiceColor(appointment.service_id);
+  const offHours = isOffHours(appointment.scheduled_at);
+  const timeStr = formatApptTime(appointment.scheduled_at);
 
   const { attributes, listeners, setNodeRef, transform, isDragging: dndIsDragging } = useDraggable({
     id: appointment.id,
@@ -66,18 +68,23 @@ export function AppointmentBlock({
         transform: CSS.Translate.toString(transform) ?? undefined,
       }}
     >
-      <p className="text-[11px] font-semibold text-text-primary truncate leading-tight">
-        {appointment.customer_name}
-      </p>
+      <div className="flex items-start justify-between gap-0.5">
+        <p className="text-[11px] font-semibold text-text-primary truncate leading-tight">
+          {appointment.customer_name}
+        </p>
+        {offHours && (
+          <span className="shrink-0 text-[8px] font-bold text-warning-fg bg-warning-bg-soft px-0.5 rounded leading-tight whitespace-nowrap">
+            ⚠ off-hrs
+          </span>
+        )}
+        {isConflict && !offHours && (
+          <span className="shrink-0 text-[9px] text-danger-fg font-bold leading-tight">⚠</span>
+        )}
+      </div>
       {height > 36 && (
         <p className="text-[10px] text-text-secondary truncate leading-tight">
-          {serviceName}
+          {timeStr} · {serviceName}
         </p>
-      )}
-      {isConflict && (
-        <span className="absolute top-0.5 right-1 text-[9px] text-danger-fg font-bold">
-          ⚠
-        </span>
       )}
       <div
         role="separator"

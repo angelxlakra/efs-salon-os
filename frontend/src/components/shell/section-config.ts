@@ -69,10 +69,14 @@ export const SHELL_SECTIONS: ShellSection[] = [
   },
 ];
 
-/** Mobile bottom nav — 4 items per spec §3.3, "More" opens overflow sheet. */
+/** Mobile bottom nav — 4 items per spec §3.3, "More" opens overflow sheet.
+ *  Order reflects daily usage frequency for reception staff:
+ *  Today → Appointments (highest-frequency calendar view) → POS → More.
+ *  Bills is accessible via More since it's consulted less often than the calendar.
+ */
 export const MOBILE_TABS: ShellNavItem[] = [
   { label: "Today", href: "/dashboard", icon: Home },
+  { label: "Appointments", href: "/dashboard/appointments", icon: Calendar },
   { label: "POS", href: "/dashboard/pos", icon: ShoppingCart },
-  { label: "Bills", href: "/dashboard/bills", icon: Receipt },
   // The "More" tab is rendered specially in BottomTabNav — it opens MoreSheet, not a route.
 ];
