@@ -100,8 +100,8 @@ export default function LoginPage() {
       </div>
 
       {/* Right Column — Login form */}
-      <div className="flex-1 flex flex-col justify-center px-8 sm:px-12 lg:px-20 xl:px-28 bg-white text-text-primary">
-        <div className="w-full max-w-sm mx-auto">
+      <div className="flex-1 flex flex-col justify-center px-8 sm:px-12 lg:px-20 xl:px-28 bg-white text-text-primary border-l-2 border-gold">
+        <div className="w-full max-w-md mx-auto">
           {/* Mobile-only logo */}
           <div className="lg:hidden mb-10 flex items-center gap-2">
             <div className="h-8 w-8 rounded-md flex items-center justify-center overflow-hidden flex-shrink-0" style={{ background: 'var(--accent-default)' }}>
