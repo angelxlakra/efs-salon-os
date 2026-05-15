@@ -31,6 +31,11 @@
   --color-accent-bg-soft:     var(--accent-bg-soft);
   --color-accent-fg:          var(--accent-fg);
 
+  --color-gold:               var(--gold-default);
+  --color-gold-hover:         var(--gold-hover);
+  --color-gold-soft:          var(--gold-soft);
+  --color-gold-fg:            var(--gold-fg);
+
   --color-success-fg:         var(--success-fg);
   --color-success-bg-soft:    var(--success-bg-soft);
   --color-success-border:     var(--success-border);
