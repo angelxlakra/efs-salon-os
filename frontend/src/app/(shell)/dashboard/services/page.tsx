@@ -196,25 +196,25 @@ export default function ServicesPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardDescription>Total Categories</CardDescription>
-            <CardTitle className="text-2xl font-bold">{catalog.categories.length}</CardTitle>
-          </CardHeader>
+        <Card density="sm">
+          <Card.Header className="pb-3">
+            <p className="text-xs text-text-muted">Total Categories</p>
+            <p className="text-2xl font-bold text-text-primary">{catalog.categories.length}</p>
+          </Card.Header>
         </Card>
-        <Card>
-          <CardHeader className="pb-3">
-            <CardDescription>Total Services</CardDescription>
-            <CardTitle className="text-2xl font-bold">{catalog.services.length}</CardTitle>
-          </CardHeader>
+        <Card density="sm">
+          <Card.Header className="pb-3">
+            <p className="text-xs text-text-muted">Total Services</p>
+            <p className="text-2xl font-bold text-text-primary">{catalog.services.length}</p>
+          </Card.Header>
         </Card>
-        <Card>
-          <CardHeader className="pb-3">
-            <CardDescription>Active Services</CardDescription>
-            <CardTitle className="text-2xl font-bold">
+        <Card density="sm">
+          <Card.Header className="pb-3">
+            <p className="text-xs text-text-muted">Active Services</p>
+            <p className="text-2xl font-bold text-text-primary">
               {catalog.services.filter((s) => s.is_active).length}
-            </CardTitle>
-          </CardHeader>
+            </p>
+          </Card.Header>
         </Card>
       </div>
 

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Plus, Loader2, Edit2, Trash2, Search, User, Wallet, History, UserX, Receipt } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { useAuthStore } from '@/stores/auth-store';
 import { titleCase } from '@/lib/utils';
@@ -209,35 +209,35 @@ export default function CustomersPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardDescription>{excludeWalkins ? 'Registered Customers' : 'Total Customers'}</CardDescription>
-            <CardTitle className="text-2xl font-bold">{stats.total_customers}</CardTitle>
-          </CardHeader>
+        <Card density="sm">
+          <Card.Header className="pb-3">
+            <p className="text-xs text-text-muted">{excludeWalkins ? 'Registered Customers' : 'Total Customers'}</p>
+            <p className="text-2xl font-bold text-text-primary">{stats.total_customers}</p>
+          </Card.Header>
         </Card>
-        <Card>
-          <CardHeader className="pb-3">
-            <CardDescription>Active This Month</CardDescription>
-            <CardTitle className="text-2xl font-bold">{stats.active_this_month}</CardTitle>
-          </CardHeader>
+        <Card density="sm">
+          <Card.Header className="pb-3">
+            <p className="text-xs text-text-muted">Active This Month</p>
+            <p className="text-2xl font-bold text-text-primary">{stats.active_this_month}</p>
+          </Card.Header>
         </Card>
-        <Card>
-          <CardHeader className="pb-3">
-            <CardDescription>Total Visits</CardDescription>
-            <CardTitle className="text-2xl font-bold">{stats.total_visits}</CardTitle>
-          </CardHeader>
+        <Card density="sm">
+          <Card.Header className="pb-3">
+            <p className="text-xs text-text-muted">Total Visits</p>
+            <p className="text-2xl font-bold text-text-primary">{stats.total_visits}</p>
+          </Card.Header>
         </Card>
-        <Card>
-          <CardHeader className="pb-3">
-            <CardDescription>Total Revenue</CardDescription>
-            <CardTitle className="text-2xl font-bold">{formatPrice(stats.total_revenue)}</CardTitle>
-          </CardHeader>
+        <Card density="sm">
+          <Card.Header className="pb-3">
+            <p className="text-xs text-text-muted">Total Revenue</p>
+            <p className="text-2xl font-bold text-text-primary">{formatPrice(stats.total_revenue)}</p>
+          </Card.Header>
         </Card>
-        <Card>
-          <CardHeader className="pb-3">
-            <CardDescription>Pending Balance</CardDescription>
-            <CardTitle className="text-2xl font-bold text-red-400">{formatPrice(stats.total_pending)}</CardTitle>
-          </CardHeader>
+        <Card density="sm">
+          <Card.Header className="pb-3">
+            <p className="text-xs text-text-muted">Pending Balance</p>
+            <p className="text-2xl font-bold text-danger-fg">{formatPrice(stats.total_pending)}</p>
+          </Card.Header>
         </Card>
       </div>
 
