@@ -60,6 +60,27 @@
   --font-sans:                var(--font-body);
   --font-display:             var(--font-display);
   --font-mono:                var(--font-mono);
+
+  /* ── shadcn/Radix compatibility aliases ────────────────────────────
+     These map generic shadcn token names (bg-popover, text-foreground,
+     bg-destructive, etc.) to our design-system primitives so that
+     third-party components (Combobox, Select, DropdownMenu, Command,
+     Calendar) render with correct opaque backgrounds. Without these,
+     Tailwind v4 resolves bg-popover → var(--color-popover) → undefined
+     → transparent, making every dropdown invisible.
+  ─────────────────────────────────────────────────────────────────── */
+  --color-background:               var(--surface-page);
+  --color-foreground:               var(--text-primary);
+  --color-popover:                  var(--surface-card);
+  --color-popover-foreground:       var(--text-primary);
+  --color-muted-foreground:         var(--text-muted);
+  --color-primary:                  var(--accent-default);
+  --color-primary-foreground:       var(--accent-fg);
+  --color-accent-foreground:        var(--accent-fg);
+  --color-destructive:              var(--danger-fg);
+  --color-destructive-foreground:   var(--text-inverse);
+  --color-input:                    var(--border-default);
+  --color-ring:                     var(--border-focus);
 }
 
 /* Print styles preserved from V1 — receipt template is out of scope for V2 */

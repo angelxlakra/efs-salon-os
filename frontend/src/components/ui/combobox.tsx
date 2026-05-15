@@ -34,6 +34,37 @@ export function Combobox({
 }: Props) {
   const [open, setOpen] = React.useState(false);
   const selected = options.find((o) => o.value === value) ?? null;
+  const commandRef = React.useRef<HTMLDivElement>(null);
+
+  // Fix: Radix Dialog uses react-remove-scroll which attaches a document-level
+  // *bubble-phase* wheel listener (shouldPrevent) that calls preventDefault() for
+  // targets outside the dialog's shards. The Combobox Popover is portaled to
+  // <body> and is not in those shards, so every wheel event over the dropdown
+  // gets silently cancelled.
+  //
+  // The normal workaround (React fiber onWheelCapture on RemoveScroll) never
+  // fires here because RemoveScroll (DialogOverlay) is a *sibling*, not an
+  // ancestor, of the Combobox in the React fiber tree — React only dispatches
+  // capture/bubble along the target's ancestry, not to siblings.
+  //
+  // Solution: attach a *capture-phase* listener at document level. Capture always
+  // runs before bubble, so we intercept first, manually scroll [cmdk-list], and
+  // call stopPropagation() so the bubble-phase shouldPrevent never fires.
+  React.useEffect(() => {
+    if (!open) return;
+    const handleWheel = (evt: Event) => {
+      const e = evt as WheelEvent;
+      const el = commandRef.current;
+      if (!el || !el.contains(e.target as Node)) return;
+      const list = el.querySelector<HTMLElement>("[cmdk-list]");
+      if (!list || list.scrollHeight <= list.clientHeight) return;
+      e.stopPropagation(); // prevents bubble-phase shouldPrevent at document
+      e.preventDefault();  // prevents browser from double-scrolling
+      list.scrollTop += e.deltaY;
+    };
+    document.addEventListener("wheel", handleWheel, { capture: true, passive: false });
+    return () => document.removeEventListener("wheel", handleWheel, { capture: true });
+  }, [open]);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -53,7 +84,7 @@ export function Combobox({
         </Button>
       </PopoverTrigger>
       <PopoverContent className="p-0 w-[var(--radix-popover-trigger-width)]">
-        <Command>
+        <Command ref={commandRef}>
           <CommandInput placeholder={searchPlaceholder} />
           <CommandList>
             <CommandEmpty>{emptyMessage}</CommandEmpty>
