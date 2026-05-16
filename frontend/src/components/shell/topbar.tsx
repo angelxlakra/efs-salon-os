@@ -1,15 +1,33 @@
 "use client";
 
 import * as React from "react";
-import { Search, User } from "lucide-react";
+import { Search, User, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
 import { Breadcrumb } from "@/components/shell/breadcrumb";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { usePalette } from "@/components/command-palette/use-palette";
+import { useAuthStore } from "@/stores/auth-store";
+import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 export function TopBar({ className }: { className?: string }) {
   const { open } = usePalette();
+  const { user, logout } = useAuthStore();
+  const router = useRouter();
+
+  const handleLogout = () => {
+    logout();
+    router.push("/login");
+  };
+
   return (
     <header
       className={cn(
@@ -28,15 +46,36 @@ export function TopBar({ className }: { className?: string }) {
         <span className="hidden md:inline">Search…</span>
         <Kbd keys={["⌘", "K"]} />
       </button>
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        aria-label="User menu"
-        className="size-8 p-0"
-      >
-        <User className="size-4" />
-      </Button>
+
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            aria-label="User menu"
+            className="size-8 p-0"
+          >
+            <User className="size-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-48">
+          <DropdownMenuLabel className="font-normal">
+            <p className="text-sm font-semibold text-text-primary truncate">
+              {user?.username || "Account"}
+            </p>
+            <p className="text-xs text-text-muted capitalize">{user?.role}</p>
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            onClick={handleLogout}
+            className="text-danger-fg focus:text-danger-fg focus:bg-danger-bg-soft"
+          >
+            <LogOut className="mr-2 h-4 w-4" />
+            Sign out
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </header>
   );
 }

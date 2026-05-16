@@ -5,6 +5,14 @@ import { PaletteProvider } from "@/components/command-palette/use-palette";
 
 vi.mock("next/navigation", () => ({
   usePathname: () => "/dashboard/bills",
+  useRouter: () => ({ push: vi.fn() }),
+}));
+
+vi.mock("@/stores/auth-store", () => ({
+  useAuthStore: () => ({
+    user: { username: "testuser", role: "owner" },
+    logout: vi.fn(),
+  }),
 }));
 
 describe("TopBar", () => {
@@ -28,7 +36,7 @@ describe("TopBar", () => {
     expect(trigger).toBeInTheDocument();
   });
 
-  it("renders a user menu placeholder", () => {
+  it("renders the user menu trigger", () => {
     render(
       <PaletteProvider>
         <TopBar />
