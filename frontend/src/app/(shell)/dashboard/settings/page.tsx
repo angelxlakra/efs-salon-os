@@ -19,15 +19,12 @@ import {
   Globe,
   FileText,
   Receipt,
-  Palette,
   Save,
   Loader2,
   AlertCircle,
   RotateCcw,
   Target,
-  Check,
 } from 'lucide-react';
-import { AccentName, getAccent, setAccent } from '@/lib/theme';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Dialog,
@@ -68,7 +65,6 @@ export default function SettingsPage() {
   const isOwner = user?.role === 'owner';
 
   const [settings, setSettings] = useState<Record<string, unknown> | null>(null);
-  const [currentAccent, setCurrentAccent] = useState<AccentName>('violet');
   const [originalData, setOriginalData] = useState<FormDataType | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -103,7 +99,6 @@ export default function SettingsPage() {
 
   useEffect(() => {
     setHasMounted(true);
-    setCurrentAccent(getAccent());
     fetchSettings();
   }, []);
 
@@ -671,57 +666,6 @@ export default function SettingsPage() {
                 Target number of services per day (default: 25)
               </p>
             </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Appearance */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Palette className="h-5 w-5" />
-            Appearance
-          </CardTitle>
-          <CardDescription>
-            Choose an accent colour for the app. Your preference is saved locally on this device.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-3">
-            {(
-              [
-                { name: 'violet' as AccentName, label: 'Violet', hex: '#7c3aed' },
-                { name: 'rose' as AccentName, label: 'Rose', hex: '#e11d48' },
-                { name: 'amber' as AccentName, label: 'Amber', hex: '#d97706' },
-                { name: 'teal' as AccentName, label: 'Teal', hex: '#0d9488' },
-              ] as const
-            ).map((palette) => (
-              <button
-                key={palette.name}
-                type="button"
-                onClick={() => {
-                  setAccent(palette.name);
-                  setCurrentAccent(palette.name);
-                }}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg border transition-all hover:bg-surface-hover"
-                style={{
-                  borderColor: currentAccent === palette.name ? palette.hex : 'var(--color-border-subtle)',
-                  background: currentAccent === palette.name ? `${palette.hex}18` : undefined,
-                }}
-                aria-pressed={currentAccent === palette.name}
-                aria-label={`${palette.label} accent`}
-              >
-                <span
-                  className="h-4 w-4 rounded-full flex items-center justify-center shrink-0"
-                  style={{ background: palette.hex }}
-                >
-                  {currentAccent === palette.name && (
-                    <Check className="h-2.5 w-2.5 text-white" strokeWidth={3} />
-                  )}
-                </span>
-                <span className="text-sm font-medium text-text-primary">{palette.label}</span>
-              </button>
-            ))}
           </div>
         </CardContent>
       </Card>

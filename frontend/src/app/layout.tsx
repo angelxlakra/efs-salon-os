@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import { Toaster } from '@/components/ui/sonner';
 
-import { ThemeInit } from '@/components/theme-init';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -21,7 +20,6 @@ export default function RootLayout({
   return (
     <html lang="en" data-theme="light" suppressHydrationWarning>
       <body className="antialiased font-sans">
-        <ThemeInit />
         {children}
         <Toaster position="top-right" />
       </body>
