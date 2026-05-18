@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
+import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/empty-state';
 import {
   Dialog,
   DialogBody,
@@ -530,7 +532,7 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
               variant="ghost"
               size="sm"
               onClick={handleClearCart}
-              className="text-red-500 hover:text-red-400 hover:bg-red-950/40"
+              className="text-danger-fg hover:bg-danger-bg-soft"
             >
               Clear
             </Button>
@@ -575,18 +577,17 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
       {/* Cart Items */}
       <ScrollArea className="flex-1 p-4">
         {isLoadingSession ? (
-          <div className="flex flex-col items-center justify-center h-64 text-center">
-            <div className="h-12 w-12 rounded-full border-4 border-border-subtle border-t-text-primary animate-spin mb-3" />
-            <p className="text-text-secondary text-sm">Loading active services...</p>
+          <div className="space-y-3" aria-busy="true">
+            <Skeleton shape="row" />
+            <Skeleton shape="row" />
+            <Skeleton shape="row" />
           </div>
         ) : items.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 text-center">
-            <ShoppingCart className="h-12 w-12 text-text-muted mb-3" />
-            <p className="text-text-secondary text-sm">Your cart is empty</p>
-            <p className="text-text-muted text-xs mt-1">
-              Add services to get started
-            </p>
-          </div>
+          <EmptyState
+            title="Cart is empty"
+            body="Search for a service or product above and select a staff member to add it here."
+            headingLevel={4}
+          />
         ) : (
           <div className="space-y-3">
             {[...items].sort((a, b) => Number(a.isBooked) - Number(b.isBooked)).map((item) => (
@@ -594,7 +595,7 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
                 key={item.id}
                 className={`rounded-lg p-3 space-y-2 ${
                   item.isBooked
-                    ? 'bg-green-950/40 border-2 border-green-800'
+                    ? 'bg-success-bg-soft border-2 border-success-border'
                     : 'bg-surface-row border-2 border-transparent'
                 }`}
               >
@@ -606,12 +607,12 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
                         {item.isProduct ? item.productName : item.serviceName}
                       </h4>
                       {item.isProduct && (
-                        <Badge variant="secondary" className="text-xs bg-blue-600 text-white">
+                        <Badge variant="secondary" className="text-xs bg-surface-row text-text-secondary border border-border-subtle">
                           Product
                         </Badge>
                       )}
                       {item.isBooked && !item.isProduct && (
-                        <Badge variant="secondary" className="text-xs bg-green-600 text-white">
+                        <Badge variant="secondary" className="text-xs bg-success-bg-soft text-success-fg border border-success-border">
                           Booked
                         </Badge>
                       )}
@@ -626,10 +627,10 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
                     size="sm"
                     onClick={() => handleRemoveItem(item)}
                     disabled={cancellingItemId === item.id}
-                    className="h-7 w-7 p-0 text-text-muted hover:text-red-600"
+                    className="h-7 w-7 p-0 text-text-muted hover:text-danger-fg"
                   >
                     {cancellingItemId === item.id ? (
-                      <div className="h-4 w-4 border-2 border-border-subtle border-t-red-600 rounded-full animate-spin" />
+                      <div className="h-4 w-4 border-2 border-border-subtle border-t-danger-fg rounded-full animate-spin" />
                     ) : (
                       <Trash2 className="h-4 w-4" />
                     )}
@@ -787,7 +788,7 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
               <span>{formatPrice(subtotal)}</span>
             </div>
             {discountAmount > 0 && (
-              <div className="flex justify-between text-green-600">
+              <div className="flex justify-between text-success-fg">
                 <span>
                   Discount
                   {subtotal > 0 && (
@@ -841,12 +842,12 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
 
           {/* Warnings */}
           {hasUnbookedItems && !allUnbookedHaveStaff && (
-            <p className="text-xs text-amber-600 text-center">
+            <p className="text-xs text-warning-fg text-center">
               ⚠ Assign staff to all new services before booking
             </p>
           )}
           {!customerName && (
-            <p className="text-xs text-amber-600 text-center">
+            <p className="text-xs text-warning-fg text-center">
               ⚠ Select a customer to proceed
             </p>
           )}
