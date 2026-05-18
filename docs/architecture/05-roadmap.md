@@ -1,7 +1,7 @@
 # SalonOS Frontend Development Roadmap
 
-**Current Status**: Phases 1-4 Complete ✅
-**Next Phase**: Phase 5 - Advanced Features
+**Current Status**: V2 Phases 0–2 Complete ✅ (see `docs/superpowers/specs/2026-04-23-v2-redesign-design.md` for active V2 roadmap)
+**Next Phase (V2)**: Phase 3 — Dashboard retrofit
 
 ---
 
