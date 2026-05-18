@@ -416,8 +416,6 @@ export function ServiceGrid({ searchInputRef, hideStaffSelection = false, onServ
     setExpandedServiceId(null);
   };
 
-  // Get count of how many times a service is in the cart
-
   // Get unique categories
   const categories = ['All', ...Array.from(new Set(services.map(s => s.category.name)))];
 
