@@ -1,10 +1,12 @@
 'use client';
 
 import { useState, useEffect, RefObject, useRef } from 'react';
-import { Plus, Search, Loader2, User, Check, Clock, ShoppingCart } from 'lucide-react';
+import { Plus, Search, Loader2, User, Clock, ShoppingCart } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/empty-state';
 import { useCartStore } from '@/stores/cart-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { apiClient } from '@/lib/api-client';
@@ -54,23 +56,32 @@ interface ServiceGridProps {
   onServiceSelect?: (serviceId: string, serviceName: string, price: number, duration: number, staffId?: string | null) => void;
 }
 
-const CATEGORY_COLORS = [
-  'bg-rose-100 text-rose-700',
-  'bg-purple-100 text-purple-700',
-  'bg-blue-100 text-blue-700',
-  'bg-teal-100 text-teal-700',
-  'bg-amber-100 text-amber-700',
-  'bg-emerald-100 text-emerald-700',
-  'bg-orange-100 text-orange-700',
-  'bg-indigo-100 text-indigo-700',
+const CATEGORY_STYLES = [
+  'bg-success-bg-soft text-success-fg',
+  'bg-warning-bg-soft text-warning-fg',
+  'bg-danger-bg-soft text-danger-fg',
+  'bg-accent-bg-soft text-accent-default',
 ];
 
-function getCategoryColor(name: string): string {
+function getCategoryStyle(name: string): string {
   let hash = 0;
   for (let i = 0; i < name.length; i++) {
     hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
   }
-  return CATEGORY_COLORS[hash % CATEGORY_COLORS.length];
+  return CATEGORY_STYLES[hash % CATEGORY_STYLES.length];
+}
+
+// Format price from paise to rupees
+function formatServicePrice(paise: number) {
+  return `₹${(paise / 100).toFixed(2)}`;
+}
+
+function formatWait(minutes: number) {
+  if (minutes === 0) return 'No wait';
+  if (minutes < 60) return `~${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  return mins > 0 ? `~${hours}h ${mins}m` : `~${hours}h`;
 }
 
 export function ServiceGrid({ searchInputRef, hideStaffSelection = false, onServiceSelect }: ServiceGridProps) {
@@ -141,7 +152,6 @@ export function ServiceGrid({ searchInputRef, hideStaffSelection = false, onServ
     try {
       setIsLoading(true);
       const { data } = await apiClient.get('/catalog/services', { params: { sort_by: 'popularity' } });
-      console.log({data: data.services});
 
       setServices(data.services || []);
       setFilteredServices(data.services || []);
@@ -159,23 +169,17 @@ export function ServiceGrid({ searchInputRef, hideStaffSelection = false, onServ
 
       // If current user is staff, only fetch staff list (no busyness - they can't access it)
       if (user?.role === 'staff') {
-        console.log('Staff user detected:', user);
         const staffResponse = await apiClient.get('/staff', {
           params: { is_active: true, service_providers_only: true }
         });
         const staffList = staffResponse.data.items || staffResponse.data || [];
-        console.log('Staff list fetched:', staffList);
-        console.log('Looking for user_id:', user.id);
 
         // Find their own staff profile
         const userStaff = staffList.find((s: Staff) => s.user_id === user.id);
-        console.log('Found user staff profile:', userStaff);
 
         if (userStaff) {
           setCurrentUserStaff(userStaff);
-          console.log('Set currentUserStaff:', userStaff);
         } else {
-          console.error('Staff profile not found. User ID:', user.id, 'Staff list:', staffList);
           toast.error('No staff profile found for your account. Please contact admin.');
         }
 
@@ -229,7 +233,6 @@ export function ServiceGrid({ searchInputRef, hideStaffSelection = false, onServ
 
       setStaff(staffWithBusyness);
     } catch (error: any) {
-      console.error('Error fetching staff:', error);
       // Don't show error toast for staff users if they can't access busyness endpoint
       if (user?.role !== 'staff') {
         toast.error('Failed to load staff members');
@@ -256,7 +259,7 @@ export function ServiceGrid({ searchInputRef, hideStaffSelection = false, onServ
     } catch (error: any) {
       // If 404, service doesn't have templates - that's okay
       if (error.response?.status !== 404) {
-        console.error('Error fetching service templates:', error);
+        // swallow other errors silently for templates
       }
     } finally {
       setIsLoadingTemplates(false);
@@ -379,22 +382,14 @@ export function ServiceGrid({ searchInputRef, hideStaffSelection = false, onServ
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'available':
-        return <Badge className="bg-green-500 text-white text-xs">Available</Badge>;
+        return <Badge className="bg-success-bg-soft text-success-fg text-xs">Available</Badge>;
       case 'busy':
-        return <Badge className="bg-yellow-500 text-white text-xs">Busy</Badge>;
+        return <Badge className="bg-warning-bg-soft text-warning-fg text-xs">Busy</Badge>;
       case 'very_busy':
-        return <Badge className="bg-red-500 text-white text-xs">Very Busy</Badge>;
+        return <Badge className="bg-danger-bg-soft text-danger-fg text-xs">Very Busy</Badge>;
       default:
         return null;
     }
-  };
-
-  const formatWaitTime = (minutes: number) => {
-    if (minutes === 0) return 'No wait';
-    if (minutes < 60) return `~${minutes} min`;
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    return mins > 0 ? `~${hours}h ${mins}m` : `~${hours}h`;
   };
 
   const getStaffBusynessText = (staffMember: StaffWithBusyness) => {
@@ -424,21 +419,13 @@ export function ServiceGrid({ searchInputRef, hideStaffSelection = false, onServ
 
   // Get unique categories
   const categories = ['All', ...Array.from(new Set(services.map(s => s.category.name)))];
-  console.log({categories, services});
-  
-
-  // Format price from paise to rupees
-  const formatPrice = (paise: number) => {
-    return `₹${(paise / 100).toFixed(2)}`;
-  };
 
   if (isLoading) {
     return (
-      <div className="flex-1 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-text-disabled mx-auto mb-2" />
-          <p className="text-sm text-text-muted">Loading services...</p>
-        </div>
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4" aria-busy="true">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <Skeleton key={i} shape="kpi" />
+        ))}
       </div>
     );
   }
@@ -479,19 +466,18 @@ export function ServiceGrid({ searchInputRef, hideStaffSelection = false, onServ
       {/* Service Grid */}
       <div className="flex-1 overflow-auto">
         {filteredServices.length === 0 ? (
-          <div className="flex items-center justify-center h-64">
-            <div className="text-center">
-              <p className="text-text-muted">No services found</p>
-              {searchQuery && (
-                <Button
-                  variant="link"
-                  onClick={() => setSearchQuery('')}
-                  className="mt-2"
-                >
-                  Clear search
-                </Button>
-              )}
-            </div>
+          <div className="col-span-full">
+            <EmptyState
+              title={searchQuery ? 'No matching services' : 'No services yet'}
+              body={searchQuery
+                ? 'Try a different search term or clear the filter to see all services.'
+                : 'Add services in the Services catalogue to see them here.'}
+              headingLevel={4}
+              primaryAction={searchQuery
+                ? <Button variant="outline" onClick={() => setSearchQuery('')}>Clear search</Button>
+                : undefined
+              }
+            />
           </div>
         ) : (
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 items-start">
@@ -504,11 +490,11 @@ export function ServiceGrid({ searchInputRef, hideStaffSelection = false, onServ
                 <div
                   key={service.id}
                   ref={isExpanded ? expandedCardRef : null}
-                  className={`relative bg-white rounded-xl border-2 transition-all ${
+                  className={`relative bg-surface-card rounded-xl border-2 transition-all ${
                     isExpanded
-                      ? 'border-black shadow-lg col-span-2 lg:col-span-3'
+                      ? 'border-accent-default shadow-lg col-span-2 lg:col-span-3'
                       : isInCart
-                      ? 'border-green-500 shadow-md'
+                      ? 'border-success-border shadow-md'
                       : 'border-border-default'
                   }`}
                 >
@@ -523,14 +509,14 @@ export function ServiceGrid({ searchInputRef, hideStaffSelection = false, onServ
                     <div className="flex items-start justify-between mb-2 min-h-[1.5rem]">
                       <div>
                         {isInCart && (
-                          <Badge className="bg-green-600 text-white text-xs flex items-center gap-1">
+                          <Badge className="bg-success-bg-soft text-success-fg border border-success-border text-xs flex items-center gap-1">
                             <ShoppingCart className="h-3 w-3" />
                             {cartCount}
                           </Badge>
                         )}
                       </div>
                       <span
-                        className={`text-[10px] font-semibold leading-tight px-1.5 py-0.5 rounded whitespace-normal break-words ml-2 ${getCategoryColor(service.category.name)}`}
+                        className={`text-[10px] font-semibold leading-tight px-1.5 py-0.5 rounded whitespace-normal break-words ml-2 ${getCategoryStyle(service.category.name)}`}
                       >
                         {service.category.name}
                       </span>
@@ -549,12 +535,12 @@ export function ServiceGrid({ searchInputRef, hideStaffSelection = false, onServ
                     {/* Price and Add Button */}
                     <div className="flex items-center justify-between">
                       <span className="text-lg font-bold text-text-primary">
-                        {formatPrice(service.base_price)}
+                        {formatServicePrice(service.base_price)}
                       </span>
-                      <div className={`h-8 w-8 rounded-full bg-black flex items-center justify-center transition-opacity ${
+                      <div className={`h-8 w-8 rounded-full bg-accent flex items-center justify-center transition-opacity ${
                         isExpanded ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
                       }`}>
-                        <Plus className="h-4 w-4 text-white" />
+                        <Plus className="h-4 w-4 text-accent-fg" />
                       </div>
                     </div>
                   </button>
@@ -617,7 +603,7 @@ export function ServiceGrid({ searchInputRef, hideStaffSelection = false, onServ
                                     )
                                   }
                                   title={getStaffBusynessText(staffMember)}
-                                  className="flex items-center justify-between gap-2 w-full px-2.5 py-2 bg-surface-page hover:bg-black hover:text-white border border-border-default hover:border-black rounded-lg transition-all text-left"
+                                  className="flex items-center justify-between gap-2 w-full px-2.5 py-2 bg-surface-page hover:bg-accent hover:text-accent-fg border border-border-default hover:border-accent-default rounded-lg transition-all text-left"
                                 >
                                   <div className="flex items-center gap-1.5 min-w-0">
                                     <User className="h-3 w-3 flex-shrink-0" />
@@ -630,7 +616,7 @@ export function ServiceGrid({ searchInputRef, hideStaffSelection = false, onServ
                                     {staffMember.busyness && staffMember.busyness.total_wait_minutes > 0 && (
                                       <span className="text-text-muted flex items-center gap-0.5">
                                         <Clock className="h-3 w-3" />
-                                        {formatWaitTime(staffMember.busyness.total_wait_minutes)}
+                                        {formatWait(staffMember.busyness.total_wait_minutes)}
                                       </span>
                                     )}
                                   </div>
