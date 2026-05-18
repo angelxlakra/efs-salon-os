@@ -190,10 +190,8 @@ export default function DashboardPage() {
     } catch (error: unknown) {
       console.error('Failed to fetch dashboard data:', error);
       setActiveSessions([]);
-      const detail =
-        error instanceof Error && (error as any).response?.data?.detail
-          ? (error as any).response.data.detail
-          : 'Failed to load dashboard data';
+      const apiError = error as { response?: { data?: { detail?: string } } };
+      const detail = apiError.response?.data?.detail ?? 'Failed to load dashboard data';
       if (!silent) toast.error(detail);
     } finally {
       setIsLoading(false);
@@ -217,20 +215,22 @@ export default function DashboardPage() {
       if (!session) { toast.error('Session not found'); return; }
 
       clearCart();
-      session.walkins.forEach((walkin) => {
-        addItem({
-          isProduct: false,
-          serviceId: walkin.service.id,
-          serviceName: walkin.service.name,
-          quantity: 1,
-          unitPrice: walkin.service.base_price,
-          discount: 0,
-          taxRate: 18,
-          staffId: walkin.assigned_staff.id,
-          staffName: walkin.assigned_staff.display_name,
-          duration: walkin.duration_minutes,
+      session.walkins
+        .filter((w) => w.status !== 'cancelled')
+        .forEach((walkin) => {
+          addItem({
+            isProduct: false,
+            serviceId: walkin.service.id,
+            serviceName: walkin.service.name,
+            quantity: 1,
+            unitPrice: walkin.service.base_price,
+            discount: 0,
+            taxRate: 18,
+            staffId: walkin.assigned_staff.id,
+            staffName: walkin.assigned_staff.display_name,
+            duration: walkin.duration_minutes,
+          });
         });
-      });
 
       setCustomer(session.customer_id, titleCase(session.customer_name), session.customer_phone);
       setSessionId(sessionId);
@@ -357,7 +357,9 @@ export default function DashboardPage() {
             <Card.Header title="Daily Goals" />
             <Card.Body>
               {isLoading ? (
-                <Skeleton shape="kpi" aria-busy="true" />
+                <div aria-busy="true">
+                  <Skeleton shape="kpi" />
+                </div>
               ) : (
                 <>
                   <DualRadialGoals
@@ -395,7 +397,9 @@ export default function DashboardPage() {
             />
             <Card.Body>
               {isLoading ? (
-                <Skeleton shape="card" className="h-64" aria-busy="true" />
+                <div aria-busy="true">
+                  <Skeleton shape="card" className="h-64" />
+                </div>
               ) : hourlyData.length > 0 ? (
                 <HourlyTrendChart data={hourlyData} peakHour={peakHour} />
               ) : (
@@ -414,7 +418,9 @@ export default function DashboardPage() {
             <Card.Header title="Top Services" description="Revenue by service type" />
             <Card.Body>
               {isLoading ? (
-                <Skeleton shape="card" className="h-64" aria-busy="true" />
+                <div aria-busy="true">
+                  <Skeleton shape="card" className="h-64" />
+                </div>
               ) : topServices.length > 0 ? (
                 <ServiceDistributionChart
                   services={topServices}
