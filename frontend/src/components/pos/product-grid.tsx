@@ -5,6 +5,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Package, Search } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/empty-state';
 import { productApi } from '@/lib/api/products';
 import type { RetailProduct } from '@/types/product';
 import { useCartStore } from '@/stores/cart-store';
@@ -98,8 +100,10 @@ export function ProductGrid({ onProductAdded }: ProductGridProps) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-muted-foreground">Loading products...</div>
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4" aria-busy="true">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <Skeleton key={i} shape="kpi" />
+        ))}
       </div>
     );
   }
@@ -109,7 +113,7 @@ export function ProductGrid({ onProductAdded }: ProductGridProps) {
       {/* Filters */}
       <div className="flex gap-4">
         <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-text-muted" />
           <Input
             placeholder="Search products..."
             value={searchTerm}
@@ -145,14 +149,14 @@ export function ProductGrid({ onProductAdded }: ProductGridProps) {
             <CardContent className="p-4">
               <div className="flex flex-col h-full">
                 <div className="flex items-start justify-between mb-2">
-                  <Package className="h-5 w-5 text-blue-600" />
+                  <Package className="h-5 w-5 text-text-muted" />
                   <span
                     className={`text-xs px-2 py-1 rounded ${
                       product.current_stock > 10
-                        ? 'bg-green-100 text-green-700'
+                        ? 'bg-success-bg-soft text-success-fg'
                         : product.current_stock > 0
-                        ? 'bg-yellow-100 text-yellow-700'
-                        : 'bg-red-100 text-red-700'
+                        ? 'bg-warning-bg-soft text-warning-fg'
+                        : 'bg-danger-bg-soft text-danger-fg'
                     }`}
                   >
                     {product.current_stock > 0 ? `${product.current_stock} ${product.uom}` : 'Out of stock'}
@@ -161,14 +165,14 @@ export function ProductGrid({ onProductAdded }: ProductGridProps) {
 
                 <h3 className="font-medium text-sm mb-1 line-clamp-2">{product.name}</h3>
 
-                <p className="text-xs text-muted-foreground mb-2">{product.sku_code}</p>
+                <p className="text-xs text-text-muted mb-2">{product.sku_code}</p>
 
                 {product.category_name && (
-                  <p className="text-xs text-muted-foreground mb-2">{product.category_name}</p>
+                  <p className="text-xs text-text-muted mb-2">{product.category_name}</p>
                 )}
 
                 <div className="mt-auto">
-                  <div className="text-lg font-bold text-blue-600">
+                  <div className="text-lg font-bold text-text-primary">
                     {formatCurrency(product.retail_price)}
                   </div>
                 </div>
@@ -179,10 +183,14 @@ export function ProductGrid({ onProductAdded }: ProductGridProps) {
       </div>
 
       {filteredProducts.length === 0 && (
-        <div className="text-center py-12 text-muted-foreground">
-          <Package className="h-12 w-12 mx-auto mb-4 opacity-20" />
-          <p>No products found</p>
-        </div>
+        <EmptyState
+          icon={<Package />}
+          title={searchTerm ? 'No matching products' : 'No products yet'}
+          body={searchTerm
+            ? 'Try a different name or SKU code.'
+            : 'Add retail products in Inventory to sell them here.'}
+          headingLevel={4}
+        />
       )}
     </div>
   );
