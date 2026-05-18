@@ -122,11 +122,11 @@ export const StaffAssignmentSelector: React.FC<StaffAssignmentSelectorProps> = (
   };
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-6">
+    <div className="bg-white rounded-lg border border-border-default p-6">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h3 className="text-lg font-semibold text-gray-900">{serviceName}</h3>
-          <p className="text-sm text-gray-600">
+          <h3 className="text-lg font-semibold text-text-primary">{serviceName}</h3>
+          <p className="text-sm text-text-secondary">
             ₹{(servicePrice / 100).toFixed(2)} • {templates.length} staff required
           </p>
         </div>
@@ -137,7 +137,7 @@ export const StaffAssignmentSelector: React.FC<StaffAssignmentSelectorProps> = (
               type="checkbox"
               checked={trackTime}
               onChange={(e) => setTrackTime(e.target.checked)}
-              className="rounded border-gray-300"
+              className="rounded border-border-strong"
             />
             <span>Track actual time</span>
           </label>
@@ -152,7 +152,7 @@ export const StaffAssignmentSelector: React.FC<StaffAssignmentSelectorProps> = (
           return (
             <div
               key={template.id}
-              className="border border-gray-200 rounded-lg p-4"
+              className="border border-border-default rounded-lg p-4"
             >
               <div className="flex items-start gap-3">
                 <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-semibold text-sm">
@@ -161,7 +161,7 @@ export const StaffAssignmentSelector: React.FC<StaffAssignmentSelectorProps> = (
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-2">
-                    <h4 className="font-medium text-gray-900">
+                    <h4 className="font-medium text-text-primary">
                       {template.role_name}
                     </h4>
                     {template.is_required && (
@@ -171,20 +171,20 @@ export const StaffAssignmentSelector: React.FC<StaffAssignmentSelectorProps> = (
                     )}
                   </div>
 
-                  <p className="text-sm text-gray-600 mb-3">
+                  <p className="text-sm text-text-secondary mb-3">
                     {template.role_description || 'No description'}
                   </p>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {/* Staff Selection */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label className="block text-sm font-medium text-text-secondary mb-1">
                         Assign Staff
                       </label>
                       <select
                         value={assignment?.staffId || ''}
                         onChange={(e) => handleStaffSelect(template.id, e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-3 py-2 border border-border-strong rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
                         <option value="">Select staff member...</option>
                         {availableStaff.map((staff) => (
@@ -198,7 +198,7 @@ export const StaffAssignmentSelector: React.FC<StaffAssignmentSelectorProps> = (
                     {/* Time Input (if tracking) */}
                     {trackTime && (
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <label className="block text-sm font-medium text-text-secondary mb-1">
                           Actual Time (minutes)
                         </label>
                         <input
@@ -208,7 +208,7 @@ export const StaffAssignmentSelector: React.FC<StaffAssignmentSelectorProps> = (
                           value={assignment?.actualTimeMinutes || template.estimated_duration_minutes}
                           onChange={(e) => handleTimeInput(template.id, parseInt(e.target.value))}
                           placeholder={`Est. ${template.estimated_duration_minutes} min`}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-full px-3 py-2 border border-border-strong rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                       </div>
                     )}
@@ -217,7 +217,7 @@ export const StaffAssignmentSelector: React.FC<StaffAssignmentSelectorProps> = (
                   {/* Notes */}
                   {assignment?.staffId && (
                     <div className="mt-3">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label className="block text-sm font-medium text-text-secondary mb-1">
                         Notes (optional)
                       </label>
                       <input
@@ -225,7 +225,7 @@ export const StaffAssignmentSelector: React.FC<StaffAssignmentSelectorProps> = (
                         value={assignment?.notes || ''}
                         onChange={(e) => handleNotesInput(template.id, e.target.value)}
                         placeholder="Any special notes for this role..."
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-3 py-2 border border-border-strong rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
                   )}
@@ -233,11 +233,11 @@ export const StaffAssignmentSelector: React.FC<StaffAssignmentSelectorProps> = (
                   {/* Contribution Estimate */}
                   {assignment?.staffId && estimatedContribution > 0 && (
                     <div className="mt-3 flex items-center gap-2 text-sm">
-                      <span className="text-gray-600">Est. contribution:</span>
+                      <span className="text-text-secondary">Est. contribution:</span>
                       <span className="font-semibold text-green-700">
                         ₹{(estimatedContribution / 100).toFixed(2)}
                       </span>
-                      <span className="text-gray-500">
+                      <span className="text-text-muted">
                         ({template.default_contribution_percent}%)
                       </span>
                     </div>
@@ -250,7 +250,7 @@ export const StaffAssignmentSelector: React.FC<StaffAssignmentSelectorProps> = (
       </div>
 
       {/* Completion Status */}
-      <div className="mt-6 pt-4 border-t border-gray-200">
+      <div className="mt-6 pt-4 border-t border-border-default">
         {isComplete ? (
           <div className="flex items-center gap-2 text-green-700">
             <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">

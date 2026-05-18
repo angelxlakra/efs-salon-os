@@ -252,7 +252,7 @@ export function ServiceDialog({ open, service, categories, onClose, onSuccess }:
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
               <Label htmlFor="is_active">Active</Label>
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-text-muted">
                 Inactive services won't appear in POS
               </p>
             </div>

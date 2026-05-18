@@ -27,7 +27,7 @@ export function ExpenseFiltersBar({ filters, onFiltersChange }: ExpenseFiltersBa
   return (
     <div className="flex gap-4 items-end flex-wrap">
       <div className="flex-1 min-w-[200px]">
-        <label className="text-sm font-medium text-gray-700 block mb-2">Start Date</label>
+        <label className="text-sm font-medium text-text-secondary block mb-2">Start Date</label>
         <Input
           type="date"
           value={filters.start_date || ''}
@@ -36,7 +36,7 @@ export function ExpenseFiltersBar({ filters, onFiltersChange }: ExpenseFiltersBa
       </div>
 
       <div className="flex-1 min-w-[200px]">
-        <label className="text-sm font-medium text-gray-700 block mb-2">End Date</label>
+        <label className="text-sm font-medium text-text-secondary block mb-2">End Date</label>
         <Input
           type="date"
           value={filters.end_date || ''}
@@ -45,7 +45,7 @@ export function ExpenseFiltersBar({ filters, onFiltersChange }: ExpenseFiltersBa
       </div>
 
       <div className="flex-1 min-w-[200px]">
-        <label className="text-sm font-medium text-gray-700 block mb-2">Category</label>
+        <label className="text-sm font-medium text-text-secondary block mb-2">Category</label>
         <Select
           value={filters.category || 'all'}
           onValueChange={(value) => updateFilter('category', value === 'all' ? undefined : value)}
@@ -65,7 +65,7 @@ export function ExpenseFiltersBar({ filters, onFiltersChange }: ExpenseFiltersBa
       </div>
 
       <div className="flex-1 min-w-[200px]">
-        <label className="text-sm font-medium text-gray-700 block mb-2">Status</label>
+        <label className="text-sm font-medium text-text-secondary block mb-2">Status</label>
         <Select
           value={filters.status || 'all'}
           onValueChange={(value) => updateFilter('status', value === 'all' ? undefined : value)}

@@ -248,12 +248,12 @@ export const AdHocStaffTeamEditor: React.FC<AdHocStaffTeamEditorProps> = ({
                   key={assignment.staff_id}
                   className="flex items-center gap-3 p-3 border rounded-lg"
                 >
-                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 text-gray-600 font-semibold flex-shrink-0">
+                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-surface-row-hover text-text-secondary font-semibold flex-shrink-0">
                     {index + 1}
                   </div>
                   <div className="flex-1">
                     <div className="font-medium">{assignment.staff_name}</div>
-                    <div className="text-sm text-gray-500">
+                    <div className="text-sm text-text-muted">
                       {formatPrice(getContributionAmount(assignment.contribution_percent))}
                     </div>
                   </div>
@@ -271,7 +271,7 @@ export const AdHocStaffTeamEditor: React.FC<AdHocStaffTeamEditorProps> = ({
                       max="100"
                       className="w-20 text-right"
                     />
-                    <span className="text-sm text-gray-500">%</span>
+                    <span className="text-sm text-text-muted">%</span>
                   </div>
                   <Button
                     variant="ghost"
@@ -288,7 +288,7 @@ export const AdHocStaffTeamEditor: React.FC<AdHocStaffTeamEditorProps> = ({
           )}
 
           {/* Total Percentage */}
-          <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+          <div className="flex items-center justify-between p-3 bg-surface-page rounded-lg">
             <span className="font-semibold">Total Contribution</span>
             <div className="flex items-center gap-2">
               <Badge

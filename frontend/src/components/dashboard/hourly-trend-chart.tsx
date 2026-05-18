@@ -57,16 +57,16 @@ export function HourlyTrendChart({ data, peakHour }: HourlyTrendChartProps) {
     if (!active || !payload?.length) return null;
     const d = payload[0].payload;
     return (
-      <div className="bg-white p-3 rounded-lg shadow-lg border border-gray-200">
-        <p className="text-xs font-semibold text-gray-900 mb-1">{d.hour_label}</p>
+      <div className="bg-white p-3 rounded-lg shadow-lg border border-border-default">
+        <p className="text-xs font-semibold text-text-primary mb-1">{d.hour_label}</p>
         <div className="space-y-0.5">
-          <p className="text-xs text-gray-600">
+          <p className="text-xs text-text-secondary">
             Revenue: <span className="font-medium text-green-600">{formatRevenue(d.revenue_paise)}</span>
           </p>
-          <p className="text-xs text-gray-600">
+          <p className="text-xs text-text-secondary">
             Bills: <span className="font-medium">{d.bills_count}</span>
           </p>
-          <p className="text-xs text-gray-600">
+          <p className="text-xs text-text-secondary">
             Services: <span className="font-medium">{d.services_count}</span>
           </p>
         </div>
@@ -124,8 +124,8 @@ export function HourlyTrendChart({ data, peakHour }: HourlyTrendChartProps) {
       </ResponsiveContainer>
       {peakHourInView && (
         <div className="mt-2 text-center">
-          <p className="text-xs text-gray-500">
-            Peak hour: <span className="font-semibold text-gray-900">{formatHour12(peakHour!)}</span>
+          <p className="text-xs text-text-muted">
+            Peak hour: <span className="font-semibold text-text-primary">{formatHour12(peakHour!)}</span>
           </p>
         </div>
       )}

@@ -17,13 +17,13 @@ export function TrendIndicator({ value, label, className = '' }: TrendIndicatorP
     ? 'text-green-600'
     : isNegative
     ? 'text-red-600'
-    : 'text-gray-500';
+    : 'text-text-muted';
 
   const bgClass = isPositive
     ? 'bg-green-50'
     : isNegative
     ? 'bg-red-50'
-    : 'bg-gray-50';
+    : 'bg-surface-page';
 
   const Icon = isPositive ? ArrowUp : isNegative ? ArrowDown : Minus;
 

@@ -489,10 +489,10 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
             <div className="rounded-full bg-green-100 p-3 mb-3">
               <CheckCircle2 className="h-10 w-10 sm:h-12 sm:w-12 text-green-600" />
             </div>
-            <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-1">
+            <h3 className="text-lg sm:text-xl font-semibold text-text-primary mb-1">
               Payment Received!
             </h3>
-            <p className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">
+            <p className="text-2xl sm:text-3xl font-bold text-text-primary mb-3">
               {formatPrice(successData?.paid ?? total)}
             </p>
             {successData && successData.paid < successData.total && (
@@ -501,7 +501,7 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
               </p>
             )}
             {paymentMethod === 'cash' && (successData?.change ?? changeAmount) > 0 && (
-              <p className="text-gray-600 mb-4">
+              <p className="text-text-secondary mb-4">
                 Change: <span className="font-semibold">₹{(successData?.change ?? changeAmount).toFixed(2)}</span>
               </p>
             )}
@@ -630,24 +630,24 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
             )}
 
             {/* Amount Information */}
-            <div className="bg-gray-50 rounded-lg p-3">
+            <div className="bg-surface-page rounded-lg p-3">
               <div className="flex justify-between items-end mb-2">
-                 <span className="text-sm text-gray-600">Total Amount</span>
-                 <span className="text-lg font-bold text-gray-900">{formatPrice(total)}</span>
+                 <span className="text-sm text-text-secondary">Total Amount</span>
+                 <span className="text-lg font-bold text-text-primary">{formatPrice(total)}</span>
               </div>
 
               {payments.length > 0 && (
-                  <div className="space-y-1 mb-2 pt-2 border-t border-gray-200">
+                  <div className="space-y-1 mb-2 pt-2 border-t border-border-default">
                       {payments.map((p) => (
                           <div key={p.id} className="flex items-center justify-between text-sm">
-                              <span className="text-gray-500 capitalize">{p.method}</span>
+                              <span className="text-text-muted capitalize">{p.method}</span>
                               <div className="flex items-center gap-1.5">
                                 <span className="text-green-600 font-medium">-{formatPrice(p.amount * 100)}</span>
                                 <button
                                   type="button"
                                   onClick={() => handleRemovePayment(p.id)}
                                   disabled={isDeletingPayment === p.id || status === 'processing'}
-                                  className="text-gray-400 hover:text-red-500 transition-colors disabled:opacity-50 p-0.5 rounded"
+                                  className="text-text-disabled hover:text-red-500 transition-colors disabled:opacity-50 p-0.5 rounded"
                                   title="Remove payment"
                                 >
                                   {isDeletingPayment === p.id ? (
@@ -662,8 +662,8 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
                   </div>
               )}
 
-              <div className="flex justify-between items-end pt-2 border-t border-gray-200">
-                 <span className="text-base font-medium text-gray-900">Remaining</span>
+              <div className="flex justify-between items-end pt-2 border-t border-border-default">
+                 <span className="text-base font-medium text-text-primary">Remaining</span>
                  <span className="text-xl sm:text-2xl font-bold text-primary">{formatPrice(remainingPaise)}</span>
               </div>
             </div>

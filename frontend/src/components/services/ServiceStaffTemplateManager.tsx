@@ -238,12 +238,12 @@ export const ServiceStaffTemplateManager: React.FC<ServiceStaffTemplateManagerPr
         <DialogBody className="space-y-4">
           {/* Existing Templates */}
           {isLoading ? (
-            <div className="text-center py-8 text-gray-500">Loading roles...</div>
+            <div className="text-center py-8 text-text-muted">Loading roles...</div>
           ) : templates.length === 0 && !editingTemplate ? (
             <div className="text-center py-8 border-2 border-dashed rounded-lg">
-              <Users className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-              <p className="text-gray-500 mb-4">No staff roles configured yet</p>
-              <p className="text-sm text-gray-400 mb-4">
+              <Users className="h-12 w-12 text-text-disabled mx-auto mb-3" />
+              <p className="text-text-muted mb-4">No staff roles configured yet</p>
+              <p className="text-sm text-text-disabled mb-4">
                 This service will use single-staff assignment at checkout.
                 <br />
                 Add roles to enable multi-staff team assignment.
@@ -260,18 +260,18 @@ export const ServiceStaffTemplateManager: React.FC<ServiceStaffTemplateManagerPr
                 .map((template, index) => (
                   <div
                     key={template.id}
-                    className="border rounded-lg p-4 hover:border-gray-400 transition-colors"
+                    className="border rounded-lg p-4 hover:border-border-strong transition-colors"
                   >
                     <div className="flex items-start gap-3">
-                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 text-gray-600 font-semibold flex-shrink-0">
+                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-surface-row-hover text-text-secondary font-semibold flex-shrink-0">
                         {index + 1}
                       </div>
                       <div className="flex-1">
                         <div className="flex items-start justify-between mb-2">
                           <div>
-                            <h4 className="font-semibold text-gray-900">{template.role_name}</h4>
+                            <h4 className="font-semibold text-text-primary">{template.role_name}</h4>
                             {template.role_description && (
-                              <p className="text-sm text-gray-500 mt-1">
+                              <p className="text-sm text-text-muted mt-1">
                                 {template.role_description}
                               </p>
                             )}
@@ -449,7 +449,7 @@ export const ServiceStaffTemplateManager: React.FC<ServiceStaffTemplateManagerPr
                     }
                     min="1"
                   />
-                  <p className="text-xs text-gray-500 mt-1">Order of execution (1, 2, 3...)</p>
+                  <p className="text-xs text-text-muted mt-1">Order of execution (1, 2, 3...)</p>
                 </div>
 
                 {/* Is Required */}

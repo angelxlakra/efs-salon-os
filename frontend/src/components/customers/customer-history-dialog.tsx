@@ -110,17 +110,17 @@ export function CustomerHistoryDialog({ open, onClose, customerId, customerName 
         <DialogHeader>
           <DialogTitle>Visit History — {customerName}</DialogTitle>
           {data && (
-            <p className="text-sm text-gray-500">{data.total} visit{data.total !== 1 ? 's' : ''} on record</p>
+            <p className="text-sm text-text-muted">{data.total} visit{data.total !== 1 ? 's' : ''} on record</p>
           )}
         </DialogHeader>
 
         <DialogBody className="max-h-[60vh] overflow-y-auto pr-1">
           {isLoading && !data ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+              <Loader2 className="h-6 w-6 animate-spin text-text-disabled" />
             </div>
           ) : data?.items.length === 0 ? (
-            <p className="text-sm text-gray-500 py-8 text-center">
+            <p className="text-sm text-text-muted py-8 text-center">
               No visits found for this customer.
             </p>
           ) : (
@@ -131,21 +131,21 @@ export function CustomerHistoryDialog({ open, onClose, customerId, customerName 
                   <div key={bill.id} className="border rounded-lg overflow-hidden">
                     {/* Bill header row — clickable to expand */}
                     <button
-                      className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors text-left"
+                      className="w-full flex items-center justify-between px-4 py-3 hover:bg-surface-row-hover transition-colors text-left"
                       onClick={() => toggleBill(bill.id)}
                     >
                       <div className="flex items-center gap-2">
                         {expanded ? (
-                          <ChevronDown className="h-4 w-4 text-gray-400 shrink-0" />
+                          <ChevronDown className="h-4 w-4 text-text-disabled shrink-0" />
                         ) : (
-                          <ChevronRight className="h-4 w-4 text-gray-400 shrink-0" />
+                          <ChevronRight className="h-4 w-4 text-text-disabled shrink-0" />
                         )}
                         <div>
-                          <span className="font-medium text-sm text-gray-900">
+                          <span className="font-medium text-sm text-text-primary">
                             {formatDate(bill.posted_at)}
                           </span>
                           {bill.invoice_number && (
-                            <span className="text-xs text-gray-400 ml-2">
+                            <span className="text-xs text-text-disabled ml-2">
                               {bill.invoice_number}
                             </span>
                           )}
@@ -165,24 +165,24 @@ export function CustomerHistoryDialog({ open, onClose, customerId, customerName 
 
                     {/* Expanded items list */}
                     {expanded && (
-                      <div className="border-t divide-y bg-gray-50">
+                      <div className="border-t divide-y bg-surface-page">
                         {bill.items.map((item, idx) => (
                           <div
                             key={idx}
                             className="px-4 py-2 flex items-center justify-between text-sm"
                           >
                             <div>
-                              <span className="text-gray-900">{item.item_name}</span>
+                              <span className="text-text-primary">{item.item_name}</span>
                               {item.quantity > 1 && (
-                                <span className="text-gray-400 ml-1">×{item.quantity}</span>
+                                <span className="text-text-disabled ml-1">×{item.quantity}</span>
                               )}
                               {item.staff_name && (
-                                <span className="block text-xs text-gray-400 mt-0.5">
+                                <span className="block text-xs text-text-disabled mt-0.5">
                                   by {item.staff_name}
                                 </span>
                               )}
                             </div>
-                            <span className="text-gray-700 ml-4 shrink-0">
+                            <span className="text-text-secondary ml-4 shrink-0">
                               {formatPrice(item.line_total)}
                             </span>
                           </div>
@@ -196,7 +196,7 @@ export function CustomerHistoryDialog({ open, onClose, customerId, customerName 
               {/* Pagination */}
               {data && data.pages > 1 && (
                 <div className="flex items-center justify-between pt-2">
-                  <span className="text-xs text-gray-500">{data.total} visits total</span>
+                  <span className="text-xs text-text-muted">{data.total} visits total</span>
                   <div className="flex items-center gap-2">
                     <Button
                       variant="outline"
@@ -206,7 +206,7 @@ export function CustomerHistoryDialog({ open, onClose, customerId, customerName 
                     >
                       Previous
                     </Button>
-                    <span className="text-xs text-gray-500 px-1">
+                    <span className="text-xs text-text-muted px-1">
                       {page} / {data.pages}
                     </span>
                     <Button

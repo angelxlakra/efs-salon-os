@@ -37,7 +37,7 @@ export const ServiceStaffTemplatesList: React.FC<ServiceStaffTemplatesProps> = (
 
   if (compact) {
     return (
-      <div className="text-sm text-gray-600">
+      <div className="text-sm text-text-secondary">
         <span className="font-medium">Requires {templates.length} staff:</span>
         {sortedTemplates.map((template, index) => (
           <span key={template.id}>
@@ -82,7 +82,7 @@ export const ServiceStaffTemplatesList: React.FC<ServiceStaffTemplatesProps> = (
                   <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-sm font-medium">
                     {template.sequence_order}
                   </span>
-                  <span className="font-medium text-gray-900">
+                  <span className="font-medium text-text-primary">
                     {template.role_name}
                   </span>
                   {template.is_required && (
@@ -93,7 +93,7 @@ export const ServiceStaffTemplatesList: React.FC<ServiceStaffTemplatesProps> = (
                 </div>
 
                 {template.role_description && (
-                  <p className="text-sm text-gray-600 mt-1 ml-8">
+                  <p className="text-sm text-text-secondary mt-1 ml-8">
                     {template.role_description}
                   </p>
                 )}
@@ -104,7 +104,7 @@ export const ServiceStaffTemplatesList: React.FC<ServiceStaffTemplatesProps> = (
                   {getContributionDisplay(template)}
                 </div>
                 {showEstimates && (
-                  <div className="text-xs text-gray-500 mt-1">
+                  <div className="text-xs text-text-muted mt-1">
                     ~{template.estimated_duration_minutes} min
                   </div>
                 )}
@@ -114,7 +114,7 @@ export const ServiceStaffTemplatesList: React.FC<ServiceStaffTemplatesProps> = (
         ))}
       </div>
 
-      <div className="mt-3 text-xs text-gray-600 flex items-center gap-1">
+      <div className="mt-3 text-xs text-text-secondary flex items-center gap-1">
         <svg
           className="w-4 h-4"
           fill="none"

@@ -88,7 +88,7 @@ export function PendingPaymentHistory({
       case 'card':
         return 'bg-blue-100 text-blue-800';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-surface-row-hover text-text-secondary';
     }
   };
 
@@ -103,11 +103,11 @@ export function PendingPaymentHistory({
         <DialogBody className="space-y-4">
           {isLoading ? (
             <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+              <Loader2 className="h-6 w-6 animate-spin text-text-disabled" />
             </div>
           ) : collections.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              <ArrowDownCircle className="h-12 w-12 mx-auto mb-2 text-gray-300" />
+            <div className="text-center py-8 text-text-muted">
+              <ArrowDownCircle className="h-12 w-12 mx-auto mb-2 text-text-disabled" />
               <p>No payment collection history</p>
             </div>
           ) : (
@@ -115,7 +115,7 @@ export function PendingPaymentHistory({
               {collections.map((collection) => (
                 <div
                   key={collection.id}
-                  className="border rounded-lg p-4 hover:bg-gray-50 transition-colors"
+                  className="border rounded-lg p-4 hover:bg-surface-row-hover transition-colors"
                 >
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex-1">
@@ -130,12 +130,12 @@ export function PendingPaymentHistory({
                           {collection.payment_method.toUpperCase()}
                         </Badge>
                       </div>
-                      <p className="text-sm text-gray-600">
+                      <p className="text-sm text-text-secondary">
                         {formatDate(collection.collected_at)}
                       </p>
                     </div>
                     <div className="text-right">
-                      <div className="text-xs text-gray-500">Balance</div>
+                      <div className="text-xs text-text-muted">Balance</div>
                       <div className="text-sm">
                         <span className="text-red-600">{formatPrice(collection.previous_balance)}</span>
                         {' → '}
@@ -147,19 +147,19 @@ export function PendingPaymentHistory({
                   </div>
 
                   {collection.bill_id && (
-                    <div className="text-xs text-gray-500 mb-1">
+                    <div className="text-xs text-text-muted mb-1">
                       Via overpayment on bill
                     </div>
                   )}
 
                   {collection.reference_number && (
-                    <div className="text-xs text-gray-500 mb-1">
+                    <div className="text-xs text-text-muted mb-1">
                       Ref: {collection.reference_number}
                     </div>
                   )}
 
                   {collection.notes && (
-                    <div className="text-sm text-gray-600 mt-2 p-2 bg-gray-50 rounded">
+                    <div className="text-sm text-text-secondary mt-2 p-2 bg-surface-page rounded">
                       {collection.notes}
                     </div>
                   )}

@@ -88,7 +88,7 @@ export function ServiceHistoryDialog({ open, onClose, serviceId, serviceName }: 
         <DialogHeader>
           <DialogTitle>Service History — {serviceName}</DialogTitle>
           {data && (
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-text-muted">
               Performed {data.total} time{data.total !== 1 ? 's' : ''}
             </p>
           )}
@@ -97,10 +97,10 @@ export function ServiceHistoryDialog({ open, onClose, serviceId, serviceName }: 
         <DialogBody className="max-h-[60vh] overflow-y-auto">
           {isLoading && !data ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+              <Loader2 className="h-6 w-6 animate-spin text-text-disabled" />
             </div>
           ) : data?.items.length === 0 ? (
-            <p className="text-sm text-gray-500 py-8 text-center">
+            <p className="text-sm text-text-muted py-8 text-center">
               This service hasn't been performed yet.
             </p>
           ) : (
@@ -108,32 +108,32 @@ export function ServiceHistoryDialog({ open, onClose, serviceId, serviceName }: 
               <table className="w-full text-sm">
                 <thead className="sticky top-0 bg-white border-b">
                   <tr>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-3 py-2 text-left text-xs font-medium text-text-muted uppercase tracking-wider">
                       Date
                     </th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-3 py-2 text-left text-xs font-medium text-text-muted uppercase tracking-wider">
                       Customer
                     </th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-3 py-2 text-left text-xs font-medium text-text-muted uppercase tracking-wider">
                       Staff
                     </th>
-                    <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-3 py-2 text-right text-xs font-medium text-text-muted uppercase tracking-wider">
                       Price
                     </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
                   {data?.items.map((item, idx) => (
-                    <tr key={`${item.bill_id}-${idx}`} className="hover:bg-gray-50">
+                    <tr key={`${item.bill_id}-${idx}`} className="hover:bg-surface-page">
                       <td className="px-3 py-2 whitespace-nowrap">
-                        <span className="text-gray-700">{formatDate(item.posted_at)}</span>
+                        <span className="text-text-secondary">{formatDate(item.posted_at)}</span>
                         {item.invoice_number && (
-                          <span className="block text-xs text-gray-400">
+                          <span className="block text-xs text-text-disabled">
                             {item.invoice_number}
                           </span>
                         )}
                       </td>
-                      <td className="px-3 py-2 text-gray-900">{item.customer_name}</td>
+                      <td className="px-3 py-2 text-text-primary">{item.customer_name}</td>
                       <td className="px-3 py-2">
                         {item.has_multi_staff ? (
                           <Badge variant="secondary" className="text-xs">
@@ -141,12 +141,12 @@ export function ServiceHistoryDialog({ open, onClose, serviceId, serviceName }: 
                             Multiple
                           </Badge>
                         ) : item.staff_name ? (
-                          <span className="text-gray-700">{item.staff_name}</span>
+                          <span className="text-text-secondary">{item.staff_name}</span>
                         ) : (
-                          <span className="text-gray-400">—</span>
+                          <span className="text-text-disabled">—</span>
                         )}
                       </td>
-                      <td className="px-3 py-2 text-right font-medium text-gray-900">
+                      <td className="px-3 py-2 text-right font-medium text-text-primary">
                         {formatPrice(item.price_paid)}
                       </td>
                     </tr>
@@ -157,7 +157,7 @@ export function ServiceHistoryDialog({ open, onClose, serviceId, serviceName }: 
               {/* Pagination */}
               {data && data.pages > 1 && (
                 <div className="flex items-center justify-between px-3 py-3 border-t mt-2">
-                  <span className="text-xs text-gray-500">{data.total} records</span>
+                  <span className="text-xs text-text-muted">{data.total} records</span>
                   <div className="flex items-center gap-2">
                     <Button
                       variant="outline"
@@ -167,7 +167,7 @@ export function ServiceHistoryDialog({ open, onClose, serviceId, serviceName }: 
                     >
                       Previous
                     </Button>
-                    <span className="text-xs text-gray-500 px-1">
+                    <span className="text-xs text-text-muted px-1">
                       {page} / {data.pages}
                     </span>
                     <Button

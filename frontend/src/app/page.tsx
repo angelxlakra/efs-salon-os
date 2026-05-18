@@ -39,22 +39,22 @@ export default function HomePage() {
       <div className="card-salon max-w-[448px] w-full text-center space-y-6">
         <div className="flex justify-center mb-4">
           <Image
-            src="/logo-black.svg"
+            src="/logo-navy.svg"
             alt="Logo"
             width={64}
             height={64}
             className="object-contain"
           />
         </div>
-        <h1 className="text-4xl font-bold text-gray-900">
+        <h1 className="text-4xl font-bold text-text-primary">
           {settings?.salon_name || 'Salon Management'}
         </h1>
-        <p className="text-lg text-gray-600">
+        <p className="text-lg text-text-secondary">
           {settings?.salon_tagline || 'Professional Salon Management System'}
         </p>
         <div className="pt-4">
           <div className="animate-pulse">
-            <div className="h-12 w-32 bg-gray-200 rounded-lg mx-auto"></div>
+            <div className="h-12 w-32 bg-border-subtle rounded-lg mx-auto"></div>
           </div>
         </div>
       </div>

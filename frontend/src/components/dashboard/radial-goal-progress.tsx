@@ -29,7 +29,7 @@ export function RadialGoalProgress({
 
   return (
     <div className="flex flex-col items-center">
-      <h4 className="text-sm font-medium text-gray-700 mb-2">{title}</h4>
+      <h4 className="text-sm font-medium text-text-secondary mb-2">{title}</h4>
       <div className="relative w-32 h-32">
         <ResponsiveContainer width="100%" height="100%">
           <RadialBarChart
@@ -65,14 +65,14 @@ export function RadialGoalProgress({
         </ResponsiveContainer>
         {/* Center text */}
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <div className="text-2xl font-bold text-gray-900">{percentage}%</div>
-          <div className="text-[10px] text-gray-500 mt-0.5">complete</div>
+          <div className="text-2xl font-bold text-text-primary">{percentage}%</div>
+          <div className="text-[10px] text-text-muted mt-0.5">complete</div>
         </div>
       </div>
       <div className="mt-2 text-center">
-        <div className="text-xs text-gray-600">
+        <div className="text-xs text-text-secondary">
           <span className="font-semibold">{formatter(current)}</span>
-          <span className="text-gray-400"> / </span>
+          <span className="text-text-disabled"> / </span>
           <span>{formatter(target)}</span>
         </div>
       </div>

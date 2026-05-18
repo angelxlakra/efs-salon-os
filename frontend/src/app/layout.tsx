@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
-import { Toaster } from 'sonner';
+import { Toaster } from '@/components/ui/sonner';
 
-import { ThemeInit } from '@/components/theme-init';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -9,7 +8,7 @@ export const metadata: Metadata = {
   description: 'Local-first salon POS, scheduling, inventory, and accounting system',
   icons: {
     icon: '/favicon.svg',
-    apple: '/logo-black.svg',
+    apple: '/logo-navy.svg',
   },
 };
 
@@ -19,14 +18,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet" />
-      </head>
+    <html lang="en" data-theme="light" suppressHydrationWarning>
       <body className="antialiased font-sans">
-        <ThemeInit />
         {children}
         <Toaster position="top-right" />
       </body>

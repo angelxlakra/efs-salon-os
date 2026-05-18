@@ -1,0 +1,148 @@
+/* ────────────────────────────────────────────────────────────────
+   SalonOS design tokens — V2
+   Single source of truth. Do not add raw hex literals anywhere
+   else in the codebase. Lint enforces this.
+   ──────────────────────────────────────────────────────────────── */
+
+:root {
+  /* Surface */
+  --surface-page:       #f8f5f0;
+  --surface-card:       #ffffff;
+  --surface-row:        #ffffff;
+  --surface-row-hover:  #f5f5f4;
+  --surface-sidebar:    #f8f7f5;
+  --surface-overlay:    rgba(20, 14, 10, 0.48);
+
+  /* Border */
+  --border-subtle:      #eeece9;
+  --border-default:     #e3e0db;
+  --border-strong:      #cfcac3;
+  --border-focus:       #1c104c;
+
+  /* Text */
+  --text-primary:       #1c1917;
+  --text-secondary:     #44403c;
+  --text-muted:         #8b6b4a; /* walnut */
+  --text-disabled:      #a8a29e;
+  --text-inverse:       #ffffff;
+
+  /* Accent — Navy */
+  --accent-default:     #1c104c;
+  --accent-hover:       #2a1865;
+  --accent-active:      #1a0e40;
+  --accent-bg-soft:     #ece8f5;
+  --accent-fg:          #f5f0e8;
+
+  /* Gold — secondary accent */
+  --gold-default:       #c9a96e;
+  --gold-hover:         #b8945a;
+  --gold-soft:          #f5ecd9;
+  --gold-fg:            #1c104c;
+
+  /* Semantic */
+  --success-fg:         #166534;
+  --success-bg-soft:    #dcfce7;
+  --success-border:     #bbf7d0;
+
+  --warning-fg:         #92400e;
+  --warning-bg-soft:    #fef3c7;
+  --warning-border:     #fde68a;
+
+  --danger-fg:          #991b1b;
+  --danger-bg-soft:     #fee2e2;
+  --danger-border:      #fecaca;
+
+  --info-fg:            #1e40af;
+  --info-bg-soft:       #dbeafe;
+  --info-border:        #bfdbfe;
+
+  /* Data viz */
+  --data-series-1:      #1c104c;
+  --data-series-2:      #1e40af;
+  --data-series-3:      #166534;
+  --data-series-4:      #92400e;
+  --data-series-5:      #6b21a8;
+  --data-series-6:      #0e7490;
+
+  /* Radius */
+  --radius-sm:          4px;
+  --radius-md:          6px;
+  --radius-lg:          10px;
+  --radius-xl:          14px;
+  --radius-full:        9999px;
+
+  /* Shadow */
+  --shadow-xs:          0 1px 2px rgba(20, 14, 10, 0.06);
+  --shadow-sm:          0 2px 4px rgba(20, 14, 10, 0.06), 0 1px 2px rgba(20, 14, 10, 0.04);
+  --shadow-md:          0 8px 20px rgba(20, 14, 10, 0.10), 0 2px 6px rgba(20, 14, 10, 0.06);
+  --shadow-focus:       0 0 0 3px rgba(28, 16, 76, 0.18);
+
+  /* Motion */
+  --motion-fast:        80ms;
+  --motion-default:     120ms;
+  --motion-slow:        180ms;
+  --motion-spring:      cubic-bezier(0.22, 1.2, 0.36, 1);
+  --motion-ease-out:    cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+[data-theme="dark"] {
+  --surface-page:       #14120f;
+  --surface-card:       #1c1a17;
+  --surface-row:        #1f1d1a;
+  --surface-row-hover:  #26231f;
+  --surface-sidebar:    #0f0e0c;
+  --surface-overlay:    rgba(0, 0, 0, 0.6);
+
+  --border-subtle:      #2a2723;
+  --border-default:     #3a3631;
+  --border-strong:      #504a42;
+  --border-focus:       #c9a96e;
+
+  --text-primary:       #f5f2ee;
+  --text-secondary:     #c9c2b8;
+  --text-muted:         #948b7e;
+  --text-disabled:      #5a5249;
+  --text-inverse:       #1c1917;
+
+  --accent-default:     #c9a96e; /* gold on dark — navy would vanish against charcoal */
+  --accent-hover:       #d4b87a;
+  --accent-active:      #dfc48a;
+  --accent-bg-soft:     #2a1d0a;
+  --accent-fg:          #1c1917;
+
+  --success-fg:         #86efac;
+  --success-bg-soft:    #14321f;
+  --success-border:     #1f4a2d;
+
+  --warning-fg:         #fcd34d;
+  --warning-bg-soft:    #3b2a10;
+  --warning-border:     #5a4018;
+
+  --danger-fg:          #fca5a5;
+  --danger-bg-soft:     #3b1616;
+  --danger-border:      #5a2020;
+
+  --info-fg:            #93c5fd;
+  --info-bg-soft:       #1e2a4a;
+  --info-border:        #2a3d6e;
+
+  --data-series-1:      #c9a96e;
+  --data-series-2:      #7aa0e8;
+  --data-series-3:      #86efac;
+  --data-series-4:      #fcd34d;
+  --data-series-5:      #c084fc;
+  --data-series-6:      #5eead4;
+
+  --shadow-xs:          0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-sm:          0 2px 4px rgba(0, 0, 0, 0.35), 0 1px 2px rgba(0, 0, 0, 0.25);
+  --shadow-md:          0 8px 20px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.3);
+  --shadow-focus:       0 0 0 3px rgba(201, 169, 110, 0.28);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-fast: 0ms;
+    --motion-default: 0ms;
+    --motion-slow: 0ms;
+  }
+}

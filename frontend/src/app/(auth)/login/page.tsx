@@ -13,7 +13,7 @@ import { AlertCircle, Loader2 } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, user, isLoading } = useAuthStore();
+  const { login, isLoading } = useAuthStore();
   const { settings, fetchSettings } = useSettingsStore();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -32,10 +32,7 @@ export default function LoginPage() {
     try {
       await login({ username, password });
 
-      // Get the user from the store after login
       const currentUser = useAuthStore.getState().user;
-
-      // Redirect staff to their My Services page
       if (currentUser?.role === 'staff') {
         router.push('/dashboard/staff');
       } else {
@@ -47,64 +44,73 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen w-full flex font-sans bg-white">
-      {/* Left Column - Branding (Visual) - 50% width */}
-      <div className="hidden lg:flex w-1/2 bg-black relative flex-col justify-between p-16 text-white">
-        {/* Background Pattern */}
-        <div 
-          className="absolute inset-0 z-0 opacity-40"
-          style={{ 
-            backgroundImage: 'url("https://images.unsplash.com/photo-1633681926022-84c23e8cb2d6?q=80&w=2574&auto=format&fit=crop")',
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            filter: 'grayscale(100%) contrast(120%)'
+    <div className="min-h-screen w-full flex font-sans">
+      {/* Left Column — Brand panel */}
+      <div
+        className="hidden lg:flex w-1/2 relative flex-col justify-between p-16 text-white overflow-hidden"
+        style={{ background: 'linear-gradient(135deg, #1c104c 0%, #0e0828 100%)' }}
+      >
+        {/* Subtle dot-grid texture */}
+        <div
+          className="absolute inset-0 opacity-[0.04]"
+          style={{
+            backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)',
+            backgroundSize: '28px 28px',
           }}
         />
-        <div className="absolute inset-0 z-0 bg-gradient-to-br from-black/90 via-black/50 to-transparent" />
+        {/* Gold accent rule at top edge */}
+        <div className="absolute top-0 left-0 right-0 h-0.5" style={{ background: 'var(--gold-default)' }} />
 
-        {/* Content */}
+        {/* Wordmark */}
         <div className="relative z-10">
-          <div className="flex items-center gap-3 mb-12">
-            <div className="h-10 w-10 bg-white rounded-lg flex items-center justify-center overflow-hidden">
-              <Image
-                src="/logo-black.svg"
-                alt="Logo"
-                width={40}
-                height={40}
-                className="object-contain"
-              />
-            </div>
-            <span className="text-2xl font-bold tracking-tight">
-              {settings?.salon_name || 'Salon'}
-            </span>
+          <div className="mb-16">
+            <Image
+              src="/wordmark-gold.svg"
+              alt={settings?.salon_name || 'Elegance'}
+              width={160}
+              height={160}
+              className="object-contain"
+            />
           </div>
 
-          <h1 className="text-6xl font-extrabold tracking-tight leading-tight max-w-[768px] mb-8" style={{ fontFamily: 'var(--font-heading)' }}>
-            {settings?.salon_tagline || 'The Operating System for Modern Salons.'}
+          <h1
+            className="text-5xl font-light leading-snug tracking-tight mb-5"
+            style={{ color: 'var(--accent-fg)', fontFamily: 'var(--font-display)' }}
+          >
+            The quiet system<br />behind elegant service.
           </h1>
-          <p className="text-2xl text-gray-300 font-light leading-relaxed">
-            Manage appointments, inventory, and point-of-sale in one unified, beautiful interface. Designed for speed and elegance.
+          <p className="text-sm font-light leading-relaxed" style={{ color: 'rgba(245, 240, 232, 0.55)' }}>
+            Everything your salon needs. Nothing it doesn&apos;t.
           </p>
         </div>
 
-        <div className="relative z-10">
-           <div className="flex gap-8 text-sm font-medium text-gray-400 uppercase tracking-widest">
-             <span>Speed</span>
-             <span>Security</span>
-             <span>Simplicity</span>
-           </div>
+        {/* Footer — brand values */}
+        <div className="relative z-10 flex items-center gap-3 text-xs font-medium uppercase tracking-widest" style={{ color: 'var(--gold-default)' }}>
+          <span>Speed</span>
+          <span className="opacity-40">·</span>
+          <span>Care</span>
+          <span className="opacity-40">·</span>
+          <span>Family</span>
         </div>
       </div>
 
-      {/* Right Column - Login Form - 50% width */}
-      <div className="flex-1 flex flex-col justify-center px-12 lg:px-24 xl:px-32 bg-white text-gray-900">
-        <div className="w-full">
-           <div className="mb-10">
-             <h2 className="text-4xl font-bold tracking-tight text-gray-900 mb-3" style={{ fontFamily: 'var(--font-heading)' }}>Welcome back</h2>
-             <p className="text-xl text-gray-500">Please enter your details to sign in.</p>
-           </div>
+      {/* Right Column — Login form */}
+      <div className="flex-1 flex flex-col justify-center px-8 sm:px-12 lg:px-20 xl:px-28 bg-white text-text-primary border-l-2 border-gold">
+        <div className="w-full max-w-md mx-auto">
+          {/* Mobile-only logo */}
+          <div className="lg:hidden mb-10 flex items-center gap-2">
+            <div className="h-8 w-8 rounded-md flex items-center justify-center overflow-hidden flex-shrink-0" style={{ background: 'var(--accent-default)' }}>
+              <Image src="/logo-white.svg" alt="Logo" width={32} height={32} className="object-contain" />
+            </div>
+            <span className="text-base font-semibold">{settings?.salon_name || 'Elegance'}</span>
+          </div>
 
-           <form onSubmit={handleSubmit} className="space-y-8">
+          <div className="mb-8">
+            <h2 className="text-2xl font-semibold tracking-tight text-text-primary mb-1">Welcome back</h2>
+            <p className="text-sm text-text-muted">Sign in to continue to your dashboard.</p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-5">
             {error && (
               <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
@@ -112,9 +118,9 @@ export default function LoginPage() {
               </Alert>
             )}
 
-            <div className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="username" className="text-base font-semibold text-gray-900">Email or Username</Label>
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="username" className="text-sm font-medium">Username</Label>
                 <Input
                   id="username"
                   type="text"
@@ -123,15 +129,12 @@ export default function LoginPage() {
                   onChange={(e) => setUsername(e.target.value)}
                   required
                   autoFocus
-                  className="h-14 px-4 text-lg bg-gray-50 border-gray-200 focus:border-black focus:ring-black rounded-xl"
+                  className="h-11 px-4"
                 />
               </div>
 
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="password" className="text-base font-semibold text-gray-900">Password</Label>
-                  <a href="#" className="text-sm font-medium text-gray-600 hover:text-black">Forgot password?</a>
-                </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="password" className="text-sm font-medium">Password</Label>
                 <Input
                   id="password"
                   type="password"
@@ -139,27 +142,30 @@ export default function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  className="h-14 px-4 text-lg bg-gray-50 border-gray-200 focus:border-black focus:ring-black rounded-xl"
+                  className="h-11 px-4"
                 />
               </div>
             </div>
 
-            <Button 
-              type="submit" 
-              className="w-full h-14 text-lg font-bold bg-black text-white hover:bg-gray-800 rounded-xl transition-all shadow-xl hover:shadow-2xl hover:-translate-y-1" 
+            <Button
+              type="submit"
+              className="w-full h-11 font-semibold"
               disabled={isLoading}
             >
               {isLoading ? (
                 <div className="flex items-center gap-2">
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                  <span>Signing in...</span>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Signing in…</span>
                 </div>
-              ) : 'Sign in to Account'}
+              ) : 'Sign in'}
             </Button>
           </form>
 
-          <p className="mt-10 text-center text-gray-500">
-            Don't have an account? <a href="#" className="font-semibold text-black hover:underline">Contact Owner</a>
+          <p className="mt-8 text-center text-sm text-text-muted">
+            Need access?{' '}
+            <a href="#" className="font-semibold text-accent hover:underline">
+              Contact your owner
+            </a>
           </p>
         </div>
       </div>

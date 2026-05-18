@@ -436,8 +436,8 @@ export function ServiceGrid({ searchInputRef, hideStaffSelection = false, onServ
     return (
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-gray-400 mx-auto mb-2" />
-          <p className="text-sm text-gray-500">Loading services...</p>
+          <Loader2 className="h-8 w-8 animate-spin text-text-disabled mx-auto mb-2" />
+          <p className="text-sm text-text-muted">Loading services...</p>
         </div>
       </div>
     );
@@ -449,7 +449,7 @@ export function ServiceGrid({ searchInputRef, hideStaffSelection = false, onServ
       <div className="mb-4 space-y-3">
         {/* Search */}
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-text-disabled" />
           <Input
             ref={searchInputRef}
             type="text"
@@ -481,7 +481,7 @@ export function ServiceGrid({ searchInputRef, hideStaffSelection = false, onServ
         {filteredServices.length === 0 ? (
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
-              <p className="text-gray-500">No services found</p>
+              <p className="text-text-muted">No services found</p>
               {searchQuery && (
                 <Button
                   variant="link"
@@ -509,7 +509,7 @@ export function ServiceGrid({ searchInputRef, hideStaffSelection = false, onServ
                       ? 'border-black shadow-lg col-span-2 lg:col-span-3'
                       : isInCart
                       ? 'border-green-500 shadow-md'
-                      : 'border-gray-200'
+                      : 'border-border-default'
                   }`}
                 >
                   {/* Service Card */}
@@ -537,18 +537,18 @@ export function ServiceGrid({ searchInputRef, hideStaffSelection = false, onServ
                     </div>
 
                     {/* Service Name */}
-                    <h3 className="font-semibold text-gray-900 mb-2">
+                    <h3 className="font-semibold text-text-primary mb-2">
                       {service.name}
                     </h3>
 
                     {/* Duration */}
-                    <p className="text-xs text-gray-500 mb-3">
+                    <p className="text-xs text-text-muted mb-3">
                       {service.duration_minutes} min
                     </p>
 
                     {/* Price and Add Button */}
                     <div className="flex items-center justify-between">
-                      <span className="text-lg font-bold text-gray-900">
+                      <span className="text-lg font-bold text-text-primary">
                         {formatPrice(service.base_price)}
                       </span>
                       <div className={`h-8 w-8 rounded-full bg-black flex items-center justify-center transition-opacity ${
@@ -561,18 +561,18 @@ export function ServiceGrid({ searchInputRef, hideStaffSelection = false, onServ
 
                   {/* Staff Selection - Inline */}
                   {isExpanded && !hideStaffSelection && (
-                    <div className="px-4 pb-4 border-t border-gray-100 pt-3">
+                    <div className="px-4 pb-4 border-t border-border-subtle pt-3">
                       {/* Check if this service has multi-staff templates */}
                       {serviceTemplates[service.id] && serviceTemplates[service.id].length > 0 ? (
                         // Multi-staff service with predefined roles
                         <div>
-                          <p className="text-sm font-medium text-gray-700 mb-3">
+                          <p className="text-sm font-medium text-text-secondary mb-3">
                             <User className="h-4 w-4 inline mr-1" />
                             Assign Staff to Roles
                           </p>
                           {isLoadingTemplates ? (
                             <div className="flex items-center justify-center py-4">
-                              <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+                              <Loader2 className="h-5 w-5 animate-spin text-text-disabled" />
                             </div>
                           ) : (
                             <StaffAssignmentSelector
@@ -591,17 +591,17 @@ export function ServiceGrid({ searchInputRef, hideStaffSelection = false, onServ
                       ) : (
                         // Regular single-staff service
                         <div>
-                          <p className="text-sm font-medium text-gray-700 mb-3">
+                          <p className="text-sm font-medium text-text-secondary mb-3">
                             <User className="h-4 w-4 inline mr-1" />
                             Select Staff Member
                           </p>
 
                           {isLoadingStaff || isLoadingTemplates ? (
                             <div className="flex items-center justify-center py-4">
-                              <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+                              <Loader2 className="h-5 w-5 animate-spin text-text-disabled" />
                             </div>
                           ) : staff.length === 0 ? (
-                            <div className="text-sm text-gray-500 py-2">
+                            <div className="text-sm text-text-muted py-2">
                               No active staff available
                             </div>
                           ) : (
@@ -617,7 +617,7 @@ export function ServiceGrid({ searchInputRef, hideStaffSelection = false, onServ
                                     )
                                   }
                                   title={getStaffBusynessText(staffMember)}
-                                  className="flex items-center justify-between gap-2 w-full px-2.5 py-2 bg-gray-50 hover:bg-black hover:text-white border border-gray-200 hover:border-black rounded-lg transition-all text-left"
+                                  className="flex items-center justify-between gap-2 w-full px-2.5 py-2 bg-surface-page hover:bg-black hover:text-white border border-border-default hover:border-black rounded-lg transition-all text-left"
                                 >
                                   <div className="flex items-center gap-1.5 min-w-0">
                                     <User className="h-3 w-3 flex-shrink-0" />
@@ -628,7 +628,7 @@ export function ServiceGrid({ searchInputRef, hideStaffSelection = false, onServ
                                   <div className="flex items-center gap-1.5 flex-shrink-0 text-xs">
                                     {staffMember.busyness && getStatusBadge(staffMember.busyness.status)}
                                     {staffMember.busyness && staffMember.busyness.total_wait_minutes > 0 && (
-                                      <span className="text-gray-500 flex items-center gap-0.5">
+                                      <span className="text-text-muted flex items-center gap-0.5">
                                         <Clock className="h-3 w-3" />
                                         {formatWaitTime(staffMember.busyness.total_wait_minutes)}
                                       </span>

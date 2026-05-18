@@ -162,7 +162,7 @@ export function CustomerSearch({ value, onChange, isOpen, onOpenChange }: Custom
                           <div className="font-medium truncate">
                             {titleCase(customer.first_name)} {titleCase(customer.last_name || '')}
                           </div>
-                          <div className="text-xs text-gray-500">
+                          <div className="text-xs text-text-muted">
                             {formatPhone(customer.phone)} • {customer.total_visits} visits
                           </div>
                           {customer.pending_balance > 0 && (
@@ -176,12 +176,12 @@ export function CustomerSearch({ value, onChange, isOpen, onOpenChange }: Custom
                   </CommandGroup>
                 )}
                 {search.length >= 2 && customers.length === 0 && (
-                  <div className="py-6 text-center text-sm text-gray-500">
+                  <div className="py-6 text-center text-sm text-text-muted">
                     No customers found
                   </div>
                 )}
                 {search.length > 0 && search.length < 2 && (
-                  <div className="py-6 text-center text-sm text-gray-500">
+                  <div className="py-6 text-center text-sm text-text-muted">
                     Type at least 2 characters to search
                   </div>
                 )}
