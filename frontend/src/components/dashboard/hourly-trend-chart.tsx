@@ -1,5 +1,6 @@
 'use client';
 
+import { useCallback } from 'react';
 import {
   AreaChart,
   Area,
@@ -10,6 +11,7 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from 'recharts';
+import type { TooltipContentProps } from 'recharts';
 import { useChartColors } from '@/lib/use-chart-colors';
 
 interface HourlyData {
@@ -33,6 +35,32 @@ function formatHour12(hour: number): string {
   return `${h}${ampm}`;
 }
 
+interface HourlyTooltipProps extends TooltipContentProps<number, string> {
+  formatRevenue: (v: number) => string;
+}
+
+function HourlyTooltip({ active, payload, formatRevenue }: HourlyTooltipProps) {
+  if (!active || !payload?.length) return null;
+  const d = payload[0].payload as HourlyData;
+  return (
+    <div className="bg-surface-card p-3 rounded-lg shadow-sm border border-border-default">
+      <p className="text-xs font-semibold text-text-primary mb-1">{d.hour_label}</p>
+      <div className="space-y-0.5">
+        <p className="text-xs text-text-secondary">
+          Revenue:{' '}
+          <span className="font-medium text-success-fg">{formatRevenue(d.revenue_paise)}</span>
+        </p>
+        <p className="text-xs text-text-secondary">
+          Bills: <span className="font-medium">{d.bills_count}</span>
+        </p>
+        <p className="text-xs text-text-secondary">
+          Services: <span className="font-medium">{d.services_count}</span>
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export function HourlyTrendChart({ data, peakHour }: HourlyTrendChartProps) {
   const colors = useChartColors();
 
@@ -40,7 +68,6 @@ export function HourlyTrendChart({ data, peakHour }: HourlyTrendChartProps) {
     `₹${(value / 100).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
 
   const currentHour = new Date().getHours();
-  const hasAnyRevenue = data.some(d => d.revenue_paise > 0);
   const visibleData = data.filter(d => {
     if (d.hour < SALON_OPEN_HOUR) return false;
     if (currentHour >= SALON_OPEN_HOUR && d.hour > currentHour) return false;
@@ -49,30 +76,11 @@ export function HourlyTrendChart({ data, peakHour }: HourlyTrendChartProps) {
 
   const displayData = visibleData.length > 0 ? visibleData : data;
 
-  // Suppress linter — hasAnyRevenue is intentionally unused (kept for future filter logic)
-  void hasAnyRevenue;
-
-  const CustomTooltip = ({ active, payload }: any) => {
-    if (!active || !payload?.length) return null;
-    const d = payload[0].payload;
-    return (
-      <div className="bg-surface-card p-3 rounded-lg shadow-sm border border-border-default">
-        <p className="text-xs font-semibold text-text-primary mb-1">{d.hour_label}</p>
-        <div className="space-y-0.5">
-          <p className="text-xs text-text-secondary">
-            Revenue:{' '}
-            <span className="font-medium text-success-fg">{formatRevenue(d.revenue_paise)}</span>
-          </p>
-          <p className="text-xs text-text-secondary">
-            Bills: <span className="font-medium">{d.bills_count}</span>
-          </p>
-          <p className="text-xs text-text-secondary">
-            Services: <span className="font-medium">{d.services_count}</span>
-          </p>
-        </div>
-      </div>
-    );
-  };
+  const tooltipContent = useCallback(
+    (props: TooltipContentProps<number, string>) =>
+      <HourlyTooltip {...props} formatRevenue={formatRevenue} />,
+    [formatRevenue]
+  );
 
   const revenueColor = colors.series[2]; // data-series-3 (green)
   const peakColor    = colors.series[3]; // data-series-4 (amber)
@@ -106,7 +114,7 @@ export function HourlyTrendChart({ data, peakHour }: HourlyTrendChartProps) {
             stroke={gridColor}
             width={50}
           />
-          <Tooltip content={<CustomTooltip />} />
+          <Tooltip content={tooltipContent} />
           {peakHourInView && (
             <ReferenceLine
               x={peakHour}

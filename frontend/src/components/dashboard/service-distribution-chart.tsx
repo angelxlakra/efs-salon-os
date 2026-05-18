@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
 } from 'recharts';
+import type { TooltipContentProps } from 'recharts';
 import { LayoutList, PieChart as PieIcon, BarChart2 } from 'lucide-react';
 import { useChartColors } from '@/lib/use-chart-colors';
 
@@ -20,6 +21,31 @@ interface ServiceDistributionChartProps {
 }
 
 type ViewMode = 'donut' | 'bar' | 'list';
+
+interface ServiceChartDatum {
+  name: string;
+  value: number;
+  count: number;
+  percentage: string;
+  fill: string;
+}
+
+interface ServiceTooltipProps extends TooltipContentProps<number, string> {
+  formatRevenue: (v: number) => string;
+}
+
+function ServiceTooltip({ active, payload, formatRevenue }: ServiceTooltipProps) {
+  if (!active || !payload?.length) return null;
+  const d = payload[0].payload as ServiceChartDatum;
+  return (
+    <div className="bg-surface-card p-3 rounded-lg shadow-lg border border-border-default text-xs">
+      <p className="font-semibold text-text-primary mb-1">{d.name}</p>
+      <p className="text-text-secondary">Revenue: <span className="font-medium">{formatRevenue(d.value)}</span></p>
+      <p className="text-text-secondary">Count: <span className="font-medium">{d.count}</span></p>
+      <p className="text-text-secondary">Share: <span className="font-medium">{d.percentage}%</span></p>
+    </div>
+  );
+}
 
 export function ServiceDistributionChart({
   services,
@@ -43,6 +69,12 @@ export function ServiceDistributionChart({
     percentage: total > 0 ? ((service.count / total) * 100).toFixed(1) : '0.0',
     fill: series[index % series.length],
   }));
+
+  const tooltipContent = useCallback(
+    (props: TooltipContentProps<number, string>) =>
+      <ServiceTooltip {...props} formatRevenue={formatRevenue} />,
+    [formatRevenue]
+  );
 
   if (services.length === 0) {
     return (
@@ -76,20 +108,6 @@ export function ServiceDistributionChart({
     </div>
   );
 
-  // ── Tooltip shared between donut & bar ───────────────────────────────────
-  const CustomTooltip = ({ active, payload }: any) => {
-    if (!active || !payload?.length) return null;
-    const d = payload[0].payload;
-    return (
-      <div className="bg-surface-card p-3 rounded-lg shadow-lg border border-border-default text-xs">
-        <p className="font-semibold text-text-primary mb-1">{d.name}</p>
-        <p className="text-text-secondary">Revenue: <span className="font-medium">{formatRevenue(d.value)}</span></p>
-        <p className="text-text-secondary">Count: <span className="font-medium">{d.count}</span></p>
-        <p className="text-text-secondary">Share: <span className="font-medium">{d.percentage}%</span></p>
-      </div>
-    );
-  };
-
   // ── Donut view ───────────────────────────────────────────────────────────
   if (view === 'donut') {
     return (
@@ -114,7 +132,7 @@ export function ServiceDistributionChart({
                   <Cell key={`cell-${index}`} fill={entry.fill} />
                 ))}
               </Pie>
-              <Tooltip content={<CustomTooltip />} />
+              <Tooltip content={tooltipContent} />
             </PieChart>
           </ResponsiveContainer>
 
@@ -164,7 +182,7 @@ export function ServiceDistributionChart({
                 tick={{ fontSize: 10 }}
                 tickFormatter={(v: string) => v.length > 12 ? v.slice(0, 12) + '…' : v}
               />
-              <Tooltip content={<CustomTooltip />} />
+              <Tooltip content={tooltipContent} />
               <Bar dataKey="value" radius={[0, 4, 4, 0]}>
                 {chartData.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={entry.fill} />
