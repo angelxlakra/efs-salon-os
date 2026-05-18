@@ -1,13 +1,15 @@
 'use client';
 
 import { RadialBarChart, RadialBar, ResponsiveContainer, PolarAngleAxis } from 'recharts';
+import { useChartColors } from '@/lib/use-chart-colors';
 
 interface RadialGoalProgressProps {
   title: string;
   current: number;
   target: number;
   formatter: (value: number) => string;
-  color?: string;
+  /** Index into the data-series palette (0–5). Default 0 = data-series-1 (navy). */
+  colorIndex?: number;
 }
 
 export function RadialGoalProgress({
@@ -15,17 +17,13 @@ export function RadialGoalProgress({
   current,
   target,
   formatter,
-  color = '#10b981', // green-500
+  colorIndex = 0,
 }: RadialGoalProgressProps) {
+  const { series } = useChartColors();
+  const color = series[colorIndex] ?? series[0];
   const percentage = Math.min(100, Math.round((current / target) * 100));
 
-  const data = [
-    {
-      name: title,
-      value: percentage,
-      fill: color,
-    },
-  ];
+  const data = [{ name: title, value: percentage, fill: color }];
 
   return (
     <div className="flex flex-col items-center">
@@ -42,28 +40,10 @@ export function RadialGoalProgress({
             startAngle={225}
             endAngle={-45}
           >
-            <PolarAngleAxis
-              type="number"
-              domain={[0, 100]}
-              angleAxisId={0}
-              tick={false}
-            />
-            <RadialBar
-              background
-              dataKey="value"
-              cornerRadius={10}
-              fill="url(#colorGradient)"
-            />
-            <defs>
-              <linearGradient id="colorGradient" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stopColor={color} stopOpacity={0.8} />
-                <stop offset="50%" stopColor={color} stopOpacity={0.9} />
-                <stop offset="100%" stopColor={color} stopOpacity={1} />
-              </linearGradient>
-            </defs>
+            <PolarAngleAxis type="number" domain={[0, 100]} angleAxisId={0} tick={false} />
+            <RadialBar background dataKey="value" cornerRadius={10} />
           </RadialBarChart>
         </ResponsiveContainer>
-        {/* Center text */}
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           <div className="text-2xl font-bold text-text-primary">{percentage}%</div>
           <div className="text-[10px] text-text-muted mt-0.5">complete</div>
@@ -98,19 +78,21 @@ export function DualRadialGoals({
 
   return (
     <div className="grid grid-cols-2 gap-4">
+      {/* colorIndex 2 = data-series-3 (green #166534) for revenue */}
       <RadialGoalProgress
         title="Revenue Target"
         current={currentRevenue}
         target={revenueTarget}
         formatter={formatRevenue}
-        color="#10b981"
+        colorIndex={2}
       />
+      {/* colorIndex 1 = data-series-2 (indigo #1e40af) for services */}
       <RadialGoalProgress
         title="Services Goal"
         current={currentServices}
         target={servicesTarget}
         formatter={formatServices}
-        color="#3b82f6"
+        colorIndex={1}
       />
     </div>
   );

@@ -6,6 +6,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
 } from 'recharts';
 import { LayoutList, PieChart as PieIcon, BarChart2 } from 'lucide-react';
+import { useChartColors } from '@/lib/use-chart-colors';
 
 interface ServiceData {
   service_name: string;
@@ -18,8 +19,6 @@ interface ServiceDistributionChartProps {
   totalServices: number;
 }
 
-const COLORS = ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444'];
-
 type ViewMode = 'donut' | 'bar' | 'list';
 
 export function ServiceDistributionChart({
@@ -27,6 +26,7 @@ export function ServiceDistributionChart({
   totalServices,
 }: ServiceDistributionChartProps) {
   const [view, setView] = useState<ViewMode>('donut');
+  const { series } = useChartColors();
 
   // Use services sum as fallback when totalServices is 0 to avoid Infinity%
   const total = totalServices > 0
@@ -41,7 +41,7 @@ export function ServiceDistributionChart({
     value: service.total_revenue,
     count: service.count,
     percentage: total > 0 ? ((service.count / total) * 100).toFixed(1) : '0.0',
-    fill: COLORS[index % COLORS.length],
+    fill: series[index % series.length],
   }));
 
   if (services.length === 0) {
@@ -81,7 +81,7 @@ export function ServiceDistributionChart({
     if (!active || !payload?.length) return null;
     const d = payload[0].payload;
     return (
-      <div className="bg-white p-3 rounded-lg shadow-lg border border-border-default text-xs">
+      <div className="bg-surface-card p-3 rounded-lg shadow-lg border border-border-default text-xs">
         <p className="font-semibold text-text-primary mb-1">{d.name}</p>
         <p className="text-text-secondary">Revenue: <span className="font-medium">{formatRevenue(d.value)}</span></p>
         <p className="text-text-secondary">Count: <span className="font-medium">{d.count}</span></p>
