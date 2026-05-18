@@ -14,15 +14,15 @@ export function TrendIndicator({ value, label, className = '' }: TrendIndicatorP
   const isNeutral = value === 0;
 
   const colorClass = isPositive
-    ? 'text-green-600'
+    ? 'text-success-fg'
     : isNegative
-    ? 'text-red-600'
+    ? 'text-danger-fg'
     : 'text-text-muted';
 
   const bgClass = isPositive
-    ? 'bg-green-50'
+    ? 'bg-success-bg-soft'
     : isNegative
-    ? 'bg-red-50'
+    ? 'bg-danger-bg-soft'
     : 'bg-surface-page';
 
   const Icon = isPositive ? ArrowUp : isNegative ? ArrowDown : Minus;

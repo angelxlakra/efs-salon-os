@@ -33,8 +33,8 @@ interface StaffLane {
 }
 
 const STATUS_DOT: Partial<Record<WalkInStatus, string>> = {
-  checked_in: 'bg-blue-500',
-  in_progress: 'bg-amber-400 animate-pulse',
+  checked_in: 'bg-info-fg',
+  in_progress: 'bg-warning-fg animate-pulse',
 };
 
 function buildLanes(sessions: CustomerSession[]): StaffLane[] {

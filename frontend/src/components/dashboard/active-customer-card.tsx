@@ -54,9 +54,9 @@ interface ActiveCustomerCardProps {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  checked_in: 'bg-blue-500',
-  in_progress: 'bg-amber-400 animate-pulse',
-  completed: 'bg-green-500',
+  checked_in: 'bg-info-fg',
+  in_progress: 'bg-warning-fg animate-pulse',
+  completed: 'bg-success-fg',
 };
 
 const getStatusDot = (status: string) => (
@@ -139,7 +139,7 @@ export function ActiveCustomerCard({
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-6 w-6 p-0 text-blue-400 hover:text-blue-300 hover:bg-blue-500/10"
+                      className="h-6 w-6 p-0 text-info-fg hover:bg-info-bg-soft"
                       onClick={() => handleStartService(walkin.id)}
                       title="Start service"
                     >
@@ -150,7 +150,7 @@ export function ActiveCustomerCard({
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-6 w-6 p-0 text-green-400 hover:text-green-300 hover:bg-green-500/10"
+                      className="h-6 w-6 p-0 text-success-fg hover:bg-success-bg-soft"
                       onClick={() => handleCompleteService(walkin.id)}
                       title="Complete service"
                     >
