@@ -42,7 +42,7 @@ function buildLanes(sessions: CustomerSession[]): StaffLane[] {
 
   for (const session of sessions) {
     for (const walkin of session.walkins) {
-      if (walkin.status === 'completed') continue;
+      if (walkin.status === 'completed' || walkin.status === 'cancelled') continue;
       if (!walkin.checked_in_at) continue;
 
       const staffId = walkin.assigned_staff.id;

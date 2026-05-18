@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import type { ElementType } from 'react';
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -47,6 +48,39 @@ function ServiceTooltip({ active, payload, formatRevenue }: ServiceTooltipProps)
   );
 }
 
+function formatRevenue(value: number): string {
+  return `₹${(value / 100).toLocaleString('en-IN')}`;
+}
+
+const VIEW_OPTIONS: { id: ViewMode; icon: ElementType; label: string }[] = [
+  { id: 'donut', icon: PieIcon,    label: 'Donut' },
+  { id: 'bar',   icon: BarChart2,  label: 'Bar' },
+  { id: 'list',  icon: LayoutList, label: 'List' },
+];
+
+interface ViewToggleProps { view: ViewMode; onViewChange: (v: ViewMode) => void; }
+
+function ViewToggle({ view, onViewChange }: ViewToggleProps) {
+  return (
+    <div className="flex gap-1 mb-3">
+      {VIEW_OPTIONS.map(({ id, icon: Icon, label }) => (
+        <button
+          key={id}
+          onClick={() => onViewChange(id)}
+          className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors ${
+            view === id
+              ? 'bg-accent text-accent-fg'
+              : 'bg-surface-row-hover text-text-secondary hover:bg-border-subtle'
+          }`}
+        >
+          <Icon className="h-3 w-3" />
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function ServiceDistributionChart({
   services,
   totalServices,
@@ -69,9 +103,6 @@ export function ServiceDistributionChart({
     ? totalServices
     : services.reduce((sum, s) => sum + s.count, 0);
 
-  const formatRevenue = (value: number) =>
-    `₹${(value / 100).toLocaleString('en-IN')}`;
-
   const chartData = services.map((service, index) => ({
     name: service.service_name,
     value: service.total_revenue,
@@ -83,7 +114,7 @@ export function ServiceDistributionChart({
   const tooltipContent = useCallback(
     (props: TooltipContentProps<number, string>) =>
       <ServiceTooltip {...props} formatRevenue={formatRevenue} />,
-    [formatRevenue]
+    []
   );
 
   if (services.length === 0) {
@@ -94,35 +125,11 @@ export function ServiceDistributionChart({
     );
   }
 
-  // ── View toggle bar ──────────────────────────────────────────────────────
-  const ViewToggle = () => (
-    <div className="flex gap-1 mb-3">
-      {([
-        { id: 'donut', icon: PieIcon, label: 'Donut' },
-        { id: 'bar',   icon: BarChart2, label: 'Bar' },
-        { id: 'list',  icon: LayoutList, label: 'List' },
-      ] as { id: ViewMode; icon: React.ElementType; label: string }[]).map(({ id, icon: Icon, label }) => (
-        <button
-          key={id}
-          onClick={() => handleSetView(id)}
-          className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors ${
-            view === id
-              ? 'bg-accent text-accent-fg'
-              : 'bg-surface-row-hover text-text-secondary hover:bg-border-subtle'
-          }`}
-        >
-          <Icon className="h-3 w-3" />
-          {label}
-        </button>
-      ))}
-    </div>
-  );
-
   // ── Donut view ───────────────────────────────────────────────────────────
   if (view === 'donut') {
     return (
       <div className="w-full">
-        <ViewToggle />
+        <ViewToggle view={view} onViewChange={handleSetView} />
         {/* Relative wrapper so we can absolutely centre the label */}
         <div className="relative h-52">
           <ResponsiveContainer width="100%" height="100%">
@@ -157,8 +164,8 @@ export function ServiceDistributionChart({
 
         {/* Legend */}
         <ul className="flex flex-col gap-1.5 mt-2">
-          {chartData.map((d, i) => (
-            <li key={i} className="flex items-center justify-between text-xs">
+          {chartData.map((d) => (
+            <li key={d.name} className="flex items-center justify-between text-xs">
               <div className="flex items-center gap-2">
                 <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: d.fill }} />
                 <span className="text-text-secondary truncate max-w-[120px]">{d.name}</span>
@@ -175,7 +182,7 @@ export function ServiceDistributionChart({
   if (view === 'bar') {
     return (
       <div className="w-full">
-        <ViewToggle />
+        <ViewToggle view={view} onViewChange={handleSetView} />
         <div className="h-56">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData} layout="vertical" margin={{ left: 0, right: 16, top: 4, bottom: 4 }}>
@@ -208,10 +215,10 @@ export function ServiceDistributionChart({
   // ── List view ────────────────────────────────────────────────────────────
   return (
     <div className="w-full">
-      <ViewToggle />
+      <ViewToggle view={view} onViewChange={handleSetView} />
       <div className="space-y-2">
-        {chartData.map((d, i) => (
-          <div key={i} className="flex items-center gap-3">
+        {chartData.map((d) => (
+          <div key={d.name} className="flex items-center gap-3">
             <span
               className="w-2.5 h-2.5 rounded-full flex-shrink-0"
               style={{ backgroundColor: d.fill }}

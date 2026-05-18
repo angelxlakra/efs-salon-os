@@ -61,11 +61,12 @@ function HourlyTooltip({ active, payload, formatRevenue }: HourlyTooltipProps) {
   );
 }
 
+function formatRevenue(value: number): string {
+  return `₹${(value / 100).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
+}
+
 export function HourlyTrendChart({ data, peakHour }: HourlyTrendChartProps) {
   const colors = useChartColors();
-
-  const formatRevenue = (value: number) =>
-    `₹${(value / 100).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
 
   const currentHour = new Date().getHours();
   const visibleData = data.filter(d => {
@@ -79,7 +80,7 @@ export function HourlyTrendChart({ data, peakHour }: HourlyTrendChartProps) {
   const tooltipContent = useCallback(
     (props: TooltipContentProps<number, string>) =>
       <HourlyTooltip {...props} formatRevenue={formatRevenue} />,
-    [formatRevenue]
+    []
   );
 
   const revenueColor = colors.series[2]; // data-series-3 (green)
