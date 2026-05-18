@@ -788,7 +788,7 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
               <span>{formatPrice(subtotal)}</span>
             </div>
             {discountAmount > 0 && (
-              <div className="flex justify-between text-success-fg">
+              <div className="flex justify-between text-warning-fg">
                 <span>
                   Discount
                   {subtotal > 0 && (
