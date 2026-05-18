@@ -235,7 +235,7 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="space-y-3">
+    <div className="p-4 md:p-6 space-y-3">
       {/* Birthday banner */}
       {birthdayUsers.length > 0 && (
         <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-pink-500 via-purple-500 to-yellow-400 p-[2px]">
