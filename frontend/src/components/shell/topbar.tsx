@@ -36,14 +36,19 @@ export function TopBar({ className }: { className?: string }) {
       )}
     >
       <Breadcrumb className="flex-1 min-w-0" />
+
+      <span className="hidden md:block text-caption text-text-muted shrink-0 tabular">
+        {new Date().toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", year: "numeric" })}
+      </span>
+
       <button
         type="button"
         onClick={open}
         aria-label="Open search palette"
-        className="hidden sm:inline-flex items-center gap-2 h-8 px-3 rounded-md bg-surface-row text-text-secondary border border-border-subtle hover:bg-surface-row-hover text-body-sm"
+        className="hidden sm:inline-flex items-center gap-2 h-9 px-4 rounded-lg w-56 md:w-72 bg-accent-bg-soft text-text-secondary border border-accent-default/40 hover:border-accent-default transition-colors text-body-sm"
       >
-        <Search className="size-4" />
-        <span className="hidden md:inline">Search…</span>
+        <Search className="size-4 text-accent-default shrink-0" />
+        <span className="hidden md:inline flex-1 text-left">Search…</span>
         <Kbd keys={["⌘", "K"]} />
       </button>
 

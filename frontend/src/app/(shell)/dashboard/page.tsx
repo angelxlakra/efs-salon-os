@@ -201,14 +201,6 @@ export default function DashboardPage() {
   const formatPrice = (paise: number) =>
     `₹${(paise / 100).toLocaleString('en-IN')}`;
 
-  const getCurrentDate = () =>
-    new Date().toLocaleDateString('en-IN', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
-
   const handleCheckoutSession = async (sessionId: string) => {
     try {
       const session = activeSessions.find((s) => s.session_id === sessionId);
@@ -244,13 +236,6 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-3">
-      {/* Date stamp */}
-      <div className="flex justify-end -mb-1">
-        <p className="text-xs font-medium text-text-secondary bg-surface-card px-2 py-0.5 rounded-full border border-border-subtle">
-          {getCurrentDate()}
-        </p>
-      </div>
-
       {/* Birthday banner */}
       {birthdayUsers.length > 0 && (
         <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-pink-500 via-purple-500 to-yellow-400 p-[2px]">
