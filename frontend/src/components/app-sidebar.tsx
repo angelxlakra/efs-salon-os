@@ -179,7 +179,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               <div className="flex items-center gap-2 cursor-pointer">
                 <div className="flex aspect-square size-8 items-center justify-center rounded-lg overflow-hidden">
                   <Image
-                    src="/logo-black.svg"
+                    src="/logo-navy.svg"
                     alt="Logo"
                     width={32}
                     height={32}

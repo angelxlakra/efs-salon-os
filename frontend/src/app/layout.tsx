@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   description: 'Local-first salon POS, scheduling, inventory, and accounting system',
   icons: {
     icon: '/favicon.svg',
-    apple: '/logo-black.svg',
+    apple: '/logo-navy.svg',
   },
 };
 

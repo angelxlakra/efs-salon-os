@@ -66,7 +66,7 @@ export default function LoginPage() {
           <div className="flex items-center gap-3 mb-16">
             <div className="h-9 w-9 bg-white rounded-md flex items-center justify-center overflow-hidden flex-shrink-0">
               <Image
-                src="/logo-black.svg"
+                src="/logo-navy.svg"
                 alt="Logo"
                 width={36}
                 height={36}
@@ -105,7 +105,7 @@ export default function LoginPage() {
           {/* Mobile-only logo */}
           <div className="lg:hidden mb-10 flex items-center gap-2">
             <div className="h-8 w-8 rounded-md flex items-center justify-center overflow-hidden flex-shrink-0" style={{ background: 'var(--accent-default)' }}>
-              <Image src="/logo-black.svg" alt="Logo" width={32} height={32} className="object-contain invert" />
+              <Image src="/logo-white.svg" alt="Logo" width={32} height={32} className="object-contain" />
             </div>
             <span className="text-base font-semibold">{settings?.salon_name || 'Elegance'}</span>
           </div>
