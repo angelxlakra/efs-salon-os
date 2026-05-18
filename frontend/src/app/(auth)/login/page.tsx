@@ -61,21 +61,16 @@ export default function LoginPage() {
         {/* Gold accent rule at top edge */}
         <div className="absolute top-0 left-0 right-0 h-0.5" style={{ background: 'var(--gold-default)' }} />
 
-        {/* Logo + salon name */}
+        {/* Wordmark */}
         <div className="relative z-10">
-          <div className="flex items-center gap-3 mb-16">
-            <div className="h-9 w-9 bg-white rounded-md flex items-center justify-center overflow-hidden flex-shrink-0">
-              <Image
-                src="/logo-navy.svg"
-                alt="Logo"
-                width={36}
-                height={36}
-                className="object-contain"
-              />
-            </div>
-            <span className="text-base font-semibold tracking-wide opacity-90">
-              {settings?.salon_name || 'Elegance'}
-            </span>
+          <div className="mb-16">
+            <Image
+              src="/wordmark-gold.svg"
+              alt={settings?.salon_name || 'Elegance'}
+              width={160}
+              height={160}
+              className="object-contain"
+            />
           </div>
 
           <h1
