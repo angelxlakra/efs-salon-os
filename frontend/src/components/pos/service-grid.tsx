@@ -84,6 +84,46 @@ function formatWait(minutes: number) {
   return mins > 0 ? `~${hours}h ${mins}m` : `~${hours}h`;
 }
 
+function getStatusBadge(status: string) {
+  switch (status) {
+    case 'available':
+      return <Badge className="bg-success-bg-soft text-success-fg text-xs">Available</Badge>;
+    case 'busy':
+      return <Badge className="bg-warning-bg-soft text-warning-fg text-xs">Busy</Badge>;
+    case 'very_busy':
+      return <Badge className="bg-danger-bg-soft text-danger-fg text-xs">Very Busy</Badge>;
+    default:
+      return null;
+  }
+}
+
+function getStaffBusynessText(staffMember: StaffWithBusyness): string {
+  const busyness = staffMember.busyness;
+  if (!busyness) {
+    return `${staffMember.display_name} is available`;
+  }
+
+  const totalServices = busyness.active_services + busyness.queued_services;
+
+  if (totalServices === 0) {
+    return `${staffMember.display_name} is available`;
+  }
+
+  const serviceText = totalServices === 1 ? 'service' : 'services';
+  const waitText = busyness.total_wait_minutes > 0
+    ? ` and might take ${Math.round(busyness.total_wait_minutes)} minutes more`
+    : '';
+
+  return `${staffMember.display_name} has ${totalServices} pending ${serviceText}${waitText}`;
+}
+
+function getServiceCartCount(
+  serviceId: string,
+  items: { isProduct: boolean; serviceId?: string }[]
+): number {
+  return items.filter(item => !item.isProduct && item.serviceId === serviceId).length;
+}
+
 export function ServiceGrid({ searchInputRef, hideStaffSelection = false, onServiceSelect }: ServiceGridProps) {
   const [services, setServices] = useState<Service[]>([]);
   const [filteredServices, setFilteredServices] = useState<Service[]>([]);
@@ -256,11 +296,8 @@ export function ServiceGrid({ searchInputRef, hideStaffSelection = false, onServ
       if (data.templates && data.templates.length > 0) {
         setServiceTemplates(prev => ({ ...prev, [serviceId]: data.templates }));
       }
-    } catch (error: any) {
-      // If 404, service doesn't have templates - that's okay
-      if (error.response?.status !== 404) {
-        // swallow other errors silently for templates
-      }
+    } catch {
+      // swallow — 404 means no templates, other errors are non-critical
     } finally {
       setIsLoadingTemplates(false);
     }
@@ -379,43 +416,7 @@ export function ServiceGrid({ searchInputRef, hideStaffSelection = false, onServ
     setExpandedServiceId(null);
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'available':
-        return <Badge className="bg-success-bg-soft text-success-fg text-xs">Available</Badge>;
-      case 'busy':
-        return <Badge className="bg-warning-bg-soft text-warning-fg text-xs">Busy</Badge>;
-      case 'very_busy':
-        return <Badge className="bg-danger-bg-soft text-danger-fg text-xs">Very Busy</Badge>;
-      default:
-        return null;
-    }
-  };
-
-  const getStaffBusynessText = (staffMember: StaffWithBusyness) => {
-    const busyness = staffMember.busyness;
-    if (!busyness) {
-      return `${staffMember.display_name} is available`;
-    }
-
-    const totalServices = busyness.active_services + busyness.queued_services;
-
-    if (totalServices === 0) {
-      return `${staffMember.display_name} is available`;
-    }
-
-    const serviceText = totalServices === 1 ? 'service' : 'services';
-    const waitText = busyness.total_wait_minutes > 0
-      ? ` and might take ${Math.round(busyness.total_wait_minutes)} minutes more`
-      : '';
-
-    return `${staffMember.display_name} has ${totalServices} pending ${serviceText}${waitText}`;
-  };
-
   // Get count of how many times a service is in the cart
-  const getServiceCartCount = (serviceId: string) => {
-    return items.filter(item => !item.isProduct && item.serviceId === serviceId).length;
-  };
 
   // Get unique categories
   const categories = ['All', ...Array.from(new Set(services.map(s => s.category.name)))];
@@ -466,24 +467,22 @@ export function ServiceGrid({ searchInputRef, hideStaffSelection = false, onServ
       {/* Service Grid */}
       <div className="flex-1 overflow-auto">
         {filteredServices.length === 0 ? (
-          <div className="col-span-full">
-            <EmptyState
-              title={searchQuery ? 'No matching services' : 'No services yet'}
-              body={searchQuery
-                ? 'Try a different search term or clear the filter to see all services.'
-                : 'Add services in the Services catalogue to see them here.'}
-              headingLevel={4}
-              primaryAction={searchQuery
-                ? <Button variant="outline" onClick={() => setSearchQuery('')}>Clear search</Button>
-                : undefined
-              }
-            />
-          </div>
+          <EmptyState
+            title={searchQuery ? 'No matching services' : 'No services yet'}
+            body={searchQuery
+              ? 'Try a different search term or clear the filter to see all services.'
+              : 'Add services in the Services catalogue to see them here.'}
+            headingLevel={4}
+            primaryAction={searchQuery
+              ? <Button variant="outline" onClick={() => setSearchQuery('')}>Clear search</Button>
+              : undefined
+            }
+          />
         ) : (
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 items-start">
             {filteredServices.map((service) => {
               const isExpanded = expandedServiceId === service.id;
-              const cartCount = getServiceCartCount(service.id);
+              const cartCount = getServiceCartCount(service.id, items);
               const isInCart = cartCount > 0;
 
               return (
@@ -502,7 +501,7 @@ export function ServiceGrid({ searchInputRef, hideStaffSelection = false, onServ
                   <button
                     onClick={() => handleServiceClick(service)}
                     className={`group w-full p-4 text-left ${
-                      isExpanded ? '' : 'hover:border-black hover:shadow-lg'
+                      isExpanded ? '' : 'hover:border-accent-default hover:shadow-lg'
                     }`}
                   >
                     {/* Top Row: Cart Badge (left) + Category Badge (right) */}

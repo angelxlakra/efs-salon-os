@@ -4,7 +4,21 @@ import { ServiceGrid } from '../service-grid';
 
 vi.mock('@/lib/api-client', () => ({
   apiClient: {
-    get: vi.fn().mockResolvedValue({ data: { services: [] } }),
+    get: vi.fn().mockImplementation((url: string) => {
+      if (url === '/catalog/services') {
+        return Promise.resolve({ data: { services: [] } });
+      }
+      if (url === '/staff') {
+        return Promise.resolve({ data: { items: [] } });
+      }
+      if (url === '/staff/availability/busyness') {
+        return Promise.resolve({ data: [] });
+      }
+      if (url === '/attendance') {
+        return Promise.resolve({ data: { items: [] } });
+      }
+      return Promise.resolve({ data: {} });
+    }),
   },
 }));
 
