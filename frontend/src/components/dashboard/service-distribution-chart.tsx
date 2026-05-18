@@ -51,7 +51,17 @@ export function ServiceDistributionChart({
   services,
   totalServices,
 }: ServiceDistributionChartProps) {
-  const [view, setView] = useState<ViewMode>('donut');
+  const [view, setView] = useState<ViewMode>(() => {
+    try {
+      const stored = localStorage.getItem('dashboard.chart-view') as ViewMode | null;
+      return stored === 'bar' || stored === 'list' ? stored : 'donut';
+    } catch { return 'donut'; }
+  });
+
+  const handleSetView = useCallback((next: ViewMode) => {
+    setView(next);
+    try { localStorage.setItem('dashboard.chart-view', next); } catch { /* private mode */ }
+  }, []);
   const { series } = useChartColors();
 
   // Use services sum as fallback when totalServices is 0 to avoid Infinity%
@@ -94,7 +104,7 @@ export function ServiceDistributionChart({
       ] as { id: ViewMode; icon: React.ElementType; label: string }[]).map(({ id, icon: Icon, label }) => (
         <button
           key={id}
-          onClick={() => setView(id)}
+          onClick={() => handleSetView(id)}
           className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors ${
             view === id
               ? 'bg-accent text-accent-fg'
