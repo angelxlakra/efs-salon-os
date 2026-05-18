@@ -56,7 +56,7 @@ export default function POSPage() {
   }, [items.length]);
 
   return (
-    <div className="relative">
+    <div className="relative p-4 md:p-6">
       <div className="flex gap-4">
         {/* Main Area - Service/Product Selection */}
         <div className="flex-1 flex flex-col min-w-0">
