@@ -1,10 +1,17 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render } from '@testing-library/react';
 import { StatCard } from '../stat-card';
 
+const mockUseAuthStore = vi.fn();
+
 vi.mock('@/stores/auth-store', () => ({
-  useAuthStore: () => ({ user: { role: 'owner', id: 'u1' } }),
+  useAuthStore: () => mockUseAuthStore(),
 }));
+
+beforeEach(() => {
+  localStorage.clear();
+  mockUseAuthStore.mockReturnValue({ user: { role: 'owner', id: 'u1' } });
+});
 
 describe('StatCard', () => {
   it('applies text-overline to the label', () => {
@@ -25,5 +32,13 @@ describe('StatCard', () => {
       <StatCard title="Revenue" value="₹5,000" sensitive visibilityKey="rev" />
     );
     expect(getByText('••••')).toBeTruthy();
+  });
+
+  it('renders nothing for staff user when sensitive', () => {
+    mockUseAuthStore.mockReturnValue({ user: { role: 'staff', id: 'u1' } });
+    const { container } = render(
+      <StatCard title="Revenue" value="₹5,000" sensitive />
+    );
+    expect(container.firstChild).toBeNull();
   });
 });
