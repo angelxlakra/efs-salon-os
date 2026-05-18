@@ -49,7 +49,7 @@ export function StatCard({
   return (
     <div className="rounded-xl bg-surface-card border border-border-subtle p-4 flex flex-col gap-2">
       <div className="flex items-center justify-between">
-        <span className="text-xs font-medium text-text-secondary uppercase tracking-wide">
+        <span className="text-overline text-text-secondary">
           {title}
         </span>
         <div className="flex items-center gap-2">
@@ -72,7 +72,7 @@ export function StatCard({
       </div>
 
       <div className="flex items-end justify-between gap-2">
-        <span className="text-xl md:text-2xl font-bold text-text-primary tabular-nums">
+        <span className="text-money-lg text-text-primary">
           {sensitive && !visible ? '••••' : value}
         </span>
         {trend && <span className="shrink-0">{trend}</span>}
