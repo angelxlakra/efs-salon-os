@@ -17,6 +17,7 @@ function RecordPaymentPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const invoiceIdParam = searchParams.get('invoice_id');
+  const supplierIdParam = searchParams.get('supplier_id');
 
   const [suppliers, setSuppliers] = useState<SupplierListItem[]>([]);
   const [invoice, setInvoice] = useState<PurchaseInvoice | null>(null);
@@ -24,7 +25,7 @@ function RecordPaymentPageInner() {
   const [submitting, setSubmitting] = useState(false);
 
   // Form state
-  const [supplierId, setSupplierId] = useState<string>('');
+  const [supplierId, setSupplierId] = useState<string>(supplierIdParam || '');
   const [invoiceId, setInvoiceId] = useState<string>(invoiceIdParam || '');
   const [paymentDate, setPaymentDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [amount, setAmount] = useState<string>('');
@@ -118,6 +119,8 @@ function RecordPaymentPageInner() {
       // Navigate back to invoice if it was an invoice payment
       if (invoiceId) {
         router.push(`/dashboard/purchases/invoices/${invoiceId}`);
+      } else if (supplierIdParam) {
+        router.push(`/dashboard/purchases/suppliers/${supplierIdParam}`);
       } else {
         router.push('/dashboard/purchases/invoices');
       }
@@ -169,7 +172,7 @@ function RecordPaymentPageInner() {
                         setAmount('');
                       }
                     }}
-                    disabled={!!invoiceIdParam}
+                    disabled={!!invoiceIdParam || !!supplierIdParam}
                   >
                     <SelectTrigger id="supplier">
                       <SelectValue placeholder="Select supplier" />
@@ -185,6 +188,11 @@ function RecordPaymentPageInner() {
                   {invoiceIdParam && (
                     <p className="text-xs text-muted-foreground">
                       Supplier is pre-selected based on the invoice
+                    </p>
+                  )}
+                  {supplierIdParam && !invoiceIdParam && (
+                    <p className="text-xs text-text-muted">
+                      Supplier is pre-selected
                     </p>
                   )}
                 </div>
@@ -207,6 +215,13 @@ function RecordPaymentPageInner() {
                         <p className="font-semibold text-orange-600">{formatCurrency(invoice.balance_due)}</p>
                       </div>
                     </div>
+                  </div>
+                )}
+                {!invoiceIdParam && supplierId && (
+                  <div className="p-3 bg-surface-row rounded-lg border border-border-subtle">
+                    <p className="text-xs text-text-secondary">
+                      This payment will be automatically applied to the oldest outstanding invoices for this supplier.
+                    </p>
                   </div>
                 )}
 

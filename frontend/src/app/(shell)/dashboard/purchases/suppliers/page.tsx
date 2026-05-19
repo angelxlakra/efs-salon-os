@@ -11,6 +11,7 @@ import { Switch } from '@/components/ui/switch';
 import { purchaseApi, Supplier, SupplierListItem, SupplierCreate, SupplierUpdate } from '@/lib/api/purchases';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 export default function SuppliersPage() {
   const router = useRouter();
@@ -324,7 +325,14 @@ export default function SuppliersPage() {
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    <CardTitle className="text-lg">{supplier.name}</CardTitle>
+                    <CardTitle className="text-lg">
+                      <Link
+                        href={`/dashboard/purchases/suppliers/${supplier.id}`}
+                        className="font-medium text-text-primary hover:text-accent-default hover:underline"
+                      >
+                        {supplier.name}
+                      </Link>
+                    </CardTitle>
                     {supplier.contact_person && (
                       <p className="text-sm text-muted-foreground">{supplier.contact_person}</p>
                     )}
