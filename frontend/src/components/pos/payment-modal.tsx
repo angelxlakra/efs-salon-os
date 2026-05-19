@@ -486,8 +486,8 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
 
         {status === 'success' ? (
           <DialogBody className="flex flex-col items-center py-4 sm:py-8">
-            <div className="rounded-full bg-green-100 p-3 mb-3">
-              <CheckCircle2 className="h-10 w-10 sm:h-12 sm:w-12 text-green-600" />
+            <div className="rounded-full bg-success-bg-soft p-3 mb-3">
+              <CheckCircle2 className="h-10 w-10 sm:h-12 sm:w-12 text-success-fg" />
             </div>
             <h3 className="text-lg sm:text-xl font-semibold text-text-primary mb-1">
               Payment Received!
@@ -496,7 +496,7 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
               {formatPrice(successData?.paid ?? total)}
             </p>
             {successData && successData.paid < successData.total && (
-              <p className="text-sm text-orange-600 mb-1">
+              <p className="text-sm text-warning-fg mb-1">
                 Pending: {formatPrice(successData.total - successData.paid)}
               </p>
             )}
@@ -565,8 +565,8 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
 
             {/* Collect Pending Balance Section */}
             {showCollectPending && customerPendingBalance > 0 && (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 space-y-3">
-                <h3 className="font-semibold text-sm text-yellow-900">Collect Pending Balance</h3>
+              <div className="bg-warning-bg-soft border border-warning-border rounded-lg p-3 space-y-3">
+                <h3 className="font-semibold text-sm text-warning-fg">Collect Pending Balance</h3>
 
                 <div className="grid gap-3">
                   <div>
@@ -580,7 +580,7 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
                       className="mt-1"
                       placeholder="Enter amount"
                     />
-                    <p className="text-xs text-muted-foreground mt-1">
+                    <p className="text-xs text-text-muted mt-1">
                       Max: {formatPrice(customerPendingBalance)}
                     </p>
                   </div>
@@ -642,12 +642,12 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
                           <div key={p.id} className="flex items-center justify-between text-sm">
                               <span className="text-text-muted capitalize">{p.method}</span>
                               <div className="flex items-center gap-1.5">
-                                <span className="text-green-600 font-medium">-{formatPrice(p.amount * 100)}</span>
+                                <span className="text-success-fg font-medium">-{formatPrice(p.amount * 100)}</span>
                                 <button
                                   type="button"
                                   onClick={() => handleRemovePayment(p.id)}
                                   disabled={isDeletingPayment === p.id || status === 'processing'}
-                                  className="text-text-disabled hover:text-red-500 transition-colors disabled:opacity-50 p-0.5 rounded"
+                                  className="text-text-disabled hover:text-danger-fg transition-colors disabled:opacity-50 p-0.5 rounded"
                                   title="Remove payment"
                                 >
                                   {isDeletingPayment === p.id ? (
@@ -664,7 +664,7 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
 
               <div className="flex justify-between items-end pt-2 border-t border-border-default">
                  <span className="text-base font-medium text-text-primary">Remaining</span>
-                 <span className="text-xl sm:text-2xl font-bold text-primary">{formatPrice(remainingPaise)}</span>
+                 <span className="text-xl sm:text-2xl font-bold text-text-primary">{formatPrice(remainingPaise)}</span>
               </div>
             </div>
 
@@ -678,9 +678,9 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
                   className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3"
                 >
                   {[
-                    { id: 'cash', label: 'Cash', icon: Banknote, color: 'text-green-600' },
-                    { id: 'card', label: 'Card', icon: CreditCard, color: 'text-blue-600' },
-                    { id: 'upi', label: 'UPI', icon: Wallet, color: 'text-purple-600' },
+                    { id: 'cash', label: 'Cash', icon: Banknote, color: 'text-text-secondary' },
+                    { id: 'card', label: 'Card', icon: CreditCard, color: 'text-text-secondary' },
+                    { id: 'upi', label: 'UPI', icon: Wallet, color: 'text-text-secondary' },
                   ].map((method) => (
                       <div key={method.id}>
                           <RadioGroupItem value={method.id} id={method.id} className="peer sr-only" />
@@ -712,8 +712,8 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
                     placeholder="Enter amount"
                   />
                   {paymentMethod === 'cash' && changeAmount > 0 && (
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Change to return: <span className="font-semibold text-green-600">₹{changeAmount.toFixed(2)}</span>
+                    <p className="text-sm text-text-muted mt-1">
+                      Change to return: <span className="font-semibold text-success-fg">₹{changeAmount.toFixed(2)}</span>
                     </p>
                   )}
                 </div>
@@ -764,8 +764,8 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
 
             {/* Walk-in pending balance warning */}
             {isWalkin && remainingPaise > 0 && (
-              <Alert variant="destructive" className="border-orange-300 bg-orange-50 text-orange-900">
-                <AlertTriangle className="h-4 w-4 !text-orange-600" />
+              <Alert variant="destructive" className="border-warning-border bg-warning-bg-soft text-warning-fg">
+                <AlertTriangle className="h-4 w-4 !text-warning-fg" />
                 <AlertDescription className="space-y-2">
                   <p className="text-sm font-medium">
                     Walk-in customers must pay in full or be assigned a customer profile.
@@ -786,7 +786,7 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
                       variant="outline"
                       size="sm"
                       onClick={() => setShowAssignCustomer(true)}
-                      className="border-orange-400 text-orange-800 hover:bg-orange-100"
+                      className="border-warning-border text-warning-fg hover:bg-warning-bg-soft"
                     >
                       <UserPlus className="h-3 w-3 mr-1" />
                       Assign Customer
