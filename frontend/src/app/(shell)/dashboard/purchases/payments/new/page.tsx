@@ -34,10 +34,11 @@ function RecordPaymentPageInner() {
   const [notes, setNotes] = useState<string>('');
 
   useEffect(() => {
-    loadSuppliers();
+    loadSuppliers(); // stable: no deps on component state
     if (invoiceIdParam) {
       loadInvoice(invoiceIdParam);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [invoiceIdParam]);
 
   const loadSuppliers = async () => {
@@ -124,9 +125,10 @@ function RecordPaymentPageInner() {
       } else {
         router.push('/dashboard/purchases/invoices');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error recording payment:', error);
-      toast.error(error.response?.data?.detail || 'Failed to record payment');
+      const apiError = error as { response?: { data?: { detail?: string } } };
+      toast.error(apiError.response?.data?.detail || 'Failed to record payment');
     } finally {
       setSubmitting(false);
     }
@@ -208,11 +210,11 @@ function RecordPaymentPageInner() {
                       </div>
                       <div>
                         <p className="text-muted-foreground text-xs sm:text-sm">Paid Amount</p>
-                        <p className="font-semibold text-green-600">{formatCurrency(invoice.paid_amount)}</p>
+                        <p className="font-semibold text-success-fg">{formatCurrency(invoice.paid_amount)}</p>
                       </div>
                       <div>
                         <p className="text-muted-foreground text-xs sm:text-sm">Balance Due</p>
-                        <p className="font-semibold text-orange-600">{formatCurrency(invoice.balance_due)}</p>
+                        <p className="font-semibold text-warning-fg">{formatCurrency(invoice.balance_due)}</p>
                       </div>
                     </div>
                   </div>
@@ -254,11 +256,11 @@ function RecordPaymentPageInner() {
                   {invoice && parseFloat(amount) > 0 && (
                     <p className="text-xs text-muted-foreground">
                       {parseFloat(amount) <= invoice.balance_due / 100 ? (
-                        <span className="text-green-600">
+                        <span className="text-success-fg">
                           ✓ Amount is within balance due
                         </span>
                       ) : (
-                        <span className="text-red-600">
+                        <span className="text-danger-fg">
                           ⚠ Amount exceeds balance due of {formatCurrency(invoice.balance_due)}
                         </span>
                       )}

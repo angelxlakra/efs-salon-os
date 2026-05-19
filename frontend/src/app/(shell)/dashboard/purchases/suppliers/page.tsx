@@ -328,7 +328,7 @@ export default function SuppliersPage() {
                     <CardTitle className="text-lg">
                       <Link
                         href={`/dashboard/purchases/suppliers/${supplier.id}`}
-                        className="font-medium text-text-primary hover:text-accent-default hover:underline"
+                        className="font-medium text-text-primary hover:text-accent hover:underline"
                       >
                         {supplier.name}
                       </Link>
@@ -360,7 +360,7 @@ export default function SuppliersPage() {
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Outstanding:</span>
-                    <span className={supplier.total_outstanding > 0 ? 'font-medium text-orange-600' : 'font-medium text-green-600'}>
+                    <span className={supplier.total_outstanding > 0 ? 'font-medium text-warning-fg' : 'font-medium text-success-fg'}>
                       {formatCurrency(supplier.total_outstanding)}
                     </span>
                   </div>
