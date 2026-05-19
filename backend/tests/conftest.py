@@ -20,15 +20,18 @@ def test_db_url():
     """
         Database URL for testing.
     """
-    return "postgresql+psycopg://salon_user:change_me_123@localhost:5432/salon_test_db"
+    import os
+    host = os.getenv("TEST_DB_HOST", "localhost")
+    return f"postgresql+psycopg://salon_user:change_me_123@{host}:5432/salon_test_db"
 
 @pytest.fixture(scope="session")
 def postgres_admin_engine():
     """
     Admin connection to PostgreSQL (connects to 'postgres' database).
     """
-
-    admin_url = "postgresql+psycopg://salon_user:change_me_123@localhost:5432/postgres"
+    import os
+    host = os.getenv("TEST_DB_HOST", "localhost")
+    admin_url = f"postgresql+psycopg://salon_user:change_me_123@{host}:5432/postgres"
 
     engine = create_engine(admin_url, poolclass=NullPool, isolation_level="AUTOCOMMIT")
 

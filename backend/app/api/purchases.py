@@ -682,8 +682,10 @@ def record_supplier_payment(
             .filter(
                 PurchaseInvoice.supplier_id == payment_data.supplier_id,
                 PurchaseInvoice.balance_due > 0,
+                PurchaseInvoice.status != "draft",
             )
             .order_by(PurchaseInvoice.invoice_date.asc(), PurchaseInvoice.created_at.asc())
+            .with_for_update()
             .all()
         )
         for inv in unpaid_invoices:
