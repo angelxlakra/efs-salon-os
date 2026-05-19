@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, TrendingDown, TrendingUp } from 'lucide-react';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { purchaseApi, Supplier, SupplierLedger } from '@/lib/api/purchases';
@@ -31,22 +32,28 @@ export default function SupplierDetailPage() {
   const [supplier, setSupplier] = useState<Supplier | null>(null);
   const [ledger, setLedger] = useState<SupplierLedger | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
-  useEffect(() => {
-    async function load() {
-      try {
-        const [supplierData, ledgerData] = await Promise.all([
-          purchaseApi.getSupplier(supplierId),
-          purchaseApi.getSupplierLedger(supplierId),
-        ]);
-        setSupplier(supplierData);
-        setLedger(ledgerData);
-      } catch {
-        toast.error('Failed to load supplier details');
-      } finally {
-        setLoading(false);
-      }
+  async function load() {
+    setLoading(true);
+    setError(false);
+    try {
+      const [supplierData, ledgerData] = await Promise.all([
+        purchaseApi.getSupplier(supplierId),
+        purchaseApi.getSupplierLedger(supplierId),
+      ]);
+      setSupplier(supplierData);
+      setLedger(ledgerData);
+    } catch {
+      setError(true);
+      toast.error('Failed to load supplier details');
+    } finally {
+      setLoading(false);
     }
+  }
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
     load();
   }, [supplierId]);
 
@@ -62,13 +69,24 @@ export default function SupplierDetailPage() {
     );
   }
 
+  if (error) {
+    return (
+      <div className="p-4 md:p-6 flex flex-col items-center gap-4 text-center">
+        <p className="text-sm text-text-muted">Failed to load supplier details.</p>
+        <div className="flex gap-3">
+          <Button variant="ghost" onClick={() => router.back()}>Go Back</Button>
+          <Button onClick={load}>Retry</Button>
+        </div>
+      </div>
+    );
+  }
   if (!supplier || !ledger) return null;
 
   return (
     <div className="p-4 md:p-6 space-y-6">
       {/* Header */}
       <div className="flex items-start gap-3">
-        <Button variant="ghost" size="icon" onClick={() => router.back()}>
+        <Button variant="ghost" size="icon" aria-label="Back" onClick={() => router.back()}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div className="flex-1 min-w-0">
@@ -80,12 +98,10 @@ export default function SupplierDetailPage() {
             <p className="text-sm text-text-muted">{supplier.contact_person}</p>
           )}
         </div>
-        <Button
-          onClick={() =>
-            router.push(`/dashboard/purchases/payments/new?supplier_id=${supplierId}`)
-          }
-        >
-          Record Payment
+        <Button asChild>
+          <Link href={`/dashboard/purchases/payments/new?supplier_id=${supplierId}`}>
+            Record Payment
+          </Link>
         </Button>
       </div>
 
@@ -143,7 +159,7 @@ export default function SupplierDetailPage() {
               <tbody>
                 {ledger.entries.map((entry, i) => (
                   <tr
-                    key={entry.reference_id}
+                    key={`${entry.entry_type}-${entry.reference_id}`}
                     className={`border-b border-border-subtle last:border-0 ${
                       i % 2 !== 0 ? 'bg-surface-row' : ''
                     }`}
