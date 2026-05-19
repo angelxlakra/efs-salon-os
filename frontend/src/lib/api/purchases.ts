@@ -208,6 +208,23 @@ export interface SupplierPaymentListResponse {
   pages: number;
 }
 
+export interface LedgerEntry {
+  entry_type: 'invoice' | 'payment';
+  date: string;            // ISO date "YYYY-MM-DD"
+  description: string;     // "Invoice #INV-001" or "Payment via Cash"
+  reference_id: string;    // invoice.id or payment.id
+  debit: number;           // paise
+  credit: number;          // paise
+  running_balance: number; // paise — outstanding after this entry
+}
+
+export interface SupplierLedger {
+  supplier_id: string;
+  supplier_name: string;
+  total_outstanding: number; // paise
+  entries: LedgerEntry[];
+}
+
 export interface BarcodeSearchRequest {
   barcode: string;
 }
@@ -252,6 +269,11 @@ export const purchaseApi = {
 
   updateSupplier: async (id: string, data: SupplierUpdate): Promise<Supplier> => {
     const response = await apiClient.patch(`/purchases/suppliers/${id}`, data);
+    return response.data;
+  },
+
+  getSupplierLedger: async (supplierId: string): Promise<SupplierLedger> => {
+    const response = await apiClient.get(`/purchases/suppliers/${supplierId}/ledger`);
     return response.data;
   },
 
