@@ -136,7 +136,7 @@ def get_supplier_ledger(
             "credit": 0,
         })
     for pmt in payments:
-        method_label = pmt.payment_method.replace("_", " ").title()
+        method_label = (pmt.payment_method or "unknown").replace("_", " ").title()
         raw.append({
             "entry_type": "payment",
             "date": pmt.payment_date,
@@ -165,6 +165,11 @@ def get_supplier_ledger(
 
     total_outstanding = sum(inv.balance_due for inv in invoices)
 
+    # Note: total_outstanding is the live sum of invoice balance_due fields (updated by FIFO allocation).
+    # running_balance at the last entry equals total_outstanding as long as all payments were fully
+    # consumed. In the rare overpayment case (payment > total outstanding), total_outstanding is 0
+    # while running_balance at the last entry goes negative. The UI should use total_outstanding
+    # as the authoritative figure for "amount owed".
     return SupplierLedgerResponse(
         supplier_id=supplier.id,
         supplier_name=supplier.name,

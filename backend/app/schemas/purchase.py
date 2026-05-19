@@ -2,7 +2,7 @@
 
 from datetime import date, datetime
 from decimal import Decimal
-from typing import List, Optional
+from typing import List, Literal, Optional
 from pydantic import BaseModel, Field, ConfigDict
 
 from app.models.purchase import PurchaseStatus
@@ -239,7 +239,7 @@ class SupplierPaymentListResponse(BaseModel):
 # ============ Ledger Schemas ============
 
 class LedgerEntry(BaseModel):
-    entry_type: str          # "invoice" or "payment"
+    entry_type: Literal["invoice", "payment"]
     date: date
     description: str         # "Invoice #INV-001" or "Payment via Cash"
     reference_id: str        # invoice.id or payment.id
@@ -252,7 +252,7 @@ class SupplierLedgerResponse(BaseModel):
     supplier_id: str
     supplier_name: str
     total_outstanding: int   # paise — current outstanding (sum of invoice balance_due)
-    entries: list[LedgerEntry]
+    entries: List[LedgerEntry]
 
 
 # ============ Action Schemas ============

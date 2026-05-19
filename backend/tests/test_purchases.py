@@ -174,12 +174,15 @@ def test_supplier_ledger_running_balance(db_session, supplier, test_user):
     assert result.total_outstanding == 200_00
     assert len(result.entries) == 2
 
-    invoice_entry = next(e for e in result.entries if e.entry_type == "invoice")
+    # Invoice must come first (sorted by date, then invoices before payments on same date)
+    invoice_entry = result.entries[0]
+    assert invoice_entry.entry_type == "invoice"
     assert invoice_entry.debit == 300_00
     assert invoice_entry.credit == 0
     assert invoice_entry.running_balance == 300_00
 
-    payment_entry = next(e for e in result.entries if e.entry_type == "payment")
+    payment_entry = result.entries[1]
+    assert payment_entry.entry_type == "payment"
     assert payment_entry.credit == 100_00
     assert payment_entry.debit == 0
     assert payment_entry.running_balance == 200_00
@@ -197,3 +200,36 @@ def test_supplier_ledger_empty(db_session, supplier, test_user):
 
     assert result.total_outstanding == 0
     assert result.entries == []
+
+
+def test_supplier_ledger_same_date_invoice_before_payment(db_session, supplier, test_user):
+    """When an invoice and a payment share the same date, the invoice entry must come first."""
+    inv = make_invoice(db_session, supplier.id, total=500_00, invoice_date=date(2026, 4, 1), created_by=test_user.id)
+
+    payment = SupplierPayment(
+        id=generate_ulid(),
+        supplier_id=supplier.id,
+        payment_date=date(2026, 4, 1),  # same date as invoice
+        amount=200_00,
+        payment_method="upi",
+        recorded_by=test_user.id,
+    )
+    db_session.add(payment)
+    inv.paid_amount = 200_00
+    inv.balance_due = 300_00
+    inv.status = "partially_paid"
+    db_session.flush()
+
+    from app.api.purchases import get_supplier_ledger
+
+    result = get_supplier_ledger(
+        supplier_id=supplier.id,
+        current_user=test_user,
+        db=db_session,
+    )
+
+    assert len(result.entries) == 2
+    assert result.entries[0].entry_type == "invoice"   # invoice must precede payment on same date
+    assert result.entries[0].running_balance == 500_00  # debit applied first
+    assert result.entries[1].entry_type == "payment"
+    assert result.entries[1].running_balance == 300_00  # 500 - 200
