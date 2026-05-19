@@ -137,60 +137,59 @@ export function ProductGrid({ onProductAdded }: ProductGridProps) {
       </div>
 
       {/* Product Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        {filteredProducts.map((product) => (
-          <Card
-            key={product.id}
-            className={`cursor-pointer transition-all hover:shadow-md ${
-              product.current_stock <= 0 ? 'opacity-50 cursor-not-allowed' : ''
-            }`}
-            onClick={() => handleProductClick(product)}
-          >
-            <CardContent className="p-4">
-              <div className="flex flex-col h-full">
-                <div className="flex items-start justify-between mb-2">
-                  <Package className="h-5 w-5 text-text-muted" />
-                  <span
-                    className={`text-xs px-2 py-1 rounded ${
-                      product.current_stock > 10
-                        ? 'bg-success-bg-soft text-success-fg'
-                        : product.current_stock > 0
-                        ? 'bg-warning-bg-soft text-warning-fg'
-                        : 'bg-danger-bg-soft text-danger-fg'
-                    }`}
-                  >
-                    {product.current_stock > 0 ? `${product.current_stock} ${product.uom}` : 'Out of stock'}
-                  </span>
-                </div>
-
-                <h3 className="font-medium text-sm mb-1 line-clamp-2">{product.name}</h3>
-
-                <p className="text-xs text-text-muted mb-2">{product.sku_code}</p>
-
-                {product.category_name && (
-                  <p className="text-xs text-text-muted mb-2">{product.category_name}</p>
-                )}
-
-                <div className="mt-auto">
-                  <div className="text-lg font-bold text-text-primary">
-                    {formatCurrency(product.retail_price)}
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {filteredProducts.length === 0 && (
+      {filteredProducts.length === 0 ? (
         <EmptyState
-          icon={<Package />}
           title={searchTerm ? 'No matching products' : 'No products yet'}
           body={searchTerm
             ? 'Try a different name or SKU code.'
             : 'Add retail products in Inventory to sell them here.'}
           headingLevel={4}
         />
+      ) : (
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          {filteredProducts.map((product) => (
+            <Card
+              key={product.id}
+              className={`cursor-pointer transition-all hover:shadow-md ${
+                product.current_stock <= 0 ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
+              onClick={() => handleProductClick(product)}
+            >
+              <CardContent className="p-4">
+                <div className="flex flex-col h-full">
+                  <div className="flex items-start justify-between mb-2">
+                    <Package className="h-5 w-5 text-text-muted" />
+                    <span
+                      className={`text-xs px-2 py-1 rounded ${
+                        product.current_stock > 10
+                          ? 'bg-success-bg-soft text-success-fg'
+                          : product.current_stock > 0
+                          ? 'bg-warning-bg-soft text-warning-fg'
+                          : 'bg-danger-bg-soft text-danger-fg'
+                      }`}
+                    >
+                      {product.current_stock > 0 ? `${product.current_stock} ${product.uom}` : 'Out of stock'}
+                    </span>
+                  </div>
+
+                  <h3 className="font-medium text-sm mb-1 line-clamp-2">{product.name}</h3>
+
+                  <p className="text-xs text-text-muted mb-2">{product.sku_code}</p>
+
+                  {product.category_name && (
+                    <p className="text-xs text-text-muted mb-2">{product.category_name}</p>
+                  )}
+
+                  <div className="mt-auto">
+                    <div className="text-lg font-bold text-text-primary">
+                      {formatCurrency(product.retail_price)}
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       )}
     </div>
   );

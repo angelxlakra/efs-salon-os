@@ -686,7 +686,7 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
                           <RadioGroupItem value={method.id} id={method.id} className="peer sr-only" />
                           <Label
                               htmlFor={method.id}
-                              className="flex flex-col items-center justify-center rounded-md border-2 border-muted bg-transparent p-2.5 sm:p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5 cursor-pointer transition-all text-xs sm:text-sm"
+                              className="flex flex-col items-center justify-center rounded-md border-2 border-border-subtle bg-transparent p-2.5 sm:p-4 hover:bg-accent hover:text-accent-fg peer-data-[state=checked]:border-accent-default peer-data-[state=checked]:bg-accent-bg-soft cursor-pointer transition-all text-xs sm:text-sm"
                           >
                               <method.icon className={`mb-1 sm:mb-2 h-5 w-5 sm:h-6 sm:w-6 ${method.color}`} />
                               {method.label}
