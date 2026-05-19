@@ -61,7 +61,7 @@ export default function SupplierDetailPage() {
     return (
       <div className="p-4 md:p-6 space-y-4" aria-busy="true">
         <div className="flex items-center gap-3">
-          <Skeleton shape="kpi" />
+          <Skeleton shape="row" />
         </div>
         <Skeleton shape="card" />
         <Skeleton shape="card" />
