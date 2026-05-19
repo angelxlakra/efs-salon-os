@@ -668,11 +668,32 @@ def record_supplier_payment(
     )
     db.add(payment)
 
-    # Update invoice if payment is linked
+    # Update invoice(s) based on payment type
     if invoice:
+        # Linked payment: update the specific invoice only
         invoice.paid_amount += payment_data.amount
         invoice.balance_due = invoice.total_amount - invoice.paid_amount
         invoice.update_status()
+    else:
+        # General vendor payment: apply FIFO to oldest unpaid invoices
+        remaining = payment_data.amount
+        unpaid_invoices = (
+            db.query(PurchaseInvoice)
+            .filter(
+                PurchaseInvoice.supplier_id == payment_data.supplier_id,
+                PurchaseInvoice.balance_due > 0,
+            )
+            .order_by(PurchaseInvoice.invoice_date.asc(), PurchaseInvoice.created_at.asc())
+            .all()
+        )
+        for inv in unpaid_invoices:
+            if remaining <= 0:
+                break
+            apply = min(remaining, inv.balance_due)
+            inv.paid_amount += apply
+            inv.balance_due = inv.total_amount - inv.paid_amount
+            inv.update_status()
+            remaining -= apply
 
     db.commit()
     db.refresh(payment)
