@@ -19,6 +19,7 @@ from app.schemas.purchase import (
     PurchaseInvoiceListResponse, PurchaseInvoiceListItem,
     SupplierPaymentCreate, SupplierPaymentResponse, SupplierPaymentListResponse,
     GoodsReceiptRequest, BarcodeSearchRequest, BarcodeSearchResponse,
+    LedgerEntry, SupplierLedgerResponse,
 )
 from app.utils import generate_ulid, IST
 
@@ -95,6 +96,81 @@ def get_supplier(
     if not supplier:
         raise HTTPException(status_code=404, detail="Supplier not found")
     return supplier
+
+
+@router.get("/suppliers/{supplier_id}/ledger", response_model=SupplierLedgerResponse)
+def get_supplier_ledger(
+    supplier_id: str,
+    current_user: User = Depends(require_permission("purchases", "read")),
+    db: Session = Depends(get_db),
+) -> SupplierLedgerResponse:
+    """
+    Return a chronological statement of all invoices (debits) and payments (credits)
+    for a supplier with a cumulative running balance.
+    """
+    supplier = db.query(Supplier).filter(Supplier.id == supplier_id).first()
+    if not supplier:
+        raise HTTPException(status_code=404, detail="Supplier not found")
+
+    invoices = (
+        db.query(PurchaseInvoice)
+        .filter(PurchaseInvoice.supplier_id == supplier_id)
+        .order_by(PurchaseInvoice.invoice_date.asc(), PurchaseInvoice.created_at.asc())
+        .all()
+    )
+    payments = (
+        db.query(SupplierPayment)
+        .filter(SupplierPayment.supplier_id == supplier_id)
+        .order_by(SupplierPayment.payment_date.asc(), SupplierPayment.created_at.asc())
+        .all()
+    )
+
+    raw: list[dict] = []
+    for inv in invoices:
+        raw.append({
+            "entry_type": "invoice",
+            "date": inv.invoice_date,
+            "description": f"Invoice #{inv.invoice_number}" if inv.invoice_number else "Invoice",
+            "reference_id": inv.id,
+            "debit": inv.total_amount,
+            "credit": 0,
+        })
+    for pmt in payments:
+        method_label = pmt.payment_method.replace("_", " ").title()
+        raw.append({
+            "entry_type": "payment",
+            "date": pmt.payment_date,
+            "description": f"Payment via {method_label}",
+            "reference_id": pmt.id,
+            "debit": 0,
+            "credit": pmt.amount,
+        })
+
+    # Chronological sort: same date → invoices before payments
+    raw.sort(key=lambda e: (e["date"], 0 if e["entry_type"] == "invoice" else 1))
+
+    running = 0
+    entries: list[LedgerEntry] = []
+    for e in raw:
+        running += e["debit"] - e["credit"]
+        entries.append(LedgerEntry(
+            entry_type=e["entry_type"],
+            date=e["date"],
+            description=e["description"],
+            reference_id=e["reference_id"],
+            debit=e["debit"],
+            credit=e["credit"],
+            running_balance=running,
+        ))
+
+    total_outstanding = sum(inv.balance_due for inv in invoices)
+
+    return SupplierLedgerResponse(
+        supplier_id=supplier.id,
+        supplier_name=supplier.name,
+        total_outstanding=total_outstanding,
+        entries=entries,
+    )
 
 
 @router.patch("/suppliers/{supplier_id}", response_model=SupplierResponse)

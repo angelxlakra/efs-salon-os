@@ -236,6 +236,25 @@ class SupplierPaymentListResponse(BaseModel):
     pages: int
 
 
+# ============ Ledger Schemas ============
+
+class LedgerEntry(BaseModel):
+    entry_type: str          # "invoice" or "payment"
+    date: date
+    description: str         # "Invoice #INV-001" or "Payment via Cash"
+    reference_id: str        # invoice.id or payment.id
+    debit: int               # paise — invoice total (positive)
+    credit: int              # paise — payment amount (positive)
+    running_balance: int     # paise — cumulative outstanding after this entry
+
+
+class SupplierLedgerResponse(BaseModel):
+    supplier_id: str
+    supplier_name: str
+    total_outstanding: int   # paise — current outstanding (sum of invoice balance_due)
+    entries: list[LedgerEntry]
+
+
 # ============ Action Schemas ============
 
 class GoodsReceiptRequest(BaseModel):

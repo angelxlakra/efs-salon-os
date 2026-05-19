@@ -140,3 +140,60 @@ def test_invoice_linked_payment_unchanged(db_session, supplier, test_user, monke
     assert inv1.status == "partially_paid"
     assert inv1.balance_due == 50_00
     assert inv2.balance_due == 200_00  # untouched
+
+
+# ── Ledger endpoint tests ─────────────────────────────────────────────────────
+
+def test_supplier_ledger_running_balance(db_session, supplier, test_user):
+    """Ledger entries sorted by date; running balance reflects debits then credits."""
+    inv = make_invoice(db_session, supplier.id, total=300_00, invoice_date=date(2026, 3, 1), created_by=test_user.id)
+
+    # Manually create a payment and apply it to simulate post-allocation state
+    payment = SupplierPayment(
+        id=generate_ulid(),
+        supplier_id=supplier.id,
+        payment_date=date(2026, 3, 15),
+        amount=100_00,
+        payment_method="cash",
+        recorded_by=test_user.id,
+    )
+    db_session.add(payment)
+    inv.paid_amount = 100_00
+    inv.balance_due = 200_00
+    inv.status = "partially_paid"
+    db_session.flush()
+
+    from app.api.purchases import get_supplier_ledger
+
+    result = get_supplier_ledger(
+        supplier_id=supplier.id,
+        current_user=test_user,
+        db=db_session,
+    )
+
+    assert result.total_outstanding == 200_00
+    assert len(result.entries) == 2
+
+    invoice_entry = next(e for e in result.entries if e.entry_type == "invoice")
+    assert invoice_entry.debit == 300_00
+    assert invoice_entry.credit == 0
+    assert invoice_entry.running_balance == 300_00
+
+    payment_entry = next(e for e in result.entries if e.entry_type == "payment")
+    assert payment_entry.credit == 100_00
+    assert payment_entry.debit == 0
+    assert payment_entry.running_balance == 200_00
+
+
+def test_supplier_ledger_empty(db_session, supplier, test_user):
+    """Ledger for a supplier with no transactions returns empty entries."""
+    from app.api.purchases import get_supplier_ledger
+
+    result = get_supplier_ledger(
+        supplier_id=supplier.id,
+        current_user=test_user,
+        db=db_session,
+    )
+
+    assert result.total_outstanding == 0
+    assert result.entries == []
