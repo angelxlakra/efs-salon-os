@@ -110,7 +110,7 @@ export default function InvoiceDetailPage() {
       <div className="p-6">
         <Card>
           <CardContent className="py-12 text-center">
-            <p className="text-muted-foreground">Invoice not found</p>
+            <p className="text-text-muted">Invoice not found</p>
             <Button variant="outline" className="mt-4" onClick={() => router.back()}>
               Go Back
             </Button>
@@ -130,7 +130,7 @@ export default function InvoiceDetailPage() {
           </Button>
           <div className="min-w-0">
             <h1 className="text-xl font-semibold truncate">{invoice.invoice_number}</h1>
-            <p className="text-sm text-muted-foreground">Purchase Invoice Details</p>
+            <p className="text-sm text-text-muted">Purchase Invoice Details</p>
           </div>
         </div>
 
@@ -172,22 +172,22 @@ export default function InvoiceDetailPage() {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <p className="text-sm text-muted-foreground mb-1">Invoice Number</p>
+                  <p className="text-sm text-text-muted mb-1">Invoice Number</p>
                   <p className="font-semibold">{invoice.invoice_number}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground mb-1">Invoice Date</p>
+                  <p className="text-sm text-text-muted mb-1">Invoice Date</p>
                   <p className="font-semibold">{formatDate(invoice.invoice_date)}</p>
                 </div>
                 {invoice.due_date && (
                   <div>
-                    <p className="text-sm text-muted-foreground mb-1">Due Date</p>
+                    <p className="text-sm text-text-muted mb-1">Due Date</p>
                     <p className="font-semibold">{formatDate(invoice.due_date)}</p>
                   </div>
                 )}
                 {invoice.received_at && (
                   <div>
-                    <p className="text-sm text-muted-foreground mb-1">Received At</p>
+                    <p className="text-sm text-text-muted mb-1">Received At</p>
                     <p className="font-semibold">{formatDateTime(invoice.received_at)}</p>
                   </div>
                 )}
@@ -195,7 +195,7 @@ export default function InvoiceDetailPage() {
 
               {invoice.notes && (
                 <div>
-                  <p className="text-sm text-muted-foreground mb-1">Notes</p>
+                  <p className="text-sm text-text-muted mb-1">Notes</p>
                   <p className="text-sm">{invoice.notes}</p>
                 </div>
               )}
@@ -213,7 +213,7 @@ export default function InvoiceDetailPage() {
             <CardContent>
               <div className="space-y-3">
                 {/* Desktop table header */}
-                <div className="hidden md:grid grid-cols-12 gap-2 text-sm font-medium text-muted-foreground pb-2 border-b">
+                <div className="hidden md:grid grid-cols-12 gap-2 text-sm font-medium text-text-muted pb-2 border-b">
                   <div className="col-span-5">Product</div>
                   <div className="col-span-2 text-center">UOM</div>
                   <div className="col-span-2 text-right">Quantity</div>
@@ -228,16 +228,16 @@ export default function InvoiceDetailPage() {
                         <div className="min-w-0 flex-1">
                           <p className="font-medium text-sm">{item.product_name}</p>
                           {item.barcode && (
-                            <p className="text-xs text-muted-foreground">Barcode: {item.barcode}</p>
+                            <p className="text-xs text-text-muted">Barcode: {item.barcode}</p>
                           )}
                         </div>
                         <p className="font-semibold text-sm ml-2">{formatCurrency(item.total_cost)}</p>
                       </div>
-                      <div className="flex gap-3 text-xs text-muted-foreground">
+                      <div className="flex gap-3 text-xs text-text-muted">
                         <span>{item.quantity} {item.uom}</span>
                         <span>@ {formatCurrency(item.unit_cost)}</span>
                         {item.discount_amount > 0 && (
-                          <span className="text-green-600">-{formatCurrency(item.discount_amount)}</span>
+                          <span className="text-warning-fg">-{formatCurrency(item.discount_amount)}</span>
                         )}
                       </div>
                     </div>
@@ -246,17 +246,17 @@ export default function InvoiceDetailPage() {
                       <div className="col-span-5">
                         <p className="font-medium">{item.product_name}</p>
                         {item.barcode && (
-                          <p className="text-xs text-muted-foreground">Barcode: {item.barcode}</p>
+                          <p className="text-xs text-text-muted">Barcode: {item.barcode}</p>
                         )}
                       </div>
                       <div className="col-span-2 text-center">{item.uom}</div>
                       <div className="col-span-2 text-right">{item.quantity}</div>
                       <div className="col-span-3 text-right space-y-1">
-                        <div className="text-xs text-muted-foreground">
+                        <div className="text-xs text-text-muted">
                           @ {formatCurrency(item.unit_cost)}
                         </div>
                         {item.discount_amount > 0 && (
-                          <div className="text-xs text-green-600">
+                          <div className="text-xs text-warning-fg">
                             Discount: -{formatCurrency(item.discount_amount)}
                           </div>
                         )}
@@ -268,11 +268,11 @@ export default function InvoiceDetailPage() {
 
                 <div className="pt-4 space-y-2">
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Subtotal</span>
+                    <span className="text-text-muted">Subtotal</span>
                     <span className="font-semibold">{formatCurrency(invoice.subtotal)}</span>
                   </div>
                   {invoice.invoice_discount_amount > 0 && (
-                    <div className="flex justify-between text-sm text-green-600">
+                    <div className="flex justify-between text-sm text-warning-fg">
                       <span>Invoice Discount</span>
                       <span className="font-semibold">-{formatCurrency(invoice.invoice_discount_amount)}</span>
                     </div>
@@ -305,12 +305,12 @@ export default function InvoiceDetailPage() {
                           <p className="font-semibold">{formatCurrency(payment.amount)}</p>
                           <Badge variant="outline">{payment.payment_method}</Badge>
                         </div>
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-sm text-text-muted">
                           {formatDate(payment.payment_date)}
                           {payment.reference_number && ` • Ref: ${payment.reference_number}`}
                         </p>
                         {payment.notes && (
-                          <p className="text-sm text-muted-foreground mt-1">{payment.notes}</p>
+                          <p className="text-sm text-text-muted mt-1">{payment.notes}</p>
                         )}
                       </div>
                     </div>
@@ -346,17 +346,17 @@ export default function InvoiceDetailPage() {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Total Amount</span>
+                  <span className="text-text-muted">Total Amount</span>
                   <span className="font-semibold">{formatCurrency(invoice.total_amount)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Paid Amount</span>
-                  <span className="font-semibold text-green-600">{formatCurrency(invoice.paid_amount)}</span>
+                  <span className="text-text-muted">Paid Amount</span>
+                  <span className="font-semibold text-success-fg">{formatCurrency(invoice.paid_amount)}</span>
                 </div>
                 <Separator />
                 <div className="flex justify-between">
                   <span className="font-semibold">Balance Due</span>
-                  <span className={`font-bold text-lg ${invoice.balance_due > 0 ? 'text-orange-600' : 'text-green-600'}`}>
+                  <span className={`font-bold text-lg ${invoice.balance_due > 0 ? 'text-warning-fg' : 'text-success-fg'}`}>
                     {formatCurrency(invoice.balance_due)}
                   </span>
                 </div>
