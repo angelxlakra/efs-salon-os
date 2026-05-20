@@ -152,7 +152,7 @@ export default function SuppliersPage() {
           </Button>
           <div className="min-w-0 flex-1">
             <h1 className="text-xl font-semibold truncate">{editingSupplier ? 'Edit Supplier' : 'Add New Supplier'}</h1>
-            <p className="text-sm md:text-base text-muted-foreground truncate">
+            <p className="text-sm md:text-base text-text-muted truncate">
               {editingSupplier ? `Updating ${editingSupplier.name}` : 'Create a new supplier profile'}
             </p>
           </div>
@@ -281,7 +281,7 @@ export default function SuppliersPage() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="min-w-0 flex-1">
           <h1 className="text-xl font-semibold">Suppliers</h1>
-          <p className="text-sm md:text-base text-muted-foreground">Manage your suppliers and vendors</p>
+          <p className="text-sm md:text-base text-text-muted">Manage your suppliers and vendors</p>
         </div>
         <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
           <Button variant="outline" onClick={() => router.push('/dashboard/purchases/invoices')} className="w-full sm:w-auto">
@@ -297,7 +297,7 @@ export default function SuppliersPage() {
 
       {/* Search */}
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted" />
         <Input
           placeholder="Search suppliers by name, contact person, or phone..."
           value={searchQuery}
@@ -312,8 +312,8 @@ export default function SuppliersPage() {
       ) : filteredSuppliers.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center">
-            <Building2 className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-            <p className="text-muted-foreground">
+            <Building2 className="mx-auto h-12 w-12 text-text-muted mb-4" />
+            <p className="text-text-muted">
               {searchQuery ? 'No suppliers found matching your search' : 'No suppliers yet'}
             </p>
           </CardContent>
@@ -334,7 +334,7 @@ export default function SuppliersPage() {
                       </Link>
                     </CardTitle>
                     {supplier.contact_person && (
-                      <p className="text-sm text-muted-foreground">{supplier.contact_person}</p>
+                      <p className="text-sm text-text-muted">{supplier.contact_person}</p>
                     )}
                   </div>
                   <Button
@@ -349,17 +349,17 @@ export default function SuppliersPage() {
               <CardContent className="space-y-2">
                 {supplier.phone && (
                   <div className="text-sm">
-                    <span className="text-muted-foreground">Phone:</span> {supplier.phone}
+                    <span className="text-text-muted">Phone:</span> {supplier.phone}
                   </div>
                 )}
 
                 <div className="pt-2 border-t space-y-1">
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Total Purchases:</span>
+                    <span className="text-text-muted">Total Purchases:</span>
                     <span className="font-medium">{formatCurrency(supplier.total_purchases)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Outstanding:</span>
+                    <span className="text-text-muted">Outstanding:</span>
                     <span className={supplier.total_outstanding > 0 ? 'font-medium text-warning-fg' : 'font-medium text-success-fg'}>
                       {formatCurrency(supplier.total_outstanding)}
                     </span>
