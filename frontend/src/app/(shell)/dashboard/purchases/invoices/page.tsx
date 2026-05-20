@@ -1,14 +1,15 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { Plus, FileText, CheckCircle, DollarSign, Eye, Users, Search, Calendar } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Plus, CheckCircle, DollarSign, Eye, Users, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { purchaseApi, PurchaseInvoiceListItem } from '@/lib/api/purchases';
+import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/empty-state';
+import { purchaseApi, PurchaseInvoiceListItem, SupplierListItem } from '@/lib/api/purchases';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 export default function PurchaseInvoicesPage() {
   const router = useRouter();
@@ -19,6 +20,7 @@ export default function PurchaseInvoicesPage() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [searchDebounced, setSearchDebounced] = useState('');
+  const [suppliers, setSuppliers] = useState<SupplierListItem[]>([]);
 
   useEffect(() => {
     const timer = setTimeout(() => setSearchDebounced(searchQuery), 300);
@@ -37,22 +39,29 @@ export default function PurchaseInvoicesPage() {
       if (searchDebounced) params.search = searchDebounced;
       if (startDate) params.start_date = startDate;
       if (endDate) params.end_date = endDate;
-      const response = await purchaseApi.listPurchaseInvoices(params);
-      setInvoices(response.items || []);
+      const [supplierResponse, invoiceResponse] = await Promise.all([
+        purchaseApi.listSuppliers({ active_only: true, size: 100 }),
+        purchaseApi.listPurchaseInvoices(params),
+      ]);
+      setSuppliers(supplierResponse.items || []);
+      setInvoices(invoiceResponse.items || []);
     } catch (error) {
-      console.error('Error loading invoices:', error);
-      toast.error('Failed to load purchase invoices');
+      console.error('Error loading data:', error);
+      toast.error('Failed to load purchase data');
     } finally {
       setLoading(false);
     }
   };
 
   const formatCurrency = (amount: number) => {
-    return `₹${(amount / 100).toFixed(2)}`;
+    return `₹${(amount / 100).toLocaleString('en-IN', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-IN', {
+    return new Date(dateString + 'T00:00:00').toLocaleDateString('en-IN', {
       day: '2-digit',
       month: 'short',
       year: 'numeric',
@@ -61,19 +70,20 @@ export default function PurchaseInvoicesPage() {
 
   const getStatusChip = (status: string) => {
     const styles: Record<string, string> = {
-      draft: 'bg-slate-500/40 text-slate-400',
-      received: 'bg-blue-500/40 text-blue-400',
-      partially_paid: 'bg-amber-500/40 text-amber-400',
-      paid: 'bg-green-500/40 text-green-400',
+      draft:           'bg-surface-row text-text-muted border border-border-subtle',
+      received:        'bg-accent/10 text-accent border border-accent/20',
+      partially_paid:  'bg-warning-bg-soft text-warning-fg border border-warning-border',
+      paid:            'bg-success-bg-soft text-success-fg border border-success-border',
     };
     return (
-      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${styles[status] ?? 'bg-slate-500/40 text-slate-400'}`}>
+      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${styles[status] ?? 'bg-surface-row text-text-muted border border-border-subtle'}`}>
         {status.replace('_', ' ').toUpperCase()}
       </span>
     );
   };
 
   const filteredInvoices = invoices;
+  const outstandingSuppliers = suppliers.filter((s) => s.total_outstanding > 0);
 
   return (
     <div className="p-4 space-y-4">
@@ -96,6 +106,68 @@ export default function PurchaseInvoicesPage() {
           </Button>
         </div>
       </div>
+
+      {/* Outstanding Balances */}
+      {loading ? (
+        <div aria-busy="true" className="space-y-2">
+          <Skeleton shape="row" />
+          <Skeleton shape="row" />
+          <Skeleton shape="row" />
+        </div>
+      ) : outstandingSuppliers.length > 0 ? (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <h2 className="text-sm font-semibold text-text-primary">Outstanding Balances</h2>
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-warning-bg-soft text-warning-fg border border-warning-border">
+              {outstandingSuppliers.length}
+            </span>
+          </div>
+          {outstandingSuppliers.map((supplier) => {
+            const oldestDate = invoices
+              .filter(
+                (inv) =>
+                  inv.supplier_id === supplier.id &&
+                  inv.balance_due > 0 &&
+                  inv.status !== 'draft',
+              )
+              .map((inv) => inv.invoice_date)
+              .sort()[0];
+            return (
+              <div
+                key={supplier.id}
+                className="bg-surface-card border border-border-default rounded-xl px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3"
+              >
+                <Link
+                  href={`/dashboard/purchases/suppliers/${supplier.id}`}
+                  className="text-sm font-semibold text-text-primary hover:text-accent hover:underline flex-1 min-w-0 truncate"
+                >
+                  {supplier.name}
+                </Link>
+                {oldestDate && (
+                  <span className="hidden sm:inline text-xs text-text-muted shrink-0">
+                    Since {formatDate(oldestDate)}
+                  </span>
+                )}
+                <span className="text-sm font-bold text-warning-fg shrink-0">
+                  {formatCurrency(supplier.total_outstanding)}
+                </span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="shrink-0"
+                  onClick={() =>
+                    router.push(
+                      `/dashboard/purchases/payments/new?supplier_id=${supplier.id}`,
+                    )
+                  }
+                >
+                  Pay
+                </Button>
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
 
       {/* Status Filter */}
       <div className="flex gap-2 overflow-x-auto pb-1 flex-nowrap" aria-label="Filter by status">
@@ -179,16 +251,27 @@ export default function PurchaseInvoicesPage() {
 
       {/* Invoices List */}
       {loading ? (
-        <div className="text-center py-12">Loading invoices...</div>
+        <div aria-busy="true" className="space-y-3">
+          <Skeleton shape="row" />
+          <Skeleton shape="row" />
+          <Skeleton shape="row" />
+          <Skeleton shape="row" />
+          <Skeleton shape="row" />
+        </div>
       ) : filteredInvoices.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <FileText className="mx-auto h-12 w-12 text-text-muted mb-4" />
-            <p className="text-text-secondary">
-              No purchase invoices found
-            </p>
-          </CardContent>
-        </Card>
+        <EmptyState
+          title={
+            searchDebounced || statusFilter !== 'all' || startDate || endDate
+              ? 'No matching invoices'
+              : 'No purchase invoices'
+          }
+          body={
+            searchDebounced || statusFilter !== 'all' || startDate || endDate
+              ? 'Try a different status filter or date range.'
+              : 'Create your first invoice to start tracking supplier purchases.'
+          }
+          headingLevel={3}
+        />
       ) : (
         <>
           {/* Mobile Cards */}
@@ -248,7 +331,7 @@ export default function PurchaseInvoicesPage() {
                           Paid: {formatCurrency(invoice.paid_amount)}
                         </div>
                         {invoice.balance_due > 0 && (
-                          <div className="text-sm font-medium text-amber-400">
+                          <div className="text-sm font-medium text-warning-fg">
                             Due: {formatCurrency(invoice.balance_due)}
                           </div>
                         )}
