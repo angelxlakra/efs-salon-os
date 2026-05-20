@@ -48,6 +48,8 @@ export default function PurchaseInvoicesPage() {
     } catch (error) {
       console.error('Error loading data:', error);
       toast.error('Failed to load purchase data');
+      setSuppliers([]);
+      setInvoices([]);
     } finally {
       setLoading(false);
     }
@@ -61,7 +63,10 @@ export default function PurchaseInvoicesPage() {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString + 'T00:00:00').toLocaleDateString('en-IN', {
+    // Append local-time sentinel only when the string is a bare date (no T separator).
+    // Prevents double-appending if the API returns a full datetime string.
+    const normalised = dateString.includes('T') ? dateString : dateString + 'T00:00:00';
+    return new Date(normalised).toLocaleDateString('en-IN', {
       day: '2-digit',
       month: 'short',
       year: 'numeric',
@@ -155,6 +160,7 @@ export default function PurchaseInvoicesPage() {
                   size="sm"
                   variant="outline"
                   className="shrink-0"
+                  aria-label={`Pay ${supplier.name}`}
                   onClick={() =>
                     router.push(
                       `/dashboard/purchases/payments/new?supplier_id=${supplier.id}`,
