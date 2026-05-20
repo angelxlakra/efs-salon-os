@@ -91,7 +91,7 @@ export default function PurchaseInvoicesPage() {
   const outstandingSuppliers = suppliers.filter((s) => s.total_outstanding > 0);
 
   return (
-    <div className="p-4 space-y-4">
+    <div className="p-4 md:p-6 space-y-4">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
@@ -99,15 +99,13 @@ export default function PurchaseInvoicesPage() {
           <p className="text-text-secondary text-sm">Track and manage supplier invoices</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" className="sm:size-auto" onClick={() => router.push('/dashboard/purchases/suppliers')}>
+          <Button variant="outline" onClick={() => router.push('/dashboard/purchases/suppliers')}>
             <Users className="mr-1.5 h-4 w-4" />
-            <span className="hidden sm:inline">Suppliers</span>
-            <span className="sm:hidden">Suppliers</span>
+            Suppliers
           </Button>
-          <Button size="sm" className="sm:size-auto" onClick={() => router.push('/dashboard/purchases/invoices/new')}>
+          <Button onClick={() => router.push('/dashboard/purchases/invoices/new')}>
             <Plus className="mr-1.5 h-4 w-4" />
-            <span className="hidden sm:inline">New Invoice</span>
-            <span className="sm:hidden">New</span>
+            New Invoice
           </Button>
         </div>
       </div>
