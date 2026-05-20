@@ -128,6 +128,9 @@ export default function PurchaseInvoicesPage() {
             </span>
           </div>
           {outstandingSuppliers.map((supplier) => {
+            // NOTE: derived from the current paginated invoice list (max size: 50,
+            // filtered by active status/search/date). May be absent if the supplier's
+            // oldest unpaid invoice falls outside the current page.
             const oldestDate = invoices
               .filter(
                 (inv) =>

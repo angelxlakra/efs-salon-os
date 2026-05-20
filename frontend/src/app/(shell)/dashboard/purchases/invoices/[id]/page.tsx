@@ -68,7 +68,10 @@ export default function InvoiceDetailPage() {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-IN', {
+    // Append local-time sentinel only when the string is a bare date (no T separator).
+    // Prevents UTC midnight → IST day-shift on date-only strings like "2025-01-15".
+    const normalised = dateString.includes('T') ? dateString : dateString + 'T00:00:00';
+    return new Date(normalised).toLocaleDateString('en-IN', {
       day: '2-digit',
       month: 'short',
       year: 'numeric',
