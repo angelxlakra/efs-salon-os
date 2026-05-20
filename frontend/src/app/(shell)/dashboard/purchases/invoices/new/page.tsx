@@ -379,7 +379,7 @@ export default function NewPurchaseInvoicePage() {
         </Button>
         <div className="min-w-0 flex-1">
           <h1 className="text-xl font-semibold truncate">New Purchase Invoice</h1>
-          <p className="text-sm md:text-base text-muted-foreground truncate">Create a new supplier invoice</p>
+          <p className="text-sm md:text-base text-text-muted truncate">Create a new supplier invoice</p>
         </div>
       </div>
 
@@ -443,7 +443,7 @@ export default function NewPurchaseInvoicePage() {
                   </Button>
                 </div>
               </div>
-              <p className="text-xs text-muted-foreground mt-2">Type barcode manually or use camera to scan</p>
+              <p className="text-xs text-text-muted mt-2">Type barcode manually or use camera to scan</p>
             </CardContent>
           </Card>
 
@@ -455,7 +455,7 @@ export default function NewPurchaseInvoicePage() {
                 <div className="flex items-center gap-3">
                   {/* Auto-calc toggle */}
                   <div className="flex items-center gap-2 border rounded-md px-3 py-1.5 bg-muted/50">
-                    <Calculator className="h-3.5 w-3.5 text-muted-foreground" />
+                    <Calculator className="h-3.5 w-3.5 text-text-muted" />
                     <Label htmlFor="autoCalc" className="text-xs font-medium cursor-pointer">
                       Auto-calculate
                     </Label>
@@ -467,7 +467,7 @@ export default function NewPurchaseInvoicePage() {
                 </div>
               </div>
               {autoCalc && (
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="text-xs text-text-muted mt-1">
                   Enter MRP (rate incl. tax), GST %, and discount — totals are calculated automatically.
                 </p>
               )}
@@ -581,19 +581,19 @@ export default function NewPurchaseInvoicePage() {
                               return (
                                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 rounded-md bg-muted/40 border px-3 py-2">
                                   <div>
-                                    <p className="text-xs text-muted-foreground">Base Rate/unit</p>
+                                    <p className="text-xs text-text-muted">Base Rate/unit</p>
                                     <p className="text-sm font-medium">{formatCurrency(baseRate)}</p>
                                   </div>
                                   <div>
-                                    <p className="text-xs text-muted-foreground">Taxable (line)</p>
+                                    <p className="text-xs text-text-muted">Taxable (line)</p>
                                     <p className="text-sm font-medium">{formatCurrency(calc.taxableLine)}</p>
                                   </div>
                                   <div>
-                                    <p className="text-xs text-muted-foreground">CGST + SGST</p>
+                                    <p className="text-xs text-text-muted">CGST + SGST</p>
                                     <p className="text-sm font-medium">{formatCurrency(calc.cgst + calc.sgst)}</p>
                                   </div>
                                   <div>
-                                    <p className="text-xs text-muted-foreground">Line Total</p>
+                                    <p className="text-xs text-text-muted">Line Total</p>
                                     <p className="text-sm font-semibold text-primary">{formatCurrency(calc.lineTotal)}</p>
                                   </div>
                                 </div>
@@ -649,7 +649,7 @@ export default function NewPurchaseInvoicePage() {
                             {/* CGST / SGST reference fields */}
                             <div className="grid gap-4 grid-cols-2 sm:grid-cols-4">
                               <div className="space-y-2">
-                                <Label className="text-xs text-muted-foreground">CGST (₹)</Label>
+                                <Label className="text-xs text-text-muted">CGST (₹)</Label>
                                 <Input
                                   type="number" step="0.01" min="0"
                                   value={(item.cgst_amount || 0) === 0 ? '' : (item.cgst_amount || 0) / 100}
@@ -659,7 +659,7 @@ export default function NewPurchaseInvoicePage() {
                                 />
                               </div>
                               <div className="space-y-2">
-                                <Label className="text-xs text-muted-foreground">SGST (₹)</Label>
+                                <Label className="text-xs text-text-muted">SGST (₹)</Label>
                                 <Input
                                   type="number" step="0.01" min="0"
                                   value={(item.sgst_amount || 0) === 0 ? '' : (item.sgst_amount || 0) / 100}
@@ -669,7 +669,7 @@ export default function NewPurchaseInvoicePage() {
                                 />
                               </div>
                               <div className="space-y-2">
-                                <Label className="text-xs text-muted-foreground">GST %</Label>
+                                <Label className="text-xs text-text-muted">GST %</Label>
                                 <Select
                                   value={String(item.tax_rate_percent)}
                                   onValueChange={(v) => handleItemChange(index, 'tax_rate_percent', parseInt(v))}
@@ -715,7 +715,7 @@ export default function NewPurchaseInvoicePage() {
                   onChange={(e) => setInvoiceDiscount(e.target.value === '' ? 0 : Math.round(parseFloat(e.target.value) * 100) || 0)}
                   placeholder="0.00"
                 />
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-text-muted">
                   Applied to the entire invoice after item discounts
                 </p>
               </div>
@@ -742,7 +742,7 @@ export default function NewPurchaseInvoicePage() {
                     </Button>
                   )}
                 </div>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-text-muted">
                   Negative = round down (−), positive = round up (+)
                 </p>
               </div>
@@ -758,12 +758,12 @@ export default function NewPurchaseInvoicePage() {
               {/* Items List */}
               {items.some(item => item.product_name.trim()) && (
                 <div className="space-y-2">
-                  <p className="text-sm font-medium text-muted-foreground">Items Added:</p>
+                  <p className="text-sm font-medium text-text-muted">Items Added:</p>
                   <div className="space-y-2 max-h-60 overflow-y-auto">
                     {items.filter(item => item.product_name.trim()).map((item, index) => (
                       <div key={index} className="p-2 bg-muted rounded-md text-sm">
                         <div className="font-medium truncate" title={item.product_name}>{item.product_name}</div>
-                        <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                        <div className="flex justify-between text-xs text-text-muted mt-1">
                           <span>{item.quantity} {item.uom}</span>
                           <span>{formatCurrency(getLineTotal(item))}</span>
                         </div>
@@ -775,7 +775,7 @@ export default function NewPurchaseInvoicePage() {
 
               <div className="space-y-2 pt-2 border-t">
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Total Items:</span>
+                  <span className="text-text-muted">Total Items:</span>
                   <span className="font-medium">{items.filter(item => item.product_name.trim()).length}</span>
                 </div>
 
@@ -783,14 +783,14 @@ export default function NewPurchaseInvoicePage() {
                 {autoCalc && totalTaxable > 0 && (
                   <>
                     <div className="flex justify-between text-sm pt-1">
-                      <span className="text-muted-foreground">Taxable Value:</span>
+                      <span className="text-text-muted">Taxable Value:</span>
                       <span>{formatCurrency(totalTaxable)}</span>
                     </div>
-                    <div className="flex justify-between text-sm text-blue-600">
+                    <div className="flex justify-between text-sm text-accent">
                       <span>CGST:</span>
                       <span>{formatCurrency(totalCgst)}</span>
                     </div>
-                    <div className="flex justify-between text-sm text-blue-600">
+                    <div className="flex justify-between text-sm text-accent">
                       <span>SGST:</span>
                       <span>{formatCurrency(totalSgst)}</span>
                     </div>
@@ -798,17 +798,17 @@ export default function NewPurchaseInvoicePage() {
                 )}
 
                 <div className="flex justify-between text-sm pt-1 border-t">
-                  <span className="text-muted-foreground">Subtotal:</span>
+                  <span className="text-text-muted">Subtotal:</span>
                   <span className="font-semibold">{formatCurrency(calculateSubtotal())}</span>
                 </div>
                 {invoiceDiscount > 0 && (
-                  <div className="flex justify-between text-sm text-green-600">
+                  <div className="flex justify-between text-sm text-warning-fg">
                     <span>Invoice Discount:</span>
                     <span className="font-semibold">-{formatCurrency(invoiceDiscount)}</span>
                   </div>
                 )}
                 {roundOff !== 0 && (
-                  <div className={`flex justify-between text-sm ${roundOff < 0 ? 'text-orange-600' : 'text-green-600'}`}>
+                  <div className={`flex justify-between text-sm ${roundOff < 0 ? 'text-warning-fg' : 'text-success-fg'}`}>
                     <span>Round Off:</span>
                     <span className="font-semibold">
                       {roundOff > 0 ? '+' : ''}{formatCurrency(roundOff)}
@@ -826,7 +826,7 @@ export default function NewPurchaseInvoicePage() {
                 <Button variant="outline" className="w-full" onClick={() => router.back()}>Cancel</Button>
               </div>
 
-              <div className="text-xs text-muted-foreground pt-4 border-t">
+              <div className="text-xs text-text-muted pt-4 border-t">
                 <p>Note: Invoice will be created in DRAFT status. Mark as received to update inventory.</p>
               </div>
             </CardContent>
@@ -847,7 +847,7 @@ export default function NewPurchaseInvoicePage() {
             <DialogHeader><DialogTitle>Add Product Details</DialogTitle></DialogHeader>
             <DialogBody className="space-y-4">
               <div className="p-3 bg-muted rounded-lg">
-                <p className="text-sm text-muted-foreground">Barcode not found in system</p>
+                <p className="text-sm text-text-muted">Barcode not found in system</p>
                 <p className="font-mono font-semibold">{unmappedBarcode}</p>
               </div>
               <div className="space-y-2">
