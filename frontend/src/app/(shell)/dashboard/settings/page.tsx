@@ -273,7 +273,7 @@ export default function SettingsPage() {
 
   if (!isOwner) {
     return (
-      <div className="p-4 space-y-4">
+      <div className="p-4 md:p-6 pt-6 md:pt-8 space-y-4">
         <Alert>
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
@@ -294,7 +294,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="p-4 space-y-4 pb-10">
+    <div className="p-4 md:p-6 pt-6 md:pt-8 space-y-4 pb-10">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>

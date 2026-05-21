@@ -44,7 +44,7 @@ export default function ReportsPage() {
   ];
 
   return (
-    <div className="p-4 space-y-4 bg-surface-page min-h-full">
+    <div className="p-4 md:p-6 pt-6 md:pt-8 space-y-4 bg-surface-page min-h-full">
       <div>
         <h1 className="text-xl font-semibold text-text-primary">Reports</h1>
         <p className="text-text-secondary">

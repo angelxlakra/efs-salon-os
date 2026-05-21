@@ -41,7 +41,7 @@ export default function ProfitLossPage() {
   };
 
   return (
-    <div className="p-4 space-y-4">
+    <div className="p-4 md:p-6 pt-6 md:pt-8 space-y-4">
       <div>
         <h1 className="text-xl font-semibold">Profit & Loss Statement</h1>
         <p className="text-muted-foreground">View detailed financial performance</p>

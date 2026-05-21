@@ -200,7 +200,7 @@ export default function MyServicesPage() {
   }
 
   return (
-    <div className="p-4 space-y-4">
+    <div className="p-4 md:p-6 pt-6 md:pt-8 space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

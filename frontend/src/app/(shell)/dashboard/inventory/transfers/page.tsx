@@ -95,7 +95,7 @@ export default function TransfersPage() {
   const totalPages = Math.ceil(total / SIZE);
 
   return (
-    <div className="p-4 space-y-4">
+    <div className="p-4 md:p-6 pt-6 md:pt-8 space-y-4">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
           <h1 className="text-xl font-semibold">Inventory Transfers</h1>

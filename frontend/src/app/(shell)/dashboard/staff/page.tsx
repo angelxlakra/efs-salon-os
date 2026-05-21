@@ -173,7 +173,7 @@ export default function StaffDashboard() {
   }
 
   return (
-    <div className="p-4 space-y-4">
+    <div className="p-4 md:p-6 pt-6 md:pt-8 space-y-4">
       {/* Header - Mobile Optimized */}
       <div>
         <h1 className="text-xl font-semibold">My Services</h1>
