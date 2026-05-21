@@ -145,7 +145,7 @@ export default function SuppliersPage() {
 
   if (view === 'form') {
     return (
-      <div className="p-4 md:p-6 space-y-4">
+      <div className="p-4 md:p-6 pt-6 md:pt-8 space-y-4">
         <div className="flex items-center gap-3 md:gap-4">
           <Button variant="ghost" size="icon" onClick={handleCloseForm}>
             <ArrowLeft className="h-4 w-4" />
@@ -276,7 +276,7 @@ export default function SuppliersPage() {
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-4">
+    <div className="p-4 md:p-6 pt-6 md:pt-8 space-y-4">
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="min-w-0 flex-1">
