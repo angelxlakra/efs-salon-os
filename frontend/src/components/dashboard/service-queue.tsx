@@ -77,15 +77,75 @@ function elapsedMinutes(date: Date): number {
 
 interface ServiceQueueProps {
   sessions: CustomerSession[];
+  variant?: 'default' | 'sidebar';
 }
 
-export function ServiceQueue({ sessions }: ServiceQueueProps) {
+export function ServiceQueue({ sessions, variant = 'default' }: ServiceQueueProps) {
   const lanes = buildLanes(sessions);
 
   if (lanes.length === 0) {
+    if (variant === 'sidebar') {
+      return <p className="text-sm text-text-muted">No active services</p>;
+    }
     return (
       <div className="rounded-xl bg-surface-card border border-border-subtle p-6 text-center">
         <p className="text-sm text-text-muted">No active services</p>
+      </div>
+    );
+  }
+
+  if (variant === 'sidebar') {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {lanes.map((lane) => (
+          <div key={lane.staffId} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            <div className="db-queue-lane-hd">{lane.staffName}</div>
+            {lane.items.map((item) => (
+              <div key={item.walkinId} className="db-queue-item">
+                <span
+                  className={`db-q-dot ${item.status === 'in_progress' ? 'db-q-dot-ip' : 'db-q-dot-ci'}`}
+                />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div
+                    style={{
+                      fontFamily: "'DM Sans', system-ui, sans-serif",
+                      fontSize: 10,
+                      fontWeight: 600,
+                      color: 'var(--db-ink)',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {item.serviceName}
+                  </div>
+                  <div
+                    style={{
+                      fontFamily: "'DM Sans', system-ui, sans-serif",
+                      fontSize: 9,
+                      color: 'var(--db-ink-5)',
+                    }}
+                  >
+                    {item.customerName}
+                  </div>
+                </div>
+                <span
+                  className="db-num"
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 300,
+                    color: 'var(--db-ink-5)',
+                    flexShrink: 0,
+                    letterSpacing: '-0.5px',
+                    fontVariantNumeric: 'tabular-nums',
+                  }}
+                >
+                  {elapsedMinutes(item.checkedInAt)}m
+                </span>
+              </div>
+            ))}
+          </div>
+        ))}
       </div>
     );
   }

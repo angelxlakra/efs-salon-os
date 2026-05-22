@@ -32,3 +32,24 @@ describe('ServiceQueue', () => {
     expect(container.querySelector('.bg-amber-400')).toBeNull();
   });
 });
+
+describe('ServiceQueue sidebar variant', () => {
+  it('renders db-queue-lane-hd class in sidebar mode', () => {
+    const sessions = makeSessions('in_progress');
+    const { container } = render(<ServiceQueue sessions={sessions} variant="sidebar" />);
+    expect(container.querySelector('.db-queue-lane-hd')).not.toBeNull();
+  });
+
+  it('renders empty state in sidebar mode too', () => {
+    const { getByText } = render(<ServiceQueue sessions={[]} variant="sidebar" />);
+    expect(getByText('No active services')).toBeTruthy();
+  });
+
+  it('renders db-queue-item and db-q-dot-ip for in_progress walkin in sidebar mode', () => {
+    const { container } = render(
+      <ServiceQueue sessions={makeSessions('in_progress')} variant="sidebar" />
+    );
+    expect(container.querySelector('.db-queue-item')).not.toBeNull();
+    expect(container.querySelector('.db-q-dot-ip')).not.toBeNull();
+  });
+});
