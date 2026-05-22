@@ -97,3 +97,124 @@ export function DualRadialGoals({
     </div>
   );
 }
+
+// SVG ring circumference for r=35 on 84×84 viewBox: 2π×35 ≈ 219.9
+const CIRCUM = 219.9;
+
+function svgDash(pct: number) {
+  const fill = Math.min(100, Math.max(0, pct)) / 100 * CIRCUM;
+  return `${fill} ${CIRCUM - fill}`;
+}
+
+function getAssessment(pct: number): string {
+  if (pct < 20) return 'time to push hard this afternoon.';
+  if (pct < 40) return "within striking range of today's target.";
+  return 'on track for a strong finish.';
+}
+
+interface RingItemProps {
+  label: string;
+  pct: number;
+  value: string;
+  color: string;
+}
+
+function RingItem({ label, pct, value, color }: RingItemProps) {
+  const dash = svgDash(pct);
+  // Start at 12 o'clock: dashoffset shifts arc by quarter-circumference
+  const offset = CIRCUM * 0.25;
+  return (
+    <div data-ring style={{ textAlign: 'center', width: 86 }}>
+      <div style={{ width: 84, height: 84, position: 'relative', margin: '0 auto 8px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column' }}>
+        <svg
+          style={{ position: 'absolute', top: 0, left: 0 }}
+          width="84" height="84" viewBox="0 0 84 84"
+          aria-label={`${label}: ${pct}% complete`}
+          role="img"
+        >
+          <circle cx="42" cy="42" r="35" fill="none" stroke="var(--db-muted)" strokeWidth="6" />
+          <circle
+            cx="42" cy="42" r="35" fill="none"
+            stroke={color} strokeWidth="6"
+            strokeDasharray={dash}
+            strokeDashoffset={offset}
+            strokeLinecap="round"
+          />
+        </svg>
+        <span className="db-num db-num-ring">{pct}</span>
+      </div>
+      <span className="db-label" style={{ textAlign: 'center' }}>{label}</span>
+      <div className="db-ring-sub">{value}</div>
+    </div>
+  );
+}
+
+interface GoalsRingsProps {
+  revenueTarget: number;    // paise — accepted for future display; currently unused in rendering
+  currentRevenue: number;   // paise
+  servicesTarget: number;
+  currentServices: number;
+  customersTarget: number;
+  currentCustomers: number;
+  weekdayName: string;
+  revenuePct: number;       // pre-computed percentage (0–100)
+}
+
+export function GoalsRings({
+  revenueTarget,
+  currentRevenue,
+  servicesTarget,
+  currentServices,
+  customersTarget,
+  currentCustomers,
+  weekdayName,
+  revenuePct,
+}: GoalsRingsProps) {
+  const svcPct = servicesTarget > 0
+    ? Math.min(100, Math.round((currentServices / servicesTarget) * 100))
+    : 0;
+  const custPct = customersTarget > 0
+    ? Math.min(100, Math.round((currentCustomers / customersTarget) * 100))
+    : 0;
+  const formatRupees = (p: number) => `₹${Math.round(p / 100).toLocaleString('en-IN')}`;
+  const assessment = getAssessment(revenuePct);
+
+  return (
+    <div className="db-goals-section">
+      <div style={{ display: 'flex', gap: 16, flexShrink: 0 }}>
+        <RingItem
+          label="Revenue"
+          pct={revenuePct}
+          value={formatRupees(currentRevenue)}
+          color="var(--db-gold)"
+        />
+        <RingItem
+          label="Services"
+          pct={svcPct}
+          value={`${currentServices} / ${servicesTarget}`}
+          color="var(--db-gold)"
+        />
+        <RingItem
+          label="Customers"
+          pct={custPct}
+          value={`${currentCustomers} / ${customersTarget}`}
+          color="var(--db-ink-3)"
+        />
+      </div>
+      <div className="db-goals-msg">
+        <span
+          className="db-editorial"
+          style={{ fontSize: 20, color: 'var(--db-ink)', display: 'block', marginBottom: 8 }}
+        >
+          {revenuePct < 40 ? 'Three rings to close.' : 'Looking strong today.'}
+        </span>
+        <p style={{ fontFamily: "'DM Sans', system-ui, sans-serif", fontSize: 12, color: 'var(--db-ink-4)', lineHeight: 1.7 }}>
+          At <strong style={{ color: 'var(--db-ink)' }}>{revenuePct}%</strong> of today&apos;s revenue target
+          with <strong style={{ color: 'var(--db-ink)' }}>{currentServices} services</strong> and{' '}
+          <strong style={{ color: 'var(--db-ink)' }}>{currentCustomers} customers</strong> so far
+          this <strong style={{ color: 'var(--db-ink)' }}>{weekdayName}</strong> — {assessment}
+        </p>
+      </div>
+    </div>
+  );
+}
