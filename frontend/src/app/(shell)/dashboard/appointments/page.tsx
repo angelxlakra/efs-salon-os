@@ -82,7 +82,7 @@ export default function AppointmentsPage() {
             format(addDays(ms, i), "yyyy-MM-dd")
           );
         }
-        const results = await Promise.all(dates.map(listAppointments));
+        const results = await Promise.all(dates.map((date) => listAppointments(date)));
         if (cancelled) return;
         const seen = new Set<string>();
         const all: Appointment[] = [];
