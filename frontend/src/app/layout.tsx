@@ -26,6 +26,7 @@ export default function RootLayout({
             __html: `try{var t=localStorage.getItem('salon.theme');if(t==='dark'||t==='light')document.documentElement.setAttribute('data-theme',t);else document.documentElement.setAttribute('data-theme','light')}catch(e){document.documentElement.setAttribute('data-theme','light')}`,
           }}
         />
+
       </head>
       <body className="antialiased font-sans">
         {children}
