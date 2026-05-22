@@ -32,11 +32,60 @@ These tokens are **dashboard-scoped only** — defined under a `.dashboard-page`
 
 ### Typography
 
-All fonts are already self-hosted (`frontend/public/fonts/`):
+Two font families loaded from Google Fonts (add to `frontend/src/app/layout.tsx` `<head>`):
 
-- **Instrument Serif italic** (`var(--font-display)`) — pace indicator ("Behind by ~₹1,500"), goals message ("Three rings to close."), Up Next subtitle
-- **Inter bold/extrabold** — revenue number, all other headings and UI text
-- **Tabular numerals** (`font-variant-numeric: tabular-nums`) — revenue, times, all numeric displays
+- **Cormorant Garamond** — weights 300, 400, 500 (roman + italic) — all numerals and editorial phrases
+- **DM Sans** — weights 400–800 — all labels, UI text, buttons, names
+
+**Numeral CSS recipe** (applied to every number on the dashboard):
+```css
+font-family: 'Cormorant Garamond', serif;
+font-weight: 300;
+letter-spacing: -1px;
+line-height: 0.95;
+font-variant-numeric: tabular-nums;
+```
+
+**Size scale by context:**
+
+| Context | Size | Weight | Notes |
+|---|---|---|---|
+| Hero revenue (₹4,977) | 86px | 300 | Largest element on page |
+| "Behind by" warning numeral | 42px | 400 | Slightly heavier for urgency |
+| Ring center value | 34px | 300 | |
+| At-a-glance mini values | 22px | 300 | |
+| Card totals | 20px | 500 | Slightly heavier for action context |
+| Slide-over grand total | 40px | 300 | Future use |
+| Appointment times (Up Next) | 17px | 300 | |
+| Service prices in rows | 14px | 400 | |
+| Queue elapsed times | 14px | 300 | |
+
+**Editorial vs. data split:**
+- **Italic Cormorant 300** — narrative phrases only: "Behind by", "Three rings to close.", "The next guests through the door." These carry voice and judgment.
+- **Roman Cormorant** — all hard numbers. These carry data.
+
+**Label recipe** (DM Sans overline above every numeral block):
+```css
+font-family: 'DM Sans', sans-serif;
+font-size: 10px;
+letter-spacing: 3px;
+text-transform: uppercase;
+color: rgba(28, 16, 76, 0.4);
+font-weight: 500;
+```
+
+**Tabular numerals** (`font-variant-numeric: tabular-nums`) required on every numeric surface.
+
+---
+
+## Topbar
+
+The topbar spans full width above the main/sidebar split.
+
+- **Title:** "Today" — DM Sans 22px 800 weight
+- **Clock/date:** DM Sans 11px, `var(--ink-5)`
+- **Search bar:** `flex:1`, min `360px`, max `480px`. Background `var(--cream-card)`, `1.5px` border, `border-radius:10px`, `padding: 9px 16px 9px 38px`, SVG search icon inset left at `12px`. Font 13px DM Sans. Subtle `box-shadow: 0 1px 3px rgba(28,16,76,0.06)`.
+- **+ New Walk-in button:** `var(--ink)` background, white text, DM Sans 12px 700, `border-radius:8px`, `padding: 9px 16px`
 
 ---
 
@@ -199,7 +248,7 @@ Passes `status` as a query param when provided. Fully backwards-compatible.
 
 - All walk-in session state and workflow (start, complete, checkout)
 - Per-service start/complete buttons on `ActiveCustomerCard` (already exist — restyled only)
-- Birthday banner (moved to inside the stats bar card or above it)
+- Birthday banner (stays **above** the stats bar, same position as today — restyled to warm color scheme only)
 - Poll interval (10s for active sessions, 2 min for Up Next)
 - Role-based visibility (`canManageServices` check on action buttons)
 
