@@ -245,6 +245,10 @@
 .db-q-dot-ci       { background: var(--db-border); }
 .db-q-dot-done     { background: var(--db-green); }
 
+/* ─── Semantic color utilities (theme-aware via tokens.css) ───────────────── */
+.db-text-ahead  { color: var(--success-fg); }
+.db-text-behind { color: var(--danger-fg); }
+
 /* ─── Up Next panel title ──────────────────────────────────────────────────── */
 .db-upnext-title {
   font-family: 'DM Sans', system-ui, sans-serif;
