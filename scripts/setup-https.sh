@@ -38,13 +38,15 @@ if [ -n "$LOCAL_IP" ]; then
 fi
 
 if [[ "$AUTO_MODE" == "true" ]]; then
-    # Source .env from current directory to get TAILSCALE_IP
-    if [ -f ".env" ]; then
-        # shellcheck disable=SC1091
-        set -a; source .env; set +a
+    if [ ! -f ".env" ]; then
+        echo "ERROR: --auto mode requires .env in current directory ($(pwd))" >&2
+        exit 1
     fi
-    if [ -n "${TAILSCALE_IP:-}" ]; then
+    TAILSCALE_IP=$(grep -E '^TAILSCALE_IP=' .env | cut -d= -f2- | tr -d '"'"'"  | head -1)
+    if [[ "${TAILSCALE_IP:-}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
         SAN="$SAN,IP:$TAILSCALE_IP"
+    else
+        echo "WARNING: TAILSCALE_IP '${TAILSCALE_IP:-}' is not a valid IPv4 address, skipping" >&2
     fi
     ADDITIONAL_IPS=""
 else
@@ -81,8 +83,10 @@ CERT_FILE="$SSL_DIR/salon.crt"
 KEY_FILE="$SSL_DIR/salon.key"
 DOMAIN="localhost"
 
-echo "Generating self-signed SSL certificate..."
-echo ""
+if [[ "$AUTO_MODE" == "false" ]]; then
+    echo "Generating self-signed SSL certificate..."
+    echo ""
+fi
 
 # Generate self-signed certificate
 openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
@@ -91,12 +95,14 @@ openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
   -subj "/C=IN/ST=State/L=City/O=SalonOS/CN=$DOMAIN" \
   -addext "subjectAltName=$SAN"
 
-echo "✓ Certificate generated successfully!"
-echo ""
-echo "Certificate files:"
-echo "  - Certificate: $CERT_FILE"
-echo "  - Private Key: $KEY_FILE"
-echo ""
+if [[ "$AUTO_MODE" == "false" ]]; then
+    echo "✓ Certificate generated successfully!"
+    echo ""
+    echo "Certificate files:"
+    echo "  - Certificate: $CERT_FILE"
+    echo "  - Private Key: $KEY_FILE"
+    echo ""
+fi
 
 # Backup existing nginx config
 if [ -f "./nginx/nginx.conf" ]; then
@@ -243,42 +249,44 @@ else
     echo ""
 fi
 
-echo "========================================="
-echo "Setup Complete!"
-echo "========================================="
-echo ""
-echo "Next steps:"
-echo ""
-echo "1. Update docker-compose.yml (if needed - see warnings above)"
-echo ""
-echo "2. Restart nginx:"
-echo "   docker compose restart nginx"
-echo ""
-echo "3. Trust the certificate on your mobile device:"
-echo ""
-echo "   For Android:"
-echo "   a. Copy the certificate to your phone:"
-echo "      adb push $CERT_FILE /sdcard/Download/"
-echo "   b. Go to Settings > Security > Install from storage"
-echo "   c. Select the salon.crt file"
-echo "   d. Name it 'SalonOS Local' and select 'VPN and apps'"
-echo ""
-echo "   For iOS:"
-echo "   a. Email the certificate to yourself or use AirDrop"
-echo "   b. Open the certificate file"
-echo "   c. Go to Settings > General > VPN & Device Management"
-echo "   d. Install the profile"
-echo "   e. Go to Settings > General > About > Certificate Trust Settings"
-echo "   f. Enable full trust for 'SalonOS Local'"
-echo ""
-echo "4. Access your app at:"
-echo "   https://localhost"
-echo "   https://$LOCAL_IP (from mobile devices on same network)"
-echo ""
-echo "IMPORTANT FOR MOBILE ACCESS:"
-echo "  - You can access via any IP address included in the certificate"
-echo "  - If your server IP changes, re-run this script to regenerate the certificate"
-echo "  - For static IP: Configure your router to assign a fixed IP to the server"
-echo ""
-echo "Certificate valid for 365 days"
-echo "========================================="
+if [[ "$AUTO_MODE" == "false" ]]; then
+    echo "========================================="
+    echo "Setup Complete!"
+    echo "========================================="
+    echo ""
+    echo "Next steps:"
+    echo ""
+    echo "1. Update docker-compose.yml (if needed - see warnings above)"
+    echo ""
+    echo "2. Restart nginx:"
+    echo "   docker compose restart nginx"
+    echo ""
+    echo "3. Trust the certificate on your mobile device:"
+    echo ""
+    echo "   For Android:"
+    echo "   a. Copy the certificate to your phone:"
+    echo "      adb push $CERT_FILE /sdcard/Download/"
+    echo "   b. Go to Settings > Security > Install from storage"
+    echo "   c. Select the salon.crt file"
+    echo "   d. Name it 'SalonOS Local' and select 'VPN and apps'"
+    echo ""
+    echo "   For iOS:"
+    echo "   a. Email the certificate to yourself or use AirDrop"
+    echo "   b. Open the certificate file"
+    echo "   c. Go to Settings > General > VPN & Device Management"
+    echo "   d. Install the profile"
+    echo "   e. Go to Settings > General > About > Certificate Trust Settings"
+    echo "   f. Enable full trust for 'SalonOS Local'"
+    echo ""
+    echo "4. Access your app at:"
+    echo "   https://localhost"
+    echo "   https://$LOCAL_IP (from mobile devices on same network)"
+    echo ""
+    echo "IMPORTANT FOR MOBILE ACCESS:"
+    echo "  - You can access via any IP address included in the certificate"
+    echo "  - If your server IP changes, re-run this script to regenerate the certificate"
+    echo "  - For static IP: Configure your router to assign a fixed IP to the server"
+    echo ""
+    echo "Certificate valid for 365 days"
+    echo "========================================="
+fi
