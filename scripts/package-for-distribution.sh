@@ -3,8 +3,9 @@
 # SalonOS Distribution Packaging Script
 # This script creates a complete, distributable package for client deployment
 #
-# Usage: ./scripts/package-for-distribution.sh [version]
+# Usage: ./scripts/package-for-distribution.sh [--publish] [version]
 # Example: ./scripts/package-for-distribution.sh 1.0.0
+#          ./scripts/package-for-distribution.sh --publish 1.0.0
 #
 
 set -e  # Exit on error
@@ -363,15 +364,20 @@ publish_to_b2() {
 
     if ! command -v b2 &> /dev/null; then
         log_error "b2 CLI not found. Install with: pip3 install b2"
-        exit 1
+        return 1
     fi
 
-    # Compute SHA256 (macOS uses shasum, Linux uses sha256sum)
+    if ! b2 account get &> /dev/null; then
+        log_error "b2 is not authenticated. Run: b2 account authorize"
+        return 1
+    fi
+
+    # Compute SHA256 (Linux uses sha256sum, macOS falls back to shasum)
     local sha256
-    if command -v shasum &> /dev/null; then
-        sha256=$(shasum -a 256 "$tarball" | awk '{print $1}')
-    else
+    if command -v sha256sum &> /dev/null; then
         sha256=$(sha256sum "$tarball" | awk '{print $1}')
+    else
+        sha256=$(shasum -a 256 "$tarball" | awk '{print $1}')
     fi
 
     log_info "SHA256: $sha256"
@@ -383,13 +389,15 @@ publish_to_b2() {
     # Write and upload latest.json
     local tmp_json
     tmp_json=$(mktemp /tmp/latest.XXXXXX.json)
+    trap "rm -f \"$tmp_json\"" EXIT
     printf '{"version":"%s","filename":"%s.tar.gz","sha256":"%s","released_at":"%s"}' \
         "${VERSION}" "${PACKAGE_NAME}" "${sha256}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
         > "$tmp_json"
 
     log_info "Uploading latest.json ..."
     b2 file upload salon-os-releases "$tmp_json" latest.json
-    rm "$tmp_json"
+    rm -f "$tmp_json"
+    trap - EXIT
 
     log_success "Published ${VERSION} to B2. Machines will pick it up within 30 min."
     echo ""
