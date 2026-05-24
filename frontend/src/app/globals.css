@@ -2,6 +2,7 @@
 @import "tw-animate-css";
 @import "../styles/tokens.css";
 @import "../styles/typography.css";
+@import "../styles/dashboard.css";
 
 @custom-variant dark (&:is([data-theme="dark"] *));
 

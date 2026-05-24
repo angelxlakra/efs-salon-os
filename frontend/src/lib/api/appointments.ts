@@ -66,9 +66,14 @@ export interface ServiceItem {
   category_name: string;
 }
 
-export async function listAppointments(date: string): Promise<Appointment[]> {
+export async function listAppointments(
+  date: string,
+  status?: AppointmentStatus
+): Promise<Appointment[]> {
+  const params: Record<string, string> = { date };
+  if (status !== undefined) params.status = status;
   const { data } = await apiClient.get<Appointment[]>("/appointments", {
-    params: { date },
+    params,
   });
   return data;
 }
