@@ -193,7 +193,8 @@ All update activity appended to `/var/log/salon-os-updater.log`:
 - **Bucket name:** `salon-os-releases`
 - **Access:** Public (download without auth) — 25 KB files contain no secrets
 - **Lifecycle:** Keep all files (versions are small; manual cleanup if ever needed)
-- The dev Mac needs B2 CLI credentials (already set up for backups) for uploading releases. Target machines need only `curl` — downloads are via public URL, no credentials required.
+- The dev Mac needs the `b2` CLI installed and authenticated (one-time setup step, covered in the implementation plan). Target machines need only `curl` — downloads are via public URL, no credentials required.
+- Docker named volumes (PostgreSQL data, Redis data) survive `docker compose down/up` — confirmed by production history. Data is never at risk during updates.
 
 ---
 
