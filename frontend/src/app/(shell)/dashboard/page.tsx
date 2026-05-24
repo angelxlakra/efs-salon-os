@@ -200,7 +200,7 @@ export default function DashboardPage() {
     <div className="dashboard-page" style={{ display: 'flex', flexDirection: 'column', minHeight: '100dvh' }}>
 
       {/* Main layout: content + right sidebar */}
-      <div style={{ display: 'flex', flex: 1, alignItems: 'flex-start' }}>
+      <div style={{ display: 'flex', flex: 1, alignItems: 'stretch' }}>
 
         {/* Main content */}
         <div style={{ flex: 1, padding: 14, display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
