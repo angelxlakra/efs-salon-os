@@ -103,9 +103,9 @@ log "INFO" "SHA256 verified OK"
 # ─── Extract ──────────────────────────────────────────────────────────────────
 
 TARBALL_INNER_DIR=$(tar -tzf "$TMP_TARBALL" | head -1 | cut -d'/' -f1)
-if [ -z "$TARBALL_INNER_DIR" ] || [[ "$TARBALL_INNER_DIR" != salon-os-* ]]; then
+if [ -z "$TARBALL_INNER_DIR" ] || [[ "$TARBALL_INNER_DIR" != salon-os-* ]] || [[ "$TARBALL_INNER_DIR" == *".."* ]]; then
     rm -f "$TMP_TARBALL"
-    die "Unexpected tarball structure — inner dir '${TARBALL_INNER_DIR}' does not match 'salon-os-*'"
+    die "Unexpected tarball structure — inner dir '${TARBALL_INNER_DIR}' failed safety check"
 fi
 NEW_INSTALL_DIR="${INSTALL_ROOT}/${TARBALL_INNER_DIR}"
 
