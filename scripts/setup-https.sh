@@ -34,7 +34,11 @@ fi
 SAN="DNS:localhost,IP:127.0.0.1"
 
 if [ -n "$LOCAL_IP" ]; then
-    SAN="$SAN,IP:$LOCAL_IP"
+    if [[ "$LOCAL_IP" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        SAN="$SAN,IP:$LOCAL_IP"
+    else
+        echo "WARNING: LOCAL_IP '${LOCAL_IP}' is not a valid IPv4 address, skipping" >&2
+    fi
 fi
 
 if [[ "$AUTO_MODE" == "true" ]]; then
@@ -107,7 +111,9 @@ fi
 # Backup existing nginx config
 if [ -f "./nginx/nginx.conf" ]; then
     cp ./nginx/nginx.conf ./nginx/nginx.conf.backup
-    echo "✓ Backed up nginx.conf to nginx.conf.backup"
+    if [[ "$AUTO_MODE" == "false" ]]; then
+        echo "✓ Backed up nginx.conf to nginx.conf.backup"
+    fi
 fi
 
 # Create HTTPS-enabled nginx config
@@ -220,33 +226,37 @@ http {
 }
 EOF
 
-echo "✓ Updated nginx.conf with HTTPS configuration"
-echo ""
-
-# Update docker-compose to mount SSL certificates
-if grep -q "nginx/ssl" docker-compose.yml 2>/dev/null; then
-    echo "✓ docker-compose.yml already configured for SSL"
-else
-    echo "⚠ Please add SSL volume mount to docker-compose.yml:"
-    echo ""
-    echo "  nginx:"
-    echo "    volumes:"
-    echo "      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro"
-    echo "      - ./nginx/ssl:/etc/nginx/ssl:ro  # Add this line"
+if [[ "$AUTO_MODE" == "false" ]]; then
+    echo "✓ Updated nginx.conf with HTTPS configuration"
     echo ""
 fi
 
-# Update docker-compose ports
-if grep -q "443:443" docker-compose.yml 2>/dev/null; then
-    echo "✓ docker-compose.yml already has port 443"
-else
-    echo "⚠ Please add HTTPS port to docker-compose.yml:"
-    echo ""
-    echo "  nginx:"
-    echo "    ports:"
-    echo "      - \"80:80\""
-    echo "      - \"443:443\"  # Add this line"
-    echo ""
+if [[ "$AUTO_MODE" == "false" ]]; then
+    # Update docker-compose to mount SSL certificates
+    if grep -q "nginx/ssl" docker-compose.yml 2>/dev/null; then
+        echo "✓ docker-compose.yml already configured for SSL"
+    else
+        echo "⚠ Please add SSL volume mount to docker-compose.yml:"
+        echo ""
+        echo "  nginx:"
+        echo "    volumes:"
+        echo "      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro"
+        echo "      - ./nginx/ssl:/etc/nginx/ssl:ro  # Add this line"
+        echo ""
+    fi
+
+    # Update docker-compose ports
+    if grep -q "443:443" docker-compose.yml 2>/dev/null; then
+        echo "✓ docker-compose.yml already has port 443"
+    else
+        echo "⚠ Please add HTTPS port to docker-compose.yml:"
+        echo ""
+        echo "  nginx:"
+        echo "    ports:"
+        echo "      - \"80:80\""
+        echo "      - \"443:443\"  # Add this line"
+        echo ""
+    fi
 fi
 
 if [[ "$AUTO_MODE" == "false" ]]; then
