@@ -1,46 +1,63 @@
 #!/bin/bash
 
 # Setup HTTPS for SalonOS Local Server
-# This script generates a self-signed SSL certificate for local development
+# Usage: ./setup-https.sh [--auto]
+#   --auto: non-interactive, reads TAILSCALE_IP from .env in current directory
 
 set -e
 
-echo "========================================="
-echo "SalonOS HTTPS Setup"
-echo "========================================="
-echo ""
+AUTO_MODE=false
+if [[ "${1:-}" == "--auto" ]]; then
+    AUTO_MODE=true
+fi
+
+if [[ "$AUTO_MODE" == "false" ]]; then
+    echo "========================================="
+    echo "SalonOS HTTPS Setup"
+    echo "========================================="
+    echo ""
+fi
 
 # Get local IP address
 if [[ "$OSTYPE" == "darwin"* ]]; then
-    # macOS
     LOCAL_IP=$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null)
 else
-    # Linux
     LOCAL_IP=$(hostname -I | awk '{print $1}')
 fi
 
-echo "Detected local IP: $LOCAL_IP"
-echo ""
-
-# Ask if user wants to add additional IPs
-echo "Do you want to add additional IP addresses to the certificate?"
-echo "(Useful if you have multiple network interfaces or want to support IP range)"
-echo ""
-read -p "Enter additional IPs (comma-separated, or press Enter to skip): " ADDITIONAL_IPS
+if [[ "$AUTO_MODE" == "false" ]]; then
+    echo "Detected local IP: $LOCAL_IP"
+    echo ""
+fi
 
 # Build Subject Alternative Names
 SAN="DNS:localhost,IP:127.0.0.1"
 
-# Add detected IP
 if [ -n "$LOCAL_IP" ]; then
     SAN="$SAN,IP:$LOCAL_IP"
 fi
 
-# Add additional IPs if provided
+if [[ "$AUTO_MODE" == "true" ]]; then
+    # Source .env from current directory to get TAILSCALE_IP
+    if [ -f ".env" ]; then
+        # shellcheck disable=SC1091
+        set -a; source .env; set +a
+    fi
+    if [ -n "${TAILSCALE_IP:-}" ]; then
+        SAN="$SAN,IP:$TAILSCALE_IP"
+    fi
+    ADDITIONAL_IPS=""
+else
+    echo "Do you want to add additional IP addresses to the certificate?"
+    echo "(Useful if you have multiple network interfaces or want to support IP range)"
+    echo ""
+    read -p "Enter additional IPs (comma-separated, or press Enter to skip): " ADDITIONAL_IPS
+fi
+
+# Add additional IPs if provided (interactive mode only)
 if [ -n "$ADDITIONAL_IPS" ]; then
     IFS=',' read -ra IPS <<< "$ADDITIONAL_IPS"
     for ip in "${IPS[@]}"; do
-        # Trim whitespace
         ip=$(echo "$ip" | xargs)
         if [ -n "$ip" ]; then
             SAN="$SAN,IP:$ip"
@@ -48,10 +65,12 @@ if [ -n "$ADDITIONAL_IPS" ]; then
     done
 fi
 
-echo ""
-echo "Certificate will be valid for:"
-echo "$SAN" | tr ',' '\n' | sed 's/^/  - /'
-echo ""
+if [[ "$AUTO_MODE" == "false" ]]; then
+    echo ""
+    echo "Certificate will be valid for:"
+    echo "$SAN" | tr ',' '\n' | sed 's/^/  - /'
+    echo ""
+fi
 
 # Create SSL directory
 SSL_DIR="./nginx/ssl"
