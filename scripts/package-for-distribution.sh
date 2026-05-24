@@ -14,7 +14,21 @@ set -u  # Exit on undefined variable
 # Configuration
 # =============================================================================
 
-VERSION="${1:-latest}"
+VERSION="latest"
+PUBLISH=false
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --publish)
+            PUBLISH=true
+            shift
+            ;;
+        *)
+            VERSION="$1"
+            shift
+            ;;
+    esac
+done
 BUILD_DATE=$(date +%Y%m%d)
 PACKAGE_NAME="salon-os-${VERSION}-${BUILD_DATE}"
 DIST_DIR="./dist"
@@ -338,6 +352,51 @@ cleanup() {
     log_success "Cleanup complete"
 }
 
+publish_to_b2() {
+    if [[ "$PUBLISH" != "true" ]]; then
+        return 0
+    fi
+
+    local tarball="${DIST_DIR}/${PACKAGE_NAME}.tar.gz"
+
+    log_info "Publishing to Backblaze B2..."
+
+    if ! command -v b2 &> /dev/null; then
+        log_error "b2 CLI not found. Install with: pip3 install b2"
+        exit 1
+    fi
+
+    # Compute SHA256 (macOS uses shasum, Linux uses sha256sum)
+    local sha256
+    if command -v shasum &> /dev/null; then
+        sha256=$(shasum -a 256 "$tarball" | awk '{print $1}')
+    else
+        sha256=$(sha256sum "$tarball" | awk '{print $1}')
+    fi
+
+    log_info "SHA256: $sha256"
+
+    # Upload tarball
+    log_info "Uploading ${PACKAGE_NAME}.tar.gz ..."
+    b2 file upload salon-os-releases "$tarball" "${PACKAGE_NAME}.tar.gz"
+
+    # Write and upload latest.json
+    local tmp_json
+    tmp_json=$(mktemp /tmp/latest.XXXXXX.json)
+    printf '{"version":"%s","filename":"%s.tar.gz","sha256":"%s","released_at":"%s"}' \
+        "${VERSION}" "${PACKAGE_NAME}" "${sha256}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        > "$tmp_json"
+
+    log_info "Uploading latest.json ..."
+    b2 file upload salon-os-releases "$tmp_json" latest.json
+    rm "$tmp_json"
+
+    log_success "Published ${VERSION} to B2. Machines will pick it up within 30 min."
+    echo ""
+    echo "  SHA256:   $sha256"
+    echo "  Tarball:  ${PACKAGE_NAME}.tar.gz"
+}
+
 # =============================================================================
 # Main Execution
 # =============================================================================
@@ -363,8 +422,9 @@ main() {
     copy_documentation
     create_version_manifest
     create_tarball
-    cleanup
     print_summary
+    publish_to_b2
+    cleanup
 
     log_success "All done! 🎉"
 }
