@@ -26,13 +26,13 @@ export function SidebarV2({ className }: { className?: string }) {
       style={{
         background: '#1c104c',
         borderRight: '1px solid rgba(240,237,232,0.12)',
-        // Override semantic tokens so NavItem colours work on navy
+        // Override semantic tokens so NavItem colours pass WCAG AA on navy
         '--text-primary':        '#f0ede8',
-        '--text-secondary':      'rgba(240,237,232,0.70)',
-        '--text-muted':          'rgba(240,237,232,0.42)',
-        '--border-subtle':       'rgba(240,237,232,0.12)',
-        '--surface-row-hover':   'rgba(255,255,255,0.08)',
-        '--accent-bg-soft':      'rgba(232,201,122,0.18)',
+        '--text-secondary':      'rgba(240,237,232,0.90)',
+        '--text-muted':          'rgba(240,237,232,0.62)',
+        '--border-subtle':       'rgba(240,237,232,0.14)',
+        '--surface-row-hover':   'rgba(255,255,255,0.10)',
+        '--accent-bg-soft':      'rgba(232,201,122,0.22)',
         '--accent':              '#e8c97a',
       } as React.CSSProperties}
     >
