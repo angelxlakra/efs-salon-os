@@ -48,7 +48,7 @@ fi
 
 # ─── Check latest version ─────────────────────────────────────────────────────
 
-LATEST_JSON=$(curl -fsSL "${B2_PUBLIC_BASE_URL}/latest.json") \
+LATEST_JSON=$(curl -fsSL --connect-timeout 10 --max-time 30 "${B2_PUBLIC_BASE_URL}/latest.json") \
     || die "Failed to fetch latest.json from B2"
 
 LATEST_VERSION=$(echo "$LATEST_JSON" | grep -o '"version":"[^"]*"' | cut -d'"' -f4)
@@ -57,6 +57,10 @@ LATEST_SHA256=$(echo "$LATEST_JSON"  | grep -o '"sha256":"[^"]*"'   | cut -d'"' 
 
 if [ -z "$LATEST_VERSION" ] || [ -z "$LATEST_FILENAME" ] || [ -z "$LATEST_SHA256" ]; then
     die "latest.json is malformed or missing required fields"
+fi
+
+if [[ "$LATEST_FILENAME" != salon-os-*.tar.gz ]] || [[ "$LATEST_FILENAME" == *"/"* ]] || [[ "$LATEST_FILENAME" == *".."* ]]; then
+    die "LATEST_FILENAME '${LATEST_FILENAME}' failed safety check — expected 'salon-os-*.tar.gz' with no path components"
 fi
 
 CURRENT_VERSION=""
@@ -75,9 +79,10 @@ log "INFO" "new version ${LATEST_VERSION} detected (current: ${CURRENT_VERSION:-
 
 START_TIME=$(date +%s)
 TMP_TARBALL="${TMP_DIR}/${LATEST_FILENAME}"
+trap 'rm -f "$TMP_TARBALL"' EXIT
 
 log "INFO" "downloading ${LATEST_FILENAME} ..."
-curl -fsSL -o "$TMP_TARBALL" "${B2_PUBLIC_BASE_URL}/${LATEST_FILENAME}" \
+curl -fsSL --connect-timeout 10 --max-time 300 -o "$TMP_TARBALL" "${B2_PUBLIC_BASE_URL}/${LATEST_FILENAME}" \
     || die "Download failed"
 
 # ─── Verify SHA256 ────────────────────────────────────────────────────────────
@@ -98,6 +103,10 @@ log "INFO" "SHA256 verified OK"
 # ─── Extract ──────────────────────────────────────────────────────────────────
 
 TARBALL_INNER_DIR=$(tar -tzf "$TMP_TARBALL" | head -1 | cut -d'/' -f1)
+if [ -z "$TARBALL_INNER_DIR" ] || [[ "$TARBALL_INNER_DIR" != salon-os-* ]]; then
+    rm -f "$TMP_TARBALL"
+    die "Unexpected tarball structure — inner dir '${TARBALL_INNER_DIR}' does not match 'salon-os-*'"
+fi
 NEW_INSTALL_DIR="${INSTALL_ROOT}/${TARBALL_INNER_DIR}"
 
 if [ -d "$NEW_INSTALL_DIR" ]; then
@@ -125,7 +134,7 @@ bash scripts/setup-https.sh --auto \
 
 log "INFO" "stopping current containers ..."
 cd "$INSTALL_LINK"
-docker compose down || true
+docker compose down || log "WARN" "docker compose down returned non-zero — containers may not have been running"
 
 # ─── Atomic symlink swap ──────────────────────────────────────────────────────
 
@@ -142,6 +151,19 @@ docker compose up -d \
 
 # ─── Run migrations ───────────────────────────────────────────────────────────
 
+log "INFO" "waiting for api container to become healthy ..."
+READY=false
+for i in $(seq 1 30); do
+    if docker compose exec -T api python -c "import sys; sys.exit(0)" 2>/dev/null; then
+        READY=true
+        break
+    fi
+    sleep 2
+done
+if [ "$READY" != "true" ]; then
+    die "api container did not become ready after 60s"
+fi
+
 log "INFO" "running database migrations ..."
 docker compose exec -T api alembic upgrade head \
     || die "alembic upgrade failed — check logs"
@@ -150,6 +172,7 @@ docker compose exec -T api alembic upgrade head \
 
 rm -f "$TMP_TARBALL"
 log "INFO" "cleaned up temp tarball"
+trap - EXIT
 
 # ─── Prune old versions (keep newest 3) ───────────────────────────────────────
 
