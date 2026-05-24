@@ -199,33 +199,21 @@ export default function DashboardPage() {
   return (
     <div className="dashboard-page" style={{ display: 'flex', flexDirection: 'column', minHeight: '100dvh' }}>
 
-      {/* Topbar */}
-      <div className="db-topbar">
-        <span style={{ fontFamily: "'DM Sans', system-ui, sans-serif", fontSize: 22, fontWeight: 800, letterSpacing: '-0.5px', color: 'var(--db-ink)' }}>
-          Today
-        </span>
-        <span style={{ fontFamily: "'DM Sans', system-ui, sans-serif", fontSize: 11, color: 'var(--db-ink-5)', whiteSpace: 'nowrap' }}>
-          {format(new Date(), 'h:mm a · EEE, d MMM yyyy')}
-        </span>
-        <input
-          type="search"
-          className="db-search"
-          placeholder="Search customers, bills, services…"
-          aria-label="Search"
-        />
-        <button
-          style={{ background: 'var(--db-ink)', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 16px', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: "'DM Sans', system-ui, sans-serif" }}
-          onClick={() => router.push('/dashboard/pos')}
-        >
-          + New Walk-in
-        </button>
-      </div>
-
       {/* Main layout: content + right sidebar */}
       <div style={{ display: 'flex', flex: 1, alignItems: 'flex-start' }}>
 
         {/* Main content */}
         <div style={{ flex: 1, padding: 14, display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
+
+          {/* Page action row — "+ New Walk-in" lives here since shell TopBar handles nav/search */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <button
+              style={{ background: 'var(--db-ink)', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: "'DM Sans', system-ui, sans-serif" }}
+              onClick={() => router.push('/dashboard/pos')}
+            >
+              + New Walk-in
+            </button>
+          </div>
 
           {/* Birthday banner */}
           {birthdayUsers.length > 0 && (

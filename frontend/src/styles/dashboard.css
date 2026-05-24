@@ -229,12 +229,33 @@
   background: var(--db-card); color: var(--db-ink-4); border: 1px solid var(--db-border);
 }
 
-/* ─── Right sidebar ────────────────────────────────────────────────────────── */
-.db-sidebar { width: 256px; flex-shrink: 0; border-left: 1px solid var(--db-border); display: flex; flex-direction: column; }
+/* ─── Right sidebar (navy) ─────────────────────────────────────────────────── */
+.db-sidebar {
+  width: 256px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: #1c104c;
+  /* Override the warm-cream palette so all var(--db-*) inside render on navy */
+  --db-ink:    #f0ede8;
+  --db-ink-3:  rgba(240, 237, 232, 0.85);
+  --db-ink-4:  rgba(240, 237, 232, 0.65);
+  --db-ink-5:  rgba(240, 237, 232, 0.50);
+  --db-label:  rgba(240, 237, 232, 0.45);
+  --db-border: rgba(240, 237, 232, 0.12);
+  --db-muted:  rgba(240, 237, 232, 0.08);
+  --db-bg:     rgba(255, 255, 255, 0.06);
+  --db-red:    #fca5a5;
+  --db-gold:   #e8c97a;
+}
 .db-sidebar-section { padding: 16px 14px; }
 .db-sidebar-section + .db-sidebar-section { border-top: 1px solid var(--db-border); }
 
-.db-appt-dot { width: 9px; height: 9px; border-radius: 50%; border: 2px solid var(--db-gold); background: var(--db-bg); flex-shrink: 0; margin-top: 4px; }
+@media (prefers-color-scheme: dark) {
+  .db-sidebar { background: #140c32; }
+}
+
+.db-appt-dot { width: 9px; height: 9px; border-radius: 50%; border: 2px solid var(--db-gold); background: transparent; flex-shrink: 0; margin-top: 4px; }
 .db-appt-row { display: flex; align-items: flex-start; gap: 9px; padding: 10px 0; border-bottom: 1px solid var(--db-muted); }
 .db-appt-row:last-child { border-bottom: none; }
 
