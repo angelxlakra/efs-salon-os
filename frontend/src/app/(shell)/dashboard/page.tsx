@@ -103,6 +103,7 @@ export default function DashboardPage() {
   const [comparison, setComparison] = useState<ComparisonData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [birthdayUsers, setBirthdayUsers] = useState<{ id: string; full_name: string }[]>([]);
+  const [revenueHidden, setRevenueHidden] = useState(false);
 
   useEffect(() => {
     if (user?.role === 'staff') router.push('/dashboard/staff');
@@ -248,6 +249,8 @@ export default function DashboardPage() {
               checkedInWaiting={checkedInWaiting}
               pendingBills={stats.pending_bills}
               avgBillTodayPaise={avgBillTodayPaise}
+              revenueHidden={revenueHidden}
+              onToggleRevenue={() => setRevenueHidden(h => !h)}
             />
           )}
 
@@ -264,6 +267,7 @@ export default function DashboardPage() {
               currentCustomers={stats.today_customers}
               weekdayName={weekdayName}
               revenuePct={revenuePct}
+              revenueHidden={revenueHidden}
             />
           )}
 
