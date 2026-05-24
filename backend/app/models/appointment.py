@@ -28,7 +28,7 @@ class Appointment(Base, ULIDMixin, TimestampMixin):
     ticket_number = Column(String, nullable=False, unique=True, index=True)
     visit_id = Column(String(26))  # Groups multiple services for same customer
     customer_id = Column(String(26), ForeignKey("customers.id"), index=True)
-    service_id = Column(String(26), ForeignKey("services.id"), nullable=False)
+    service_id = Column(String(26), ForeignKey("services.id"), nullable=True)
     assigned_staff_id = Column(String(26), ForeignKey("staff.id"), index=True)
 
     # Scheduling

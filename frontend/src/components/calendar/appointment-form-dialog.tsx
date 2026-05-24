@@ -25,13 +25,25 @@ import type { Appointment, StaffMember, ServiceItem } from "@/lib/api/appointmen
 const schema = z.object({
   customer_name: z.string().min(2, "Name must be at least 2 characters"),
   customer_phone: z.string().min(10, "Enter a valid phone number").max(15),
-  service_id: z.string().min(1, "Select a service"),
+  service_id: z.string().optional(),
   assigned_staff_id: z.string().optional(),
   date: z.string().min(1, "Select a date"),
   time: z.string().min(1, "Select a time"),
   duration_minutes: z.number().min(15).max(480),
   booking_notes: z.string().optional(),
 });
+
+/** Pre-built list of HH:MM strings at 15-minute intervals (07:00 – 22:00). */
+const TIME_SLOTS = (() => {
+  const slots: string[] = [];
+  for (let h = 7; h <= 22; h++) {
+    for (const m of [0, 15, 30, 45]) {
+      if (h === 22 && m > 0) break;
+      slots.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
+    }
+  }
+  return slots;
+})();
 
 type FormValues = z.infer<typeof schema>;
 
@@ -142,7 +154,7 @@ export function AppointmentFormDialog({
         saved = await createAppointment({
           customer_name: values.customer_name,
           customer_phone: values.customer_phone,
-          service_id: values.service_id,
+          service_id: values.service_id || undefined,
           assigned_staff_id: values.assigned_staff_id || undefined,
           scheduled_at,
           duration_minutes: values.duration_minutes,
@@ -195,18 +207,15 @@ export function AppointmentFormDialog({
               </div>
             )}
 
-            {/* Service — Combobox has no built-in label prop; use design-system label style */}
+            {/* Service — optional */}
             <div className="flex flex-col gap-1">
-              <span className="text-heading-sm text-text-secondary">Service *</span>
+              <span className="text-heading-sm text-text-secondary">Service</span>
               <Combobox
-                options={serviceOptions}
-                value={selectedServiceId}
+                options={[{ value: "", label: "— No service yet —" }, ...serviceOptions]}
+                value={selectedServiceId ?? ""}
                 onChange={(v) => setValue("service_id", v ?? "", { shouldValidate: true })}
                 placeholder="Search services…"
               />
-              {errors.service_id && (
-                <p className="text-body-sm text-danger-fg">{errors.service_id.message}</p>
-              )}
             </div>
 
             {/* Staff — same pattern */}
@@ -227,13 +236,20 @@ export function AppointmentFormDialog({
                 error={errors.date?.message}
                 {...register("date")}
               />
-              <Input
-                label="Time *"
-                type="time"
-                step={900}
-                error={errors.time?.message}
-                {...register("time")}
-              />
+              <div className="flex flex-col gap-1">
+                <span className="text-heading-sm text-text-secondary">Time *</span>
+                <select
+                  className="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  {...register("time")}
+                >
+                  {TIME_SLOTS.map((t) => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+                {errors.time && (
+                  <p className="text-body-sm text-danger-fg">{errors.time.message}</p>
+                )}
+              </div>
               <Input
                 label="Duration (min)"
                 type="number"

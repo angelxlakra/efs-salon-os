@@ -14,7 +14,7 @@ class AppointmentCreate(BaseModel):
     customer_id: Optional[str] = Field(None, description="Existing customer ID (optional)")
     customer_name: str = Field(..., min_length=2, description="Customer name (required)")
     customer_phone: str = Field(..., min_length=10, max_length=15, description="Customer phone")
-    service_id: str = Field(..., description="Service to be performed")
+    service_id: Optional[str] = Field(None, description="Service to be performed (optional)")
     assigned_staff_id: Optional[str] = Field(None, description="Assigned staff member (optional)")
     scheduled_at: datetime = Field(..., description="Appointment date and time (IST)")
     duration_minutes: int = Field(..., ge=15, le=480, description="Duration in minutes (15min-8hrs)")
@@ -41,7 +41,7 @@ class AppointmentResponse(BaseModel):
     customer_id: Optional[str]
     customer_name: str
     customer_phone: Optional[str]  # Nullable for walk-ins without phone
-    service_id: str
+    service_id: Optional[str]
     assigned_staff_id: Optional[str]
     scheduled_at: datetime
     duration_minutes: int
@@ -89,7 +89,7 @@ class WalkInResponse(BaseModel):
     customer_id: Optional[str]
     customer_name: str
     customer_phone: Optional[str]  # Nullable for walk-ins without phone
-    service_id: str
+    service_id: Optional[str]
     assigned_staff_id: Optional[str]
     duration_minutes: int
     status: AppointmentStatus

@@ -2,12 +2,13 @@
 
 import * as React from "react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { apiClient } from "@/lib/api-client";
 
 type Bill = {
   id: string;
-  invoice_number: string;
-  total_paise: number;
-  customer_name?: string;
+  invoice_number: string | null;
+  rounded_total: number; // paise
+  customer_name?: string | null;
   status: string;
 };
 
@@ -17,13 +18,16 @@ export function BillDetail({ id }: { id: string }) {
 
   React.useEffect(() => {
     let cancelled = false;
-    fetch(`/api/pos/bills/${id}`)
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
-      .then((data: Bill) => {
+    apiClient
+      .get<Bill>(`/pos/bills/${id}`)
+      .then(({ data }) => {
         if (!cancelled) setBill(data);
       })
-      .catch((e) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load");
+      .catch((e: unknown) => {
+        if (!cancelled)
+          setError(
+            e instanceof Error ? e.message : "Failed to load"
+          );
       });
     return () => {
       cancelled = true;
@@ -49,7 +53,7 @@ export function BillDetail({ id }: { id: string }) {
         <p className="text-body-sm text-text-secondary">{bill.customer_name}</p>
       )}
       <p className="text-money-lg text-text-primary tabular">
-        ₹{(bill.total_paise / 100).toFixed(2)}
+        ₹{(bill.rounded_total / 100).toFixed(2)}
       </p>
       <p className="text-body-sm text-text-secondary capitalize">{bill.status}</p>
     </div>
