@@ -2,12 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { BillDetail } from "@/components/bills/bill-detail";
+import { BillDetailsDialog } from "@/components/bills/bill-details-dialog";
 
 export default function BillInterceptedPage({
   params,
@@ -16,12 +11,12 @@ export default function BillInterceptedPage({
 }) {
   const { id } = React.use(params);
   const router = useRouter();
+
   return (
-    <Dialog open onOpenChange={(open) => (open ? null : router.back())}>
-      <DialogContent size="md">
-        <DialogTitle className="sr-only">Bill detail</DialogTitle>
-        <BillDetail id={id} />
-      </DialogContent>
-    </Dialog>
+    <BillDetailsDialog
+      billId={id}
+      open
+      onOpenChange={(open) => { if (!open) router.back(); }}
+    />
   );
 }
