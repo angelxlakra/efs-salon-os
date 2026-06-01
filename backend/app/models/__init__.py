@@ -32,6 +32,8 @@ from app.models.package import (
     PackageSale,
     PackageSaleItem,
     PackageSaleStatus,
+    PackageRedemptionAudit,
+    PackageExpiryExtension,
 )
 
 # Inventory
@@ -107,6 +109,8 @@ __all__ = [
     "PackageSale",
     "PackageSaleItem",
     "PackageSaleStatus",
+    "PackageRedemptionAudit",
+    "PackageExpiryExtension",
     # Inventory
     "InventoryCategory",
     "Supplier",

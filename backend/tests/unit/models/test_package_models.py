@@ -5,6 +5,8 @@ from app.models.package import (
     PackageDefinition,
     PackageDefinitionItem,
     PackageDefinitionStatus,
+    PackageExpiryExtension,
+    PackageRedemptionAudit,
     PackageSale,
     PackageSaleItem,
     PackageSaleStatus,
@@ -89,3 +91,21 @@ def test_package_sale_compound_indexes():
     assert ("customer_id", "status") in index_columns
     assert ("expires_at", "status") in index_columns
     assert ("selling_staff_id", "sold_at") in index_columns
+
+
+def test_package_redemption_audit_shape():
+    assert hasattr(PackageRedemptionAudit, "package_sale_id")
+    assert hasattr(PackageRedemptionAudit, "bill_item_id")
+    assert hasattr(PackageRedemptionAudit, "package_sale_item_id")
+    assert hasattr(PackageRedemptionAudit, "redeemed_for_customer_id")
+    assert hasattr(PackageRedemptionAudit, "performed_by_user_id")
+    assert hasattr(PackageRedemptionAudit, "redeemed_at")
+    assert hasattr(PackageRedemptionAudit, "session_number")
+
+
+def test_package_expiry_extension_shape():
+    assert hasattr(PackageExpiryExtension, "package_sale_id")
+    assert hasattr(PackageExpiryExtension, "previous_expires_at")
+    assert hasattr(PackageExpiryExtension, "new_expires_at")
+    assert hasattr(PackageExpiryExtension, "performed_by_user_id")
+    assert hasattr(PackageExpiryExtension, "reason")

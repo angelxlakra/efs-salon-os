@@ -182,3 +182,53 @@ class PackageSaleItem(Base, ULIDMixin, TimestampMixin):
         CheckConstraint("quantity >= 1", name="ck_package_sale_item_qty_positive"),
         CheckConstraint("snapshot_unit_price_paise >= 0", name="ck_package_sale_item_price_non_negative"),
     )
+
+
+class PackageRedemptionAudit(Base, ULIDMixin, TimestampMixin):
+    """Append-only log of every redemption. Captures recipient for shared packages."""
+    __tablename__ = "package_redemption_audit"
+
+    package_sale_id = Column(
+        String(26), ForeignKey("package_sales.id", ondelete="CASCADE"),
+        nullable=False, index=True,
+    )
+    bill_item_id = Column(
+        String(26), ForeignKey("bill_items.id", ondelete="RESTRICT"),
+        nullable=False, unique=True,
+    )
+    package_sale_item_id = Column(
+        String(26), ForeignKey("package_sale_items.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    redeemed_for_customer_id = Column(
+        String(26), ForeignKey("customers.id", ondelete="RESTRICT"),
+        nullable=False, index=True,
+    )
+    performed_by_user_id = Column(String(26), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    redeemed_at = Column(DateTime(timezone=True), nullable=False, index=True)
+    session_number = Column(Integer, nullable=True)
+    notes = Column(Text, nullable=True)
+
+    __table_args__ = (
+        Index("ix_package_redemption_audit_for_customer_redeemed_at",
+              "redeemed_for_customer_id", "redeemed_at"),
+    )
+
+
+class PackageExpiryExtension(Base, ULIDMixin, TimestampMixin):
+    __tablename__ = "package_expiry_extensions"
+
+    package_sale_id = Column(
+        String(26), ForeignKey("package_sales.id", ondelete="CASCADE"),
+        nullable=False, index=True,
+    )
+    previous_expires_at = Column(DateTime(timezone=True), nullable=False)
+    new_expires_at = Column(DateTime(timezone=True), nullable=False)
+    performed_by_user_id = Column(String(26), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    extended_at = Column(DateTime(timezone=True), nullable=False)
+    reason = Column(Text, nullable=False)
+
+    __table_args__ = (
+        CheckConstraint("new_expires_at > previous_expires_at",
+                        name="ck_package_extend_forward_in_time"),
+    )
