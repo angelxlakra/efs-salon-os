@@ -111,3 +111,22 @@ def test_package_expiry_extension_shape():
     assert hasattr(PackageExpiryExtension, "performed_by_user_id")
     assert hasattr(PackageExpiryExtension, "extended_at")
     assert hasattr(PackageExpiryExtension, "reason")
+
+
+def test_package_redemption_audit_indexes():
+    """Verify the required compound index on PackageRedemptionAudit."""
+    index_columns = set()
+    for arg in PackageRedemptionAudit.__table_args__:
+        if hasattr(arg, "columns"):
+            cols = tuple(c.key for c in arg.columns)
+            index_columns.add(cols)
+    assert ("redeemed_for_customer_id", "redeemed_at") in index_columns
+
+
+def test_package_expiry_extension_forward_constraint():
+    """Verify the forward-in-time CheckConstraint is declared."""
+    constraint_names = set()
+    for arg in PackageExpiryExtension.__table_args__:
+        if hasattr(arg, "name"):
+            constraint_names.add(arg.name)
+    assert "ck_package_extend_forward_in_time" in constraint_names

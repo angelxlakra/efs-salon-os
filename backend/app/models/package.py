@@ -189,7 +189,7 @@ class PackageRedemptionAudit(Base, ULIDMixin, TimestampMixin):
     __tablename__ = "package_redemption_audit"
 
     package_sale_id = Column(
-        String(26), ForeignKey("package_sales.id", ondelete="CASCADE"),
+        String(26), ForeignKey("package_sales.id", ondelete="RESTRICT"),
         nullable=False, index=True,
     )
     bill_item_id = Column(
@@ -205,7 +205,7 @@ class PackageRedemptionAudit(Base, ULIDMixin, TimestampMixin):
         nullable=False, index=True,
     )
     performed_by_user_id = Column(String(26), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
-    redeemed_at = Column(DateTime(timezone=True), nullable=False, index=True)
+    redeemed_at = Column(DateTime(timezone=True), nullable=False)
     session_number = Column(Integer, nullable=True)
     notes = Column(Text, nullable=True)
 
@@ -219,7 +219,7 @@ class PackageExpiryExtension(Base, ULIDMixin, TimestampMixin):
     __tablename__ = "package_expiry_extensions"
 
     package_sale_id = Column(
-        String(26), ForeignKey("package_sales.id", ondelete="CASCADE"),
+        String(26), ForeignKey("package_sales.id", ondelete="RESTRICT"),
         nullable=False, index=True,
     )
     previous_expires_at = Column(DateTime(timezone=True), nullable=False)
