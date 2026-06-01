@@ -16,8 +16,10 @@ from app.models.user import RoleEnum
     (RoleEnum.STAFF, ("packages", "create"), False),
     (RoleEnum.OWNER, ("packages", "update"), True),
     (RoleEnum.RECEPTIONIST, ("packages", "update"), False),
+    (RoleEnum.STAFF, ("packages", "update"), False),
     (RoleEnum.OWNER, ("packages", "delete"), True),
     (RoleEnum.RECEPTIONIST, ("packages", "delete"), False),
+    (RoleEnum.STAFF, ("packages", "delete"), False),
     # packages:sell — Owner + Receptionist
     (RoleEnum.OWNER, ("packages", "sell"), True),
     (RoleEnum.RECEPTIONIST, ("packages", "sell"), True),
@@ -33,10 +35,13 @@ from app.models.user import RoleEnum
     # packages:refund / extend_expiry / override_price — Owner only
     (RoleEnum.OWNER, ("packages", "refund"), True),
     (RoleEnum.RECEPTIONIST, ("packages", "refund"), False),
+    (RoleEnum.STAFF, ("packages", "refund"), False),
     (RoleEnum.OWNER, ("packages", "extend_expiry"), True),
     (RoleEnum.RECEPTIONIST, ("packages", "extend_expiry"), False),
+    (RoleEnum.STAFF, ("packages", "extend_expiry"), False),
     (RoleEnum.OWNER, ("packages", "override_price"), True),
     (RoleEnum.RECEPTIONIST, ("packages", "override_price"), False),
+    (RoleEnum.STAFF, ("packages", "override_price"), False),
 ])
 def test_package_permissions(role, permission, allowed):
     resource, action = permission
