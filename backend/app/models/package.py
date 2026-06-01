@@ -3,9 +3,11 @@
 import enum
 from decimal import Decimal
 from sqlalchemy import (
-    Boolean, CheckConstraint, Column, DateTime, Enum, ForeignKey,
-    Integer, Numeric, String, Text, UniqueConstraint, Index,
+    Boolean, CheckConstraint, Column, Enum, ForeignKey,
+    Integer, Numeric, String, Text,
 )
+# Re-exported for Task 4 (sales/expiry/audit models)
+from sqlalchemy import DateTime, UniqueConstraint, Index  # noqa: F401
 from sqlalchemy.orm import relationship
 from app.database import Base
 from app.models.base import TimestampMixin, SoftDeleteMixin, ULIDMixin

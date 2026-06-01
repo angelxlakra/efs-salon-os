@@ -22,6 +22,15 @@ from app.models.appointment import Appointment, AppointmentStatus, WalkIn
 # Billing
 from app.models.billing import Bill, BillItem, BillItemStaffContribution, BillStatus, Payment, PaymentMethod
 
+# Packages
+from app.models.package import (
+    PackageDefinition,
+    PackageDefinitionItem,
+    PackageDefinitionStatus,
+    EntitlementType,
+    Shareability,
+)
+
 # Inventory
 from app.models.inventory import (
     InventoryCategory,
@@ -86,6 +95,12 @@ __all__ = [
     "BillStatus",
     "Payment",
     "PaymentMethod",
+    # Packages
+    "PackageDefinition",
+    "PackageDefinitionItem",
+    "PackageDefinitionStatus",
+    "EntitlementType",
+    "Shareability",
     # Inventory
     "InventoryCategory",
     "Supplier",
