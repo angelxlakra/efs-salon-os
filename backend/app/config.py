@@ -72,7 +72,10 @@ class Settings(BaseSettings):
     gst_rate: Decimal = Decimal("0.18")
 
     # Packages
-    PACKAGE_DEFAULT_CANCELLATION_FEE_PCT: Decimal = Decimal("20.00")
+    # Percent as a whole number (e.g., 20.00 = 20%), NOT a fraction.
+    # Diverges from gst_rate which stores 0.18 — preserved for operator readability
+    # in env var overrides (PACKAGE_DEFAULT_CANCELLATION_FEE_PCT=15.00).
+    package_default_cancellation_fee_pct: Decimal = Decimal("20.00")
 
     # API
     api_prefix: str = "/api"

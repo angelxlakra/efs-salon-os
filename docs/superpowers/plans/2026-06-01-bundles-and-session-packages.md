@@ -223,13 +223,13 @@ from decimal import Decimal
 from app.config import settings
 
 
-def test_package_default_cancellation_fee_pct_is_20():
-    assert settings.PACKAGE_DEFAULT_CANCELLATION_FEE_PCT == Decimal("20.00")
+def test_package_default_cancellation_fee_pct_default():
+    assert settings.package_default_cancellation_fee_pct == Decimal("20.00")
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd backend && pytest tests/unit/test_config.py::test_package_default_cancellation_fee_pct_is_20 -v`
+Run: `cd backend && pytest tests/unit/test_config.py::test_package_default_cancellation_fee_pct_default -v`
 Expected: FAIL with `AttributeError`.
 
 - [ ] **Step 3: Add setting**
@@ -243,12 +243,12 @@ class Settings(BaseSettings):
     # ... existing fields ...
 
     # Packages
-    PACKAGE_DEFAULT_CANCELLATION_FEE_PCT: Decimal = Decimal("20.00")
+    package_default_cancellation_fee_pct: Decimal = Decimal("20.00")
 ```
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `cd backend && pytest tests/unit/test_config.py::test_package_default_cancellation_fee_pct_is_20 -v`
+Run: `cd backend && pytest tests/unit/test_config.py::test_package_default_cancellation_fee_pct_default -v`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**

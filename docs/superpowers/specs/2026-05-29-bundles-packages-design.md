@@ -115,7 +115,7 @@ A "bundle" (single-sitting combo) = `entitlement_type=counted`, `total_sessions=
 ### 3.7 Refunds
 
 - Owner-only via `packages:refund` (mirrors `bills:refund`)
-- Configurable `cancellation_fee_pct` per package (default 20% in `settings.PACKAGE_DEFAULT_CANCELLATION_FEE_PCT`)
+- Configurable `cancellation_fee_pct` per package (default 20% in `settings.package_default_cancellation_fee_pct`)
 - Refund math branches by entitlement type:
   - Counted: `refund_paise = sum(unredeemed_sessions × snapshot_unit_price_paise) × (1 - cancellation_fee_pct/100)`
   - Unlimited: `refund_paise = paid_paise × (days_remaining / total_validity_days) × (1 - cancellation_fee_pct/100)`
