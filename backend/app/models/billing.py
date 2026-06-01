@@ -7,6 +7,20 @@ from app.database import Base
 from app.models.base import TimestampMixin, ULIDMixin
 
 
+class BillType(str, enum.Enum):
+    """Bill kind: normal sale or credit note (refund)."""
+    NORMAL = "normal"
+    CREDIT_NOTE = "credit_note"
+
+
+class BillItemType(str, enum.Enum):
+    """BillItem kind: existing service/product or new package item types."""
+    SERVICE = "service"
+    PRODUCT = "product"
+    PACKAGE_SALE_LINE = "package_sale_line"
+    PACKAGE_REDEMPTION = "package_redemption"
+
+
 class ContributionSplitType(str, enum.Enum):
     """How contribution is calculated for multi-staff services."""
     PERCENTAGE = "percentage"  # Percentage of line total
@@ -22,6 +36,7 @@ class PaymentMethod(str, enum.Enum):
     UPI = "upi"
     CARD = "card"
     OTHER = "other"
+    PACKAGE_REDEMPTION = "package_redemption"  # NEW: session package redemption
 
 
 class BillStatus(str, enum.Enum):
@@ -87,6 +102,21 @@ class Bill(Base, ULIDMixin, TimestampMixin):
     # Audit
     created_by = Column(String(26), ForeignKey("users.id"), nullable=False)
 
+    # Package discriminators
+    bill_type = Column(
+        Enum(BillType, name="billtype"),
+        nullable=False, default=BillType.NORMAL, server_default="normal",
+        index=True,
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "(bill_type = 'credit_note' AND original_bill_id IS NOT NULL) "
+            "OR (bill_type = 'normal' AND original_bill_id IS NULL)",
+            name="ck_bill_credit_note_has_original",
+        ),
+    )
+
     # Relationships
     customer = relationship("Customer", foreign_keys=[customer_id])
     items = relationship("BillItem", back_populates="bill", cascade="all, delete-orphan")
@@ -144,6 +174,21 @@ class BillItem(Base, ULIDMixin, TimestampMixin):
 
     # Notes
     notes = Column(Text)
+
+    # Package discriminators
+    item_type = Column(
+        Enum(BillItemType, name="billitemtype"),
+        nullable=False, default=BillItemType.SERVICE, server_default="service",
+        index=True,
+    )
+    package_sale_id = Column(
+        String(26), ForeignKey("package_sales.id", ondelete="RESTRICT"),
+        nullable=True, index=True,
+    )
+    package_sale_item_id = Column(
+        String(26), ForeignKey("package_sale_items.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
 
     # Relationships
     bill = relationship("Bill", back_populates="items")
