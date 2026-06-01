@@ -28,3 +28,11 @@ def test_bill_item_type_enum_values():
 
 def test_payment_method_has_package_redemption():
     assert PaymentMethod.PACKAGE_REDEMPTION.value == "package_redemption"
+
+
+def test_bill_credit_note_constraint_declared():
+    """Verify the credit-note check constraint is in Bill.__table_args__."""
+    constraint_names = {
+        getattr(arg, "name", None) for arg in Bill.__table_args__
+    }
+    assert "ck_bill_credit_note_has_original" in constraint_names

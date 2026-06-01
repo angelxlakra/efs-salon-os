@@ -97,7 +97,9 @@ class Bill(Base, ULIDMixin, TimestampMixin):
     refunded_at = Column(DateTime(timezone=True))
     refund_reason = Column(Text)
     refund_approved_by = Column(String(26), ForeignKey("users.id"))
-    original_bill_id = Column(String(26), ForeignKey("bills.id"))  # For refund bills
+    original_bill_id = Column(
+        String(26), ForeignKey("bills.id", ondelete="RESTRICT"), nullable=True
+    )
 
     # Audit
     created_by = Column(String(26), ForeignKey("users.id"), nullable=False)
