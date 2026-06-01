@@ -141,8 +141,9 @@ class BillItem(Base, ULIDMixin, TimestampMixin):
     """
     Individual line items on a bill.
 
-    Links to services OR retail products (SKUs).
-    Exactly one of service_id or sku_id must be set.
+    For SERVICE/PRODUCT items: exactly one of service_id or sku_id must be set.
+    For PACKAGE_SALE_LINE and PACKAGE_REDEMPTION items: both service_id and sku_id
+    may be null; the item links via package_sale_id / package_sale_item_id instead.
     """
     __tablename__ = "bill_items"
     __table_args__ = (
