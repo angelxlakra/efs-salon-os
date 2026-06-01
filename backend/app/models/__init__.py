@@ -20,7 +20,7 @@ from app.models.service import ServiceCategory, Service, ServiceAddon, ServiceMa
 from app.models.appointment import Appointment, AppointmentStatus, WalkIn
 
 # Billing
-from app.models.billing import Bill, BillItem, BillItemStaffContribution, BillStatus, Payment, PaymentMethod
+from app.models.billing import Bill, BillItem, BillItemStaffContribution, BillStatus, BillType, BillItemType, Payment, PaymentMethod
 
 # Packages
 from app.models.package import (
@@ -98,6 +98,8 @@ __all__ = [
     "BillItem",
     "BillItemStaffContribution",
     "BillStatus",
+    "BillType",
+    "BillItemType",
     "Payment",
     "PaymentMethod",
     # Packages
