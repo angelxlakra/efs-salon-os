@@ -32,8 +32,10 @@ Constraint changes:
 Implementation notes:
   - ALTER TYPE ADD VALUE cannot run inside a transaction in PostgreSQL.
     We use a non-transactional connection context for that step only.
-  - All other enum types are created via raw SQL (CREATE TYPE IF NOT EXISTS)
-    to guarantee idempotency without relying on SQLAlchemy's create_type flag.
+  - All other enum types are created via raw SQL using a DO $$ BEGIN ... EXCEPTION
+    WHEN duplicate_object THEN NULL; END $$ block to guarantee idempotency
+    (PostgreSQL does not support CREATE TYPE IF NOT EXISTS) without relying on
+    SQLAlchemy's create_type flag.
 """
 from alembic import op
 import sqlalchemy as sa
@@ -53,34 +55,6 @@ def upgrade() -> None:
     #    PostgreSQL (it is allowed but only as the sole statement in its
     #    own transaction). We use autocommit=True on a raw connection.
     # -------------------------------------------------------------------------
-    conn = op.get_bind()
-    # Execute in autocommit mode by using the underlying DBAPI connection
-    # We get the raw connection and set autocommit
-    raw_conn = conn.connection
-    # psycopg3 uses raw_conn.autocommit (attribute, not method)
-    original_autocommit = raw_conn.autocommit
-    try:
-        raw_conn.autocommit = True
-        raw_conn.execute(
-            raw_conn.cursor().__class__.__mro__  # no-op, just to get cursor
-        )
-    except Exception:
-        pass
-    finally:
-        raw_conn.autocommit = original_autocommit
-
-    # Simpler: use op.execute with explicit COMMIT trick is NOT available in
-    # Alembic transactional DDL mode. Instead, ALTER TYPE ADD VALUE is actually
-    # allowed inside a transaction in PostgreSQL 12+ ONLY IF the enum type was
-    # not yet used in the current transaction. Since this is a fresh migration,
-    # paymentmethod IS already used (in payments table), but we're not
-    # modifying it within this transaction session scope.
-    #
-    # The cleanest Alembic pattern: execute_if / non-transactional migration.
-    # We use op.execute directly — in PostgreSQL 12+, ALTER TYPE ADD VALUE
-    # CAN run inside a transaction as long as it's the first use of the type.
-    # The Alembic DDL transaction won't conflict because we're adding a value,
-    # not changing a value already in use in this transaction.
     op.execute("ALTER TYPE paymentmethod ADD VALUE IF NOT EXISTS 'package_redemption'")
 
     # -------------------------------------------------------------------------
@@ -89,22 +63,28 @@ def upgrade() -> None:
     #    everywhere and manage creation ourselves.
     # -------------------------------------------------------------------------
     op.execute(
-        "CREATE TYPE packagedefinitionstatus AS ENUM ('draft', 'published', 'archived')"
+        "DO $$ BEGIN CREATE TYPE packagedefinitionstatus AS ENUM ('draft', 'published', 'archived'); "
+        "EXCEPTION WHEN duplicate_object THEN NULL; END $$"
     )
     op.execute(
-        "CREATE TYPE entitlementtype AS ENUM ('counted', 'unlimited')"
+        "DO $$ BEGIN CREATE TYPE entitlementtype AS ENUM ('counted', 'unlimited'); "
+        "EXCEPTION WHEN duplicate_object THEN NULL; END $$"
     )
     op.execute(
-        "CREATE TYPE shareability AS ENUM ('owner_only', 'shared')"
+        "DO $$ BEGIN CREATE TYPE shareability AS ENUM ('owner_only', 'shared'); "
+        "EXCEPTION WHEN duplicate_object THEN NULL; END $$"
     )
     op.execute(
-        "CREATE TYPE packagesalestatus AS ENUM ('active', 'expired', 'refunded', 'exhausted')"
+        "DO $$ BEGIN CREATE TYPE packagesalestatus AS ENUM ('active', 'expired', 'refunded', 'exhausted'); "
+        "EXCEPTION WHEN duplicate_object THEN NULL; END $$"
     )
     op.execute(
-        "CREATE TYPE billtype AS ENUM ('normal', 'credit_note')"
+        "DO $$ BEGIN CREATE TYPE billtype AS ENUM ('normal', 'credit_note'); "
+        "EXCEPTION WHEN duplicate_object THEN NULL; END $$"
     )
     op.execute(
-        "CREATE TYPE billitemtype AS ENUM ('service', 'product', 'package_sale_line', 'package_redemption')"
+        "DO $$ BEGIN CREATE TYPE billitemtype AS ENUM ('service', 'product', 'package_sale_line', 'package_redemption'); "
+        "EXCEPTION WHEN duplicate_object THEN NULL; END $$"
     )
 
     # -------------------------------------------------------------------------
