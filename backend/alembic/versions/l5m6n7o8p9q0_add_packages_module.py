@@ -55,7 +55,11 @@ def upgrade() -> None:
     #    PostgreSQL (it is allowed but only as the sole statement in its
     #    own transaction). We use autocommit=True on a raw connection.
     # -------------------------------------------------------------------------
-    op.execute("ALTER TYPE paymentmethod ADD VALUE IF NOT EXISTS 'package_redemption'")
+    # ALTER TYPE ADD VALUE cannot reliably run inside a transaction on PG < 12.
+    # Alembic's autocommit_block() commits the current transaction, executes the
+    # statement in AUTOCOMMIT mode, then opens a new transaction for subsequent ops.
+    with op.get_context().autocommit_block():
+        op.execute(sa.text("ALTER TYPE paymentmethod ADD VALUE IF NOT EXISTS 'package_redemption'"))
 
     # -------------------------------------------------------------------------
     # 2. Create new enum types via raw SQL with IF NOT EXISTS for idempotency.
@@ -200,6 +204,16 @@ def upgrade() -> None:
             'sessions_remaining IS NULL OR sessions_remaining >= 0',
             name='ck_package_sale_sessions_remaining_non_negative',
         ),
+        sa.CheckConstraint(
+            "(total_sessions_snapshot IS NULL)"
+            " OR (sessions_remaining IS NULL)"
+            " OR (sessions_remaining <= total_sessions_snapshot)",
+            name='ck_package_sale_sessions_not_exceed_total',
+        ),
+        sa.CheckConstraint(
+            'cancellation_fee_pct_snapshot >= 0 AND cancellation_fee_pct_snapshot <= 100',
+            name='ck_package_sale_fee_snapshot_range',
+        ),
     )
     op.create_index('ix_package_sales_customer_id', 'package_sales', ['customer_id'])
     op.create_index('ix_package_sales_expires_at', 'package_sales', ['expires_at'])
@@ -290,6 +304,7 @@ def upgrade() -> None:
         'package_redemption_audit',
         ['redeemed_for_customer_id', 'redeemed_at'],
     )
+    op.create_index('ix_package_redemption_audit_package_sale_item_id', 'package_redemption_audit', ['package_sale_item_id'])
 
     # -------------------------------------------------------------------------
     # 8. Create package_expiry_extensions table
@@ -420,6 +435,12 @@ def downgrade() -> None:
     # Remove constraints first
     # -------------------------------------------------------------------------
     op.drop_constraint('ck_bill_credit_note_has_original', 'bills', type_='check')
+    # Safety: delete any package-typed bill_items before restoring the strict
+    # service/sku-only constraint. This downgrade is destructive if package data
+    # was written after the upgrade. Only run downgrade on schema-only rollbacks.
+    op.execute(
+        "DELETE FROM bill_items WHERE item_type IN ('package_sale_line', 'package_redemption')"
+    )
     op.drop_constraint('bill_item_service_or_sku_check', 'bill_items', type_='check')
     # Restore the original strict check constraint
     op.create_check_constraint(
@@ -448,8 +469,11 @@ def downgrade() -> None:
     # Drop new tables in reverse dependency order
     # -------------------------------------------------------------------------
     op.drop_table('package_expiry_extensions')
+    op.execute('DROP INDEX IF EXISTS ix_package_redemption_audit_package_sale_item_id')
     op.drop_table('package_redemption_audit')
     op.drop_table('package_sale_items')
+    op.execute('ALTER TABLE package_sales DROP CONSTRAINT IF EXISTS ck_package_sale_sessions_not_exceed_total')
+    op.execute('ALTER TABLE package_sales DROP CONSTRAINT IF EXISTS ck_package_sale_fee_snapshot_range')
     op.drop_table('package_sales')
     op.drop_table('package_definition_items')
     op.drop_table('package_definitions')
