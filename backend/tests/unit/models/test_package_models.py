@@ -76,3 +76,16 @@ def test_package_sale_item_shape():
     assert hasattr(PackageSaleItem, "snapshot_unit_price_paise")
     assert hasattr(PackageSaleItem, "snapshot_gst_rate_pct")
     assert hasattr(PackageSaleItem, "locked")
+    assert hasattr(PackageSaleItem, "sale")
+
+
+def test_package_sale_compound_indexes():
+    """Verify the three required compound indexes are declared."""
+    index_columns = set()
+    for arg in PackageSale.__table_args__:
+        if hasattr(arg, "columns"):
+            cols = tuple(c.key for c in arg.columns)
+            index_columns.add(cols)
+    assert ("customer_id", "status") in index_columns
+    assert ("expires_at", "status") in index_columns
+    assert ("selling_staff_id", "sold_at") in index_columns
