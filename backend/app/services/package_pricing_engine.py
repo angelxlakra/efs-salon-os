@@ -8,8 +8,13 @@ from __future__ import annotations
 
 import enum
 from dataclasses import dataclass, replace
-from decimal import Decimal, ROUND_FLOOR
+from decimal import Decimal, ROUND_FLOOR, ROUND_HALF_UP
 from typing import List
+
+
+def _paise(d: Decimal) -> int:
+    """Convert a Decimal paise value to int, rounding down to nearest whole paise."""
+    return int(d.to_integral_value(rounding=ROUND_FLOOR))
 
 
 class DomainError(ValueError):
@@ -39,6 +44,13 @@ def distribute_discount(
     Locked lines preserve their price exactly. Rounding spillover goes to the
     LAST unlocked line so the package total matches exactly.
 
+    Note:
+        For lines with quantity > 1, the returned unit_price_paise may be off by
+        up to (quantity - 1) paise from perfect division due to integer floor
+        division. Callers that need the exact line total should recompute it as
+        unit_price_paise * quantity; the overall package-level total is exact only
+        for qty=1 lines.
+
     Raises:
         DomainError: if all lines are locked and a discount is requested,
                      or if FINAL value exceeds total MRP.
@@ -64,15 +76,15 @@ def distribute_discount(
             .to_integral_value(rounding=ROUND_FLOOR)
         )
     elif mode == DiscountMode.FLAT:
-        if int(value) > unlocked_weight:
+        if _paise(value) > unlocked_weight:
             raise DomainError("Flat discount exceeds unlocked MRP")
-        unlocked_final = unlocked_weight - int(value)
+        unlocked_final = unlocked_weight - _paise(value)
     elif mode == DiscountMode.FINAL:
-        if int(value) > total_mrp:
+        if _paise(value) > total_mrp:
             raise DomainError("Final amount exceeds MRP")
-        if int(value) < locked_weight:
+        if _paise(value) < locked_weight:
             raise DomainError("Final amount below locked-line minimum")
-        unlocked_final = int(value) - locked_weight
+        unlocked_final = _paise(value) - locked_weight
     else:
         raise DomainError(f"Unknown discount mode: {mode}")
 

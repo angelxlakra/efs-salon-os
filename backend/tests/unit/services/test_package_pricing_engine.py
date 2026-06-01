@@ -2,6 +2,7 @@
 
 import pytest
 from decimal import Decimal
+from hypothesis import given, strategies as st
 from app.services.package_pricing_engine import (
     distribute_discount, DiscountMode, DiscountedItem, DomainError,
 )
@@ -88,7 +89,6 @@ def test_final_exceeds_mrp_sum_raises():
 
 
 # Property test
-from hypothesis import given, strategies as st
 
 
 @given(
@@ -97,9 +97,31 @@ from hypothesis import given, strategies as st
     pct=st.decimals(min_value=Decimal("0"), max_value=Decimal("100"), places=2),
 )
 def test_property_pct_distribution_exact_sum(n, base, pct):
-    """For any input, sum(distributed unit prices * qty) equals expected final total exactly."""
+    """For qty=1 items, sum of distributed unit_prices equals expected final total exactly."""
     items = [_make(base, qty=1) for _ in range(n)]
     mrp_sum = n * base
     expected_final = int(mrp_sum * (Decimal("100") - pct) / Decimal("100"))
     out = distribute_discount(items, DiscountMode.PCT, pct)
     assert sum(i.unit_price_paise * i.quantity for i in out) == expected_final
+
+
+def test_flat_exceeds_unlocked_raises():
+    """Flat discount larger than the unlocked weight is rejected."""
+    items = [_make(100000, locked=True), _make(50000)]  # unlocked = 50000
+    with pytest.raises(DomainError):
+        distribute_discount(items, DiscountMode.FLAT, Decimal("80000"))
+
+
+def test_final_below_locked_minimum_raises():
+    """Final target lower than locked-line sum is impossible."""
+    items = [_make(200000, locked=True), _make(100000)]  # locked = 200000
+    with pytest.raises(DomainError):
+        distribute_discount(items, DiscountMode.FINAL, Decimal("150000"))
+
+
+def test_negative_final_after_pct_on_negative_input():
+    """Defensive: negative unlocked_final triggers DomainError."""
+    # 150% off makes unlocked_final negative, triggering the guard.
+    items = [_make(100000)]
+    with pytest.raises(DomainError):
+        distribute_discount(items, DiscountMode.PCT, Decimal("150"))  # 150% off
