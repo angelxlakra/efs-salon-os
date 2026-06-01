@@ -147,8 +147,10 @@ class BillItem(Base, ULIDMixin, TimestampMixin):
     __tablename__ = "bill_items"
     __table_args__ = (
         CheckConstraint(
-            "(service_id IS NOT NULL AND sku_id IS NULL) OR (service_id IS NULL AND sku_id IS NOT NULL)",
-            name="bill_item_service_or_sku_check"
+            "(service_id IS NOT NULL AND sku_id IS NULL)"
+            " OR (service_id IS NULL AND sku_id IS NOT NULL)"
+            " OR item_type IN ('package_sale_line', 'package_redemption')",
+            name="bill_item_service_or_sku_check",
         ),
     )
 
@@ -187,7 +189,7 @@ class BillItem(Base, ULIDMixin, TimestampMixin):
     )
     package_sale_item_id = Column(
         String(26), ForeignKey("package_sale_items.id", ondelete="RESTRICT"),
-        nullable=True,
+        nullable=True, index=True,
     )
 
     # Relationships
