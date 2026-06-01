@@ -469,8 +469,7 @@ def downgrade() -> None:
     # Drop new tables in reverse dependency order
     # -------------------------------------------------------------------------
     op.drop_table('package_expiry_extensions')
-    op.execute('DROP INDEX IF EXISTS ix_package_redemption_audit_package_sale_item_id')
-    op.drop_table('package_redemption_audit')
+    op.drop_table('package_redemption_audit')  # drops all its indexes automatically
     op.drop_table('package_sale_items')
     op.execute('ALTER TABLE package_sales DROP CONSTRAINT IF EXISTS ck_package_sale_sessions_not_exceed_total')
     op.execute('ALTER TABLE package_sales DROP CONSTRAINT IF EXISTS ck_package_sale_fee_snapshot_range')
