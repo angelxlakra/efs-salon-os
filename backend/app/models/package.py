@@ -91,3 +91,85 @@ class PackageDefinitionItem(Base, ULIDMixin, TimestampMixin):
         CheckConstraint("quantity >= 1", name="ck_package_def_item_qty_positive"),
         CheckConstraint("unit_price_paise >= 0", name="ck_package_def_item_price_non_negative"),
     )
+
+
+class PackageSaleStatus(str, enum.Enum):
+    ACTIVE = "active"
+    EXPIRED = "expired"
+    REFUNDED = "refunded"
+    EXHAUSTED = "exhausted"
+
+
+class PackageSale(Base, ULIDMixin, TimestampMixin):
+    """Lifecycle row for one sold package. All policy snapshotted at sale time."""
+    __tablename__ = "package_sales"
+
+    bill_id = Column(
+        String(26), ForeignKey("bills.id", ondelete="RESTRICT"),
+        nullable=False, unique=True, index=True,
+    )
+    package_definition_id = Column(
+        String(26), ForeignKey("package_definitions.id", ondelete="RESTRICT"), nullable=False,
+    )
+    customer_id = Column(
+        String(26), ForeignKey("customers.id", ondelete="RESTRICT"),
+        nullable=False, index=True,
+    )
+    selling_staff_id = Column(String(26), ForeignKey("staff.id", ondelete="SET NULL"), nullable=True)
+
+    sold_at = Column(DateTime(timezone=True), nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=False, index=True)
+
+    entitlement_type_snapshot = Column(
+        Enum(EntitlementType, name="entitlementtype"), nullable=False,
+    )
+    shareability_snapshot = Column(
+        Enum(Shareability, name="shareability"), nullable=False,
+    )
+    cancellation_fee_pct_snapshot = Column(Numeric(5, 2), nullable=False)
+    total_sessions_snapshot = Column(Integer, nullable=True)
+    sessions_remaining = Column(Integer, nullable=True)
+
+    status = Column(
+        Enum(PackageSaleStatus, name="packagesalestatus"),
+        nullable=False, default=PackageSaleStatus.ACTIVE, index=True,
+    )
+    refunded_at = Column(DateTime(timezone=True), nullable=True)
+    refund_bill_id = Column(String(26), ForeignKey("bills.id"), nullable=True)
+
+    items = relationship(
+        "PackageSaleItem",
+        back_populates="sale",
+        cascade="all, delete-orphan",
+        order_by="PackageSaleItem.display_order",
+    )
+
+    __table_args__ = (
+        Index("ix_package_sales_customer_status", "customer_id", "status"),
+        Index("ix_package_sales_expires_status", "expires_at", "status"),
+        Index("ix_package_sales_selling_staff_sold_at", "selling_staff_id", "sold_at"),
+    )
+
+
+class PackageSaleItem(Base, ULIDMixin, TimestampMixin):
+    __tablename__ = "package_sale_items"
+
+    package_sale_id = Column(
+        String(26), ForeignKey("package_sales.id", ondelete="CASCADE"),
+        nullable=False, index=True,
+    )
+    package_definition_item_id = Column(
+        String(26), ForeignKey("package_definition_items.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    service_id = Column(
+        String(26), ForeignKey("services.id", ondelete="RESTRICT"),
+        nullable=False, index=True,
+    )
+    quantity = Column(Integer, nullable=False)
+    snapshot_unit_price_paise = Column(Integer, nullable=False)
+    snapshot_gst_rate_pct = Column(Numeric(5, 2), nullable=False)
+    locked = Column(Boolean, nullable=False)
+    display_order = Column(Integer, nullable=False)
+
+    sale = relationship("PackageSale", back_populates="items")

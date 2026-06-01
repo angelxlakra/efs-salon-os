@@ -29,6 +29,9 @@ from app.models.package import (
     PackageDefinitionStatus,
     EntitlementType,
     Shareability,
+    PackageSale,
+    PackageSaleItem,
+    PackageSaleStatus,
 )
 
 # Inventory
@@ -101,6 +104,9 @@ __all__ = [
     "PackageDefinitionStatus",
     "EntitlementType",
     "Shareability",
+    "PackageSale",
+    "PackageSaleItem",
+    "PackageSaleStatus",
     # Inventory
     "InventoryCategory",
     "Supplier",
