@@ -117,6 +117,7 @@ class Bill(Base, ULIDMixin, TimestampMixin):
             "OR (bill_type = 'normal' AND original_bill_id IS NULL)",
             name="ck_bill_credit_note_has_original",
         ),
+        {},  # sentinel required by SQLAlchemy when tuple has a single constraint
     )
 
     # Relationships
