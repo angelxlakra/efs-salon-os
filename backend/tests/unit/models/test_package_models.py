@@ -101,6 +101,7 @@ def test_package_redemption_audit_shape():
     assert hasattr(PackageRedemptionAudit, "performed_by_user_id")
     assert hasattr(PackageRedemptionAudit, "redeemed_at")
     assert hasattr(PackageRedemptionAudit, "session_number")
+    assert hasattr(PackageRedemptionAudit, "notes")
 
 
 def test_package_expiry_extension_shape():
@@ -108,4 +109,5 @@ def test_package_expiry_extension_shape():
     assert hasattr(PackageExpiryExtension, "previous_expires_at")
     assert hasattr(PackageExpiryExtension, "new_expires_at")
     assert hasattr(PackageExpiryExtension, "performed_by_user_id")
+    assert hasattr(PackageExpiryExtension, "extended_at")
     assert hasattr(PackageExpiryExtension, "reason")
