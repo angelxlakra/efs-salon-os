@@ -1,10 +1,13 @@
 """Smoke test: model classes exist with expected columns."""
 
 from app.models.package import (
+    EntitlementType,
     PackageDefinition,
     PackageDefinitionItem,
     PackageDefinitionStatus,
-    EntitlementType,
+    PackageSale,
+    PackageSaleItem,
+    PackageSaleStatus,
     Shareability,
 )
 
@@ -38,9 +41,6 @@ def test_package_definition_item_shape():
     assert hasattr(PackageDefinitionItem, "unit_price_paise")
     assert hasattr(PackageDefinitionItem, "locked")
     assert hasattr(PackageDefinitionItem, "display_order")
-
-
-from app.models.package import PackageSale, PackageSaleItem, PackageSaleStatus
 
 
 def test_package_sale_model_shape():

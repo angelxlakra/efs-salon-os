@@ -7,7 +7,7 @@ from sqlalchemy import (
     Integer, Numeric, String, Text,
 )
 # Re-exported for Task 4 (sales/expiry/audit models)
-from sqlalchemy import DateTime, UniqueConstraint, Index  # noqa: F401
+from sqlalchemy import DateTime, Index  # noqa: F401
 from sqlalchemy.orm import relationship
 from app.database import Base
 from app.models.base import TimestampMixin, SoftDeleteMixin, ULIDMixin
@@ -106,7 +106,7 @@ class PackageSale(Base, ULIDMixin, TimestampMixin):
 
     bill_id = Column(
         String(26), ForeignKey("bills.id", ondelete="RESTRICT"),
-        nullable=False, unique=True, index=True,
+        nullable=False, unique=True,
     )
     package_definition_id = Column(
         String(26), ForeignKey("package_definitions.id", ondelete="RESTRICT"), nullable=False,
@@ -135,7 +135,7 @@ class PackageSale(Base, ULIDMixin, TimestampMixin):
         nullable=False, default=PackageSaleStatus.ACTIVE, index=True,
     )
     refunded_at = Column(DateTime(timezone=True), nullable=True)
-    refund_bill_id = Column(String(26), ForeignKey("bills.id"), nullable=True)
+    refund_bill_id = Column(String(26), ForeignKey("bills.id", ondelete="RESTRICT"), nullable=True)
 
     items = relationship(
         "PackageSaleItem",
@@ -148,6 +148,10 @@ class PackageSale(Base, ULIDMixin, TimestampMixin):
         Index("ix_package_sales_customer_status", "customer_id", "status"),
         Index("ix_package_sales_expires_status", "expires_at", "status"),
         Index("ix_package_sales_selling_staff_sold_at", "selling_staff_id", "sold_at"),
+        CheckConstraint(
+            "sessions_remaining IS NULL OR sessions_remaining >= 0",
+            name="ck_package_sale_sessions_remaining_non_negative",
+        ),
     )
 
 
@@ -173,3 +177,8 @@ class PackageSaleItem(Base, ULIDMixin, TimestampMixin):
     display_order = Column(Integer, nullable=False)
 
     sale = relationship("PackageSale", back_populates="items")
+
+    __table_args__ = (
+        CheckConstraint("quantity >= 1", name="ck_package_sale_item_qty_positive"),
+        CheckConstraint("snapshot_unit_price_paise >= 0", name="ck_package_sale_item_price_non_negative"),
+    )
