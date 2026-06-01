@@ -71,6 +71,9 @@ class Settings(BaseSettings):
     # Tax Settings
     gst_rate: Decimal = Decimal("0.18")
 
+    # Packages
+    PACKAGE_DEFAULT_CANCELLATION_FEE_PCT: Decimal = Decimal("20.00")
+
     # API
     api_prefix: str = "/api"
     cors_origins: str | list[str] = "http://localhost:3000"
