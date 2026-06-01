@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 from typing import List, Literal, Optional
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from app.models.package import (
     PackageDefinitionStatus, EntitlementType, Shareability, PackageSaleStatus,
 )
@@ -23,7 +23,7 @@ class PackageDefinitionItemCreate(BaseModel):
 
 class DiscountInput(BaseModel):
     mode: Literal["pct", "flat", "final"]
-    value: Decimal
+    value: Decimal = Field(..., ge=0)
 
 
 class PackageDefinitionCreate(BaseModel):
@@ -39,7 +39,7 @@ class PackageDefinitionCreate(BaseModel):
     discount: Optional[DiscountInput] = None
 
     @model_validator(mode="after")
-    def validate_entitlement_sessions(self):
+    def validate_entitlement_sessions(self) -> "PackageDefinitionCreate":
         if self.entitlement_type == EntitlementType.COUNTED and self.total_sessions is None:
             raise ValueError("total_sessions required when entitlement_type=counted")
         if self.entitlement_type == EntitlementType.UNLIMITED and self.total_sessions is not None:
@@ -52,6 +52,8 @@ class PackageDefinitionUpdate(PackageDefinitionCreate):
 
 
 class PackageDefinitionItemResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     service_id: str
     service_name: Optional[str] = None
@@ -60,11 +62,10 @@ class PackageDefinitionItemResponse(BaseModel):
     locked: bool
     display_order: int
 
-    class Config:
-        from_attributes = True
-
 
 class PackageDefinitionResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     name: str
     description: Optional[str]
@@ -79,11 +80,10 @@ class PackageDefinitionResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
-
 
 class PackageSaleItemResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     service_id: str
     service_name: Optional[str] = None
@@ -92,11 +92,10 @@ class PackageSaleItemResponse(BaseModel):
     snapshot_gst_rate_pct: Decimal
     locked: bool
 
-    class Config:
-        from_attributes = True
-
 
 class PackageSaleResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     bill_id: str
     package_definition_id: str
@@ -114,16 +113,17 @@ class PackageSaleResponse(BaseModel):
     status: PackageSaleStatus
     refunded_at: Optional[datetime]
     refund_bill_id: Optional[str]
+    created_at: datetime
+    updated_at: datetime
     items: List[PackageSaleItemResponse]
-
-    class Config:
-        from_attributes = True
 
 
 class PackageSaleSummary(BaseModel):
     """Lightweight projection for eligibility rail."""
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
-    package_definition_name: str
+    package_definition_name: Optional[str] = None
     entitlement_type_snapshot: EntitlementType
     sessions_remaining: Optional[int]
     total_sessions_snapshot: Optional[int]
@@ -131,9 +131,6 @@ class PackageSaleSummary(BaseModel):
     shareability_snapshot: Shareability
     customer_id: str
     customer_name: Optional[str] = None
-
-    class Config:
-        from_attributes = True
 
 
 # ---------- Eligibility ----------

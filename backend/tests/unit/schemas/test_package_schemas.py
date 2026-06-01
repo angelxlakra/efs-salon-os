@@ -5,8 +5,7 @@ from decimal import Decimal
 from pydantic import ValidationError
 from app.schemas.package import (
     PackageDefinitionCreate, PackageDefinitionItemCreate, DiscountInput,
-    PackageDefinitionResponse, PackageSaleResponse, RefundRequest,
-    ExtendExpiryRequest, RedemptionEligibilityRequest,
+    RefundRequest, ExtendExpiryRequest, RedemptionEligibilityRequest,
 )
 
 
