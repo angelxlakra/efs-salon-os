@@ -259,7 +259,9 @@ def _compute_unlimited_refund(sale) -> RefundComputation:
     days_remaining = max((sale.expires_at - now).days, 0)
     pct_remaining = Decimal(days_remaining) / Decimal(total_validity_days)
 
-    paid_paise = sale.bill.total_paise if sale.bill else 0
+    if sale.bill is None:
+        raise DomainError("PackageSale has no associated bill — cannot compute unlimited refund")
+    paid_paise = sale.bill.total_paise
     base_paise = int(
         (Decimal(paid_paise) * pct_remaining).to_integral_value(rounding=ROUND_FLOOR)
     )

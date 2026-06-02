@@ -1,7 +1,7 @@
 """Pricing engine — pure-function math. 100% coverage required."""
 
 import pytest
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal, ROUND_FLOOR
 from hypothesis import given, strategies as st
 from unittest.mock import MagicMock
@@ -282,9 +282,6 @@ def test_refund_counted_multi_item():
     assert result.base_paise == 240000
     assert result.refund_paise == 240000
     assert result.consumed_value_paise == 240000
-
-
-from datetime import timedelta
 
 
 def test_refund_unlimited_pro_rata_time():
