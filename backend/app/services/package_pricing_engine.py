@@ -12,7 +12,7 @@ from __future__ import annotations
 import enum
 from dataclasses import dataclass, replace
 from decimal import Decimal, ROUND_FLOOR
-from typing import List, Protocol
+from typing import List, Optional, Protocol
 
 
 def _paise(d: Decimal) -> int:
@@ -177,5 +177,67 @@ def snapshot_at_sale(definition: _DefinitionProto) -> List[PackageSaleItemDraft]
         )
         for item in definition.items
     ]
+
+
+@dataclass
+class RefundComputation:
+    kind: str  # "counted" | "unlimited"
+    base_paise: int
+    fee_paise: int
+    refund_paise: int
+    consumed_value_paise: int
+    pct_remaining: Optional[Decimal] = None
+    sessions_consumed: Optional[int] = None
+    sessions_total: Optional[int] = None
+
+
+def compute_refund(sale) -> RefundComputation:
+    """Compute refund breakdown for a PackageSale.
+
+    Branches by entitlement_type_snapshot. Returns paise integers + UI breakdown.
+    Compares against string values ("counted", "unlimited") to avoid importing
+    the SQLAlchemy-backed EntitlementType enum.
+    """
+    if sale.entitlement_type_snapshot == "counted":
+        return _compute_counted_refund(sale)
+    elif sale.entitlement_type_snapshot == "unlimited":
+        return _compute_unlimited_refund(sale)
+    else:
+        raise DomainError(f"Unknown entitlement_type: {sale.entitlement_type_snapshot}")
+
+
+def _compute_counted_refund(sale) -> RefundComputation:
+    total = sale.total_sessions_snapshot or 0
+    remaining = sale.sessions_remaining or 0
+    consumed = total - remaining
+
+    # Per-session value: sum of all item MRPs (each item price is already per-session)
+    per_session_value = sum(
+        i.snapshot_unit_price_paise * i.quantity for i in sale.items
+    )
+
+    base_paise = per_session_value * remaining
+    consumed_value = per_session_value * consumed
+
+    fee_paise = int(
+        (Decimal(base_paise) * sale.cancellation_fee_pct_snapshot / Decimal("100"))
+        .to_integral_value(rounding=ROUND_FLOOR)
+    )
+    refund_paise = base_paise - fee_paise
+
+    return RefundComputation(
+        kind="counted",
+        base_paise=base_paise,
+        fee_paise=fee_paise,
+        refund_paise=refund_paise,
+        consumed_value_paise=consumed_value,
+        sessions_consumed=consumed,
+        sessions_total=total,
+    )
+
+
+def _compute_unlimited_refund(sale) -> RefundComputation:
+    # Task 13 — implemented in next task
+    raise DomainError("unlimited refund not yet implemented")
 
 

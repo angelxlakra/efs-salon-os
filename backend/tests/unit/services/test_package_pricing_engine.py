@@ -7,7 +7,9 @@ from unittest.mock import MagicMock
 from app.services.package_pricing_engine import (
     distribute_discount, DiscountMode, DiscountedItem, DomainError,
     snapshot_at_sale, PackageSaleItemDraft,
+    compute_refund, RefundComputation,
 )
+from app.models.package import EntitlementType
 
 
 def _make(price, qty=1, locked=False):
@@ -188,3 +190,45 @@ def test_snapshot_empty_definition():
     definition = MagicMock(items=[])
     drafts = snapshot_at_sale(definition)
     assert drafts == []
+
+
+def test_refund_counted_pro_rata():
+    """5 sessions of 10 used, ₹1000 each, 20% cancellation fee."""
+    sale = MagicMock(
+        entitlement_type_snapshot=EntitlementType.COUNTED,
+        total_sessions_snapshot=10,
+        sessions_remaining=5,
+        cancellation_fee_pct_snapshot=Decimal("20.00"),
+        items=[MagicMock(snapshot_unit_price_paise=100000, quantity=1)],
+    )
+    result = compute_refund(sale)
+    assert result.kind == "counted"
+    # 5 unredeemed x 10000 paise/session = 500000 paise base; 20% fee = 100000; refund = 400000
+    assert result.base_paise == 500000
+    assert result.fee_paise == 100000
+    assert result.refund_paise == 400000
+
+
+def test_refund_counted_all_redeemed_zero_refund():
+    sale = MagicMock(
+        entitlement_type_snapshot=EntitlementType.COUNTED,
+        total_sessions_snapshot=10,
+        sessions_remaining=0,
+        cancellation_fee_pct_snapshot=Decimal("20.00"),
+        items=[MagicMock(snapshot_unit_price_paise=100000, quantity=1)],
+    )
+    result = compute_refund(sale)
+    assert result.base_paise == 0
+    assert result.refund_paise == 0
+
+
+def test_refund_counted_zero_fee():
+    sale = MagicMock(
+        entitlement_type_snapshot=EntitlementType.COUNTED,
+        total_sessions_snapshot=10,
+        sessions_remaining=5,
+        cancellation_fee_pct_snapshot=Decimal("0.00"),
+        items=[MagicMock(snapshot_unit_price_paise=100000, quantity=1)],
+    )
+    result = compute_refund(sale)
+    assert result.refund_paise == result.base_paise == 500000
