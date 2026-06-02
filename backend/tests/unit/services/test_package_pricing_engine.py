@@ -9,6 +9,7 @@ from app.services.package_pricing_engine import (
     distribute_discount, DiscountMode, DiscountedItem, DomainError,
     snapshot_at_sale, PackageSaleItemDraft,
     compute_refund, RefundComputation,
+    can_extend_expiry,
 )
 from app.models.package import EntitlementType
 
@@ -334,9 +335,6 @@ def test_refund_unlimited_expired_zero():
     assert result.fee_paise == 0                      # 0 base × fee_pct = 0
     assert result.sessions_consumed is None
     assert result.sessions_total is None
-
-
-from app.services.package_pricing_engine import can_extend_expiry
 
 
 def test_extend_must_be_forward_in_time():
