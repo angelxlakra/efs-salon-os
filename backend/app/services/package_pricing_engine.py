@@ -9,7 +9,7 @@ from __future__ import annotations
 import enum
 from dataclasses import dataclass, replace
 from decimal import Decimal, ROUND_FLOOR
-from typing import List
+from typing import List, Protocol
 
 
 def _paise(d: Decimal) -> int:
@@ -126,7 +126,25 @@ def distribute_discount(
     return result
 
 
-@dataclass
+class _ServiceProto(Protocol):
+    gst_rate_pct: Decimal
+
+
+class _DefinitionItemProto(Protocol):
+    id: str
+    service_id: str
+    quantity: int
+    unit_price_paise: int
+    locked: bool
+    display_order: int
+    service: _ServiceProto
+
+
+class _DefinitionProto(Protocol):
+    items: List[_DefinitionItemProto]
+
+
+@dataclass(frozen=True)
 class PackageSaleItemDraft:
     package_definition_item_id: str
     service_id: str
@@ -137,11 +155,12 @@ class PackageSaleItemDraft:
     display_order: int
 
 
-def snapshot_at_sale(definition) -> List[PackageSaleItemDraft]:
+def snapshot_at_sale(definition: _DefinitionProto) -> List[PackageSaleItemDraft]:
     """Produce per-line snapshot drafts for a new PackageSale.
 
-    Copies unit_price_paise + service.gst_rate_pct + quantity + locked + display_order
-    from each PackageDefinitionItem at the moment of sale.
+    Copies id (→ package_definition_item_id), service_id, quantity, unit_price_paise,
+    service.gst_rate_pct, locked, and display_order from each PackageDefinitionItem
+    at the moment of sale.
     """
     return [
         PackageSaleItemDraft(

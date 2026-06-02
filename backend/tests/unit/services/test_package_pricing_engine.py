@@ -149,8 +149,8 @@ def test_negative_price_raises():
 def test_snapshot_copies_items_exactly():
     # Mock a PackageDefinition with 2 items
     def_item_1 = MagicMock(
-        id="01HXYZ_DEF_ITEM_1________A",
-        service_id="01HSVC_SERVICE_1_________A",
+        id="01HXYZDEFITEM1000000000001",
+        service_id="01HSVCSERVICE100000000001A",
         quantity=1,
         unit_price_paise=200000,
         locked=False,
@@ -158,8 +158,8 @@ def test_snapshot_copies_items_exactly():
     )
     def_item_1.service = MagicMock(gst_rate_pct=Decimal("18.00"))
     def_item_2 = MagicMock(
-        id="01HXYZ_DEF_ITEM_2________A",
-        service_id="01HSVC_SERVICE_2_________A",
+        id="01HXYZDEFITEM2000000000001",
+        service_id="01HSVCSERVICE200000000001A",
         quantity=2,
         unit_price_paise=100000,
         locked=True,
@@ -171,9 +171,20 @@ def test_snapshot_copies_items_exactly():
 
     drafts = snapshot_at_sale(definition)
     assert len(drafts) == 2
-    assert drafts[0].package_definition_item_id == "01HXYZ_DEF_ITEM_1________A"
+    assert drafts[0].package_definition_item_id == "01HXYZDEFITEM1000000000001"
     assert drafts[0].snapshot_unit_price_paise == 200000
     assert drafts[0].snapshot_gst_rate_pct == Decimal("18.00")
+    assert drafts[0].service_id == "01HSVCSERVICE100000000001A"
+    assert drafts[0].quantity == 1
+    assert drafts[0].display_order == 0
+    assert drafts[0].locked is False
     assert drafts[1].snapshot_unit_price_paise == 100000
     assert drafts[1].locked is True
     assert drafts[1].snapshot_gst_rate_pct == Decimal("12.00")
+
+
+def test_snapshot_empty_definition():
+    """snapshot_at_sale with no items returns empty list."""
+    definition = MagicMock(items=[])
+    drafts = snapshot_at_sale(definition)
+    assert drafts == []
