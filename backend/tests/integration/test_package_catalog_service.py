@@ -166,7 +166,7 @@ def test_soft_delete_allowed_when_no_active_sales(db_session, user_factory):
 
 
 def test_soft_delete_blocked_when_active_sales(
-    db_session, user_factory, package_sale_factory,
+    db_session, user_factory,
 ):
     """soft_delete() raises ValueError when active PackageSales exist."""
     svc = _make_service(db_session, "I")

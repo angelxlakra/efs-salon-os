@@ -99,7 +99,9 @@ def update_definition(
 def publish(db: Session, def_id: str) -> PackageDefinition:
     """Transition a DRAFT PackageDefinition to PUBLISHED."""
     pkg = db.get(PackageDefinition, def_id)
-    if not pkg or pkg.status != PackageDefinitionStatus.DRAFT:
+    if not pkg:
+        raise ValueError(f"PackageDefinition {def_id} not found")
+    if pkg.status != PackageDefinitionStatus.DRAFT:
         raise ValueError("Only draft packages can be published")
     pkg.status = PackageDefinitionStatus.PUBLISHED
     db.flush()
