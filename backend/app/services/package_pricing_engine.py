@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import enum
 from dataclasses import dataclass, replace
+from datetime import datetime, timezone
 from decimal import Decimal, ROUND_FLOOR
 from typing import List, Optional, Protocol
 
@@ -248,7 +249,35 @@ def _compute_counted_refund(sale) -> RefundComputation:
 
 
 def _compute_unlimited_refund(sale) -> RefundComputation:
-    # Task 13 — implemented in next task
-    raise DomainError("unlimited refund not yet implemented")
+    """Time-pro-rata refund for unlimited-entitlement packages.
+
+    pct_remaining is a Decimal fraction in [0, 1] (not a percentage),
+    unlike the counted branch which stores an integer percentage.
+    """
+    now = datetime.now(timezone.utc)
+    total_validity_days = max((sale.expires_at - sale.sold_at).days, 1)
+    days_remaining = max((sale.expires_at - now).days, 0)
+    pct_remaining = Decimal(days_remaining) / Decimal(total_validity_days)
+
+    paid_paise = sale.bill.total_paise if sale.bill else 0
+    base_paise = int(
+        (Decimal(paid_paise) * pct_remaining).to_integral_value(rounding=ROUND_FLOOR)
+    )
+    consumed_value_paise = paid_paise - base_paise
+
+    fee_paise = int(
+        (Decimal(base_paise) * sale.cancellation_fee_pct_snapshot / Decimal("100"))
+        .to_integral_value(rounding=ROUND_FLOOR)
+    )
+    refund_paise = base_paise - fee_paise
+
+    return RefundComputation(
+        kind="unlimited",
+        base_paise=base_paise,
+        fee_paise=fee_paise,
+        refund_paise=refund_paise,
+        consumed_value_paise=consumed_value_paise,
+        pct_remaining=pct_remaining,
+    )
 
 

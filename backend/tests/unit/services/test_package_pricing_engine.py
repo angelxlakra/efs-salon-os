@@ -1,6 +1,7 @@
 """Pricing engine — pure-function math. 100% coverage required."""
 
 import pytest
+from datetime import datetime, timezone
 from decimal import Decimal, ROUND_FLOOR
 from hypothesis import given, strategies as st
 from unittest.mock import MagicMock
@@ -281,3 +282,50 @@ def test_refund_counted_multi_item():
     assert result.base_paise == 240000
     assert result.refund_paise == 240000
     assert result.consumed_value_paise == 240000
+
+
+from datetime import timedelta
+
+
+def test_refund_unlimited_pro_rata_time():
+    """Bought for ₹1500, 30-day validity, 8 days elapsed → 22/30 remaining.
+
+    expires_at is set to now + 22 days + 1 hour so that timedelta.days is
+    reliably 22 even accounting for microseconds of execution time between
+    the test's 'now' and the implementation's datetime.now() call.
+    """
+    now = datetime.now(timezone.utc)
+    sale = MagicMock(
+        entitlement_type_snapshot=EntitlementType.UNLIMITED,
+        total_sessions_snapshot=None,
+        sessions_remaining=None,
+        cancellation_fee_pct_snapshot=Decimal("20.00"),
+        sold_at=now - timedelta(days=8),
+        expires_at=now + timedelta(days=22, hours=1),
+        items=[],
+    )
+    sale.bill.total_paise = 150000
+    result = compute_refund(sale)
+    assert result.kind == "unlimited"
+    # 22/30 * 150000 = 110000 base; 20% fee = 22000; refund = 88000
+    assert result.base_paise == 110000
+    assert result.fee_paise == 22000
+    assert result.refund_paise == 88000
+
+
+def test_refund_unlimited_expired_zero():
+    """Expired package → zero remaining days → zero base → zero refund."""
+    now = datetime.now(timezone.utc)
+    sale = MagicMock(
+        entitlement_type_snapshot=EntitlementType.UNLIMITED,
+        total_sessions_snapshot=None,
+        sessions_remaining=None,
+        cancellation_fee_pct_snapshot=Decimal("20.00"),
+        sold_at=now - timedelta(days=60),
+        expires_at=now - timedelta(days=30),
+        items=[],
+    )
+    sale.bill.total_paise = 150000
+    result = compute_refund(sale)
+    assert result.base_paise == 0
+    assert result.refund_paise == 0
