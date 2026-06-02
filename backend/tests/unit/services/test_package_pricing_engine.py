@@ -1,7 +1,7 @@
 """Pricing engine — pure-function math. 100% coverage required."""
 
 import pytest
-from decimal import Decimal
+from decimal import Decimal, ROUND_FLOOR
 from hypothesis import given, strategies as st
 from app.services.package_pricing_engine import (
     distribute_discount, DiscountMode, DiscountedItem, DomainError,
@@ -100,7 +100,10 @@ def test_property_pct_distribution_exact_sum(n, base, pct):
     """For qty=1 items, sum of distributed unit_prices equals expected final total exactly."""
     items = [_make(base, qty=1) for _ in range(n)]
     mrp_sum = n * base
-    expected_final = int(mrp_sum * (Decimal("100") - pct) / Decimal("100"))
+    expected_final = int(
+        (Decimal(mrp_sum) * (Decimal("100") - pct) / Decimal("100"))
+        .to_integral_value(rounding=ROUND_FLOOR)
+    )
     out = distribute_discount(items, DiscountMode.PCT, pct)
     assert sum(i.unit_price_paise * i.quantity for i in out) == expected_final
 
@@ -125,3 +128,17 @@ def test_negative_final_after_pct_on_negative_input():
     items = [_make(100000)]
     with pytest.raises(DomainError):
         distribute_discount(items, DiscountMode.PCT, Decimal("150"))  # 150% off
+
+
+def test_zero_quantity_raises():
+    """quantity=0 would cause ZeroDivisionError — guard catches it early."""
+    items = [_make(100000, qty=0)]
+    with pytest.raises(DomainError, match="quantity must be >= 1"):
+        distribute_discount(items, DiscountMode.PCT, Decimal("10"))
+
+
+def test_negative_price_raises():
+    """Negative unit price corrupts proportional distribution — guard rejects it."""
+    items = [_make(-100000)]
+    with pytest.raises(DomainError, match="unit_price_paise must be >= 0"):
+        distribute_discount(items, DiscountMode.PCT, Decimal("10"))

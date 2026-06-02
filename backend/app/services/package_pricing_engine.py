@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import enum
 from dataclasses import dataclass, replace
-from decimal import Decimal, ROUND_FLOOR, ROUND_HALF_UP
+from decimal import Decimal, ROUND_FLOOR
 from typing import List
 
 
@@ -57,6 +57,12 @@ def distribute_discount(
     """
     if not items:
         return []
+
+    for item in items:
+        if item.quantity <= 0:
+            raise DomainError(f"Item quantity must be >= 1, got {item.quantity}")
+        if item.unit_price_paise < 0:
+            raise DomainError(f"unit_price_paise must be >= 0, got {item.unit_price_paise}")
 
     if value == 0:
         return [replace(i) for i in items]
