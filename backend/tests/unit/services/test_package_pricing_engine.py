@@ -3,8 +3,10 @@
 import pytest
 from decimal import Decimal, ROUND_FLOOR
 from hypothesis import given, strategies as st
+from unittest.mock import MagicMock
 from app.services.package_pricing_engine import (
     distribute_discount, DiscountMode, DiscountedItem, DomainError,
+    snapshot_at_sale, PackageSaleItemDraft,
 )
 
 
@@ -142,3 +144,36 @@ def test_negative_price_raises():
     items = [_make(-100000)]
     with pytest.raises(DomainError, match="unit_price_paise must be >= 0"):
         distribute_discount(items, DiscountMode.PCT, Decimal("10"))
+
+
+def test_snapshot_copies_items_exactly():
+    # Mock a PackageDefinition with 2 items
+    def_item_1 = MagicMock(
+        id="01HXYZ_DEF_ITEM_1________A",
+        service_id="01HSVC_SERVICE_1_________A",
+        quantity=1,
+        unit_price_paise=200000,
+        locked=False,
+        display_order=0,
+    )
+    def_item_1.service = MagicMock(gst_rate_pct=Decimal("18.00"))
+    def_item_2 = MagicMock(
+        id="01HXYZ_DEF_ITEM_2________A",
+        service_id="01HSVC_SERVICE_2_________A",
+        quantity=2,
+        unit_price_paise=100000,
+        locked=True,
+        display_order=1,
+    )
+    def_item_2.service = MagicMock(gst_rate_pct=Decimal("12.00"))
+
+    definition = MagicMock(items=[def_item_1, def_item_2])
+
+    drafts = snapshot_at_sale(definition)
+    assert len(drafts) == 2
+    assert drafts[0].package_definition_item_id == "01HXYZ_DEF_ITEM_1________A"
+    assert drafts[0].snapshot_unit_price_paise == 200000
+    assert drafts[0].snapshot_gst_rate_pct == Decimal("18.00")
+    assert drafts[1].snapshot_unit_price_paise == 100000
+    assert drafts[1].locked is True
+    assert drafts[1].snapshot_gst_rate_pct == Decimal("12.00")

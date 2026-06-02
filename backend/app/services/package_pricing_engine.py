@@ -124,3 +124,34 @@ def distribute_discount(
         result.append(replace(item, unit_price_paise=new_unit_price))
 
     return result
+
+
+@dataclass
+class PackageSaleItemDraft:
+    package_definition_item_id: str
+    service_id: str
+    quantity: int
+    snapshot_unit_price_paise: int
+    snapshot_gst_rate_pct: Decimal
+    locked: bool
+    display_order: int
+
+
+def snapshot_at_sale(definition) -> List[PackageSaleItemDraft]:
+    """Produce per-line snapshot drafts for a new PackageSale.
+
+    Copies unit_price_paise + service.gst_rate_pct + quantity + locked + display_order
+    from each PackageDefinitionItem at the moment of sale.
+    """
+    return [
+        PackageSaleItemDraft(
+            package_definition_item_id=item.id,
+            service_id=item.service_id,
+            quantity=item.quantity,
+            snapshot_unit_price_paise=item.unit_price_paise,
+            snapshot_gst_rate_pct=item.service.gst_rate_pct,
+            locked=item.locked,
+            display_order=item.display_order,
+        )
+        for item in definition.items
+    ]
