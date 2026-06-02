@@ -106,7 +106,8 @@ class Bill(Base, ULIDMixin, TimestampMixin):
 
     # Package discriminators
     bill_type = Column(
-        Enum(BillType, name="billtype"),
+        Enum(BillType, name="billtype",
+             values_callable=lambda obj: [e.value for e in obj]),
         nullable=False, default=BillType.NORMAL, server_default="normal",
         index=True,
     )
@@ -183,7 +184,8 @@ class BillItem(Base, ULIDMixin, TimestampMixin):
 
     # Package discriminators
     item_type = Column(
-        Enum(BillItemType, name="billitemtype"),
+        Enum(BillItemType, name="billitemtype",
+             values_callable=lambda obj: [e.value for e in obj]),
         nullable=False, default=BillItemType.SERVICE, server_default="service",
         index=True,
     )

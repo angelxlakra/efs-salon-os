@@ -36,15 +36,19 @@ class PackageDefinition(Base, ULIDMixin, TimestampMixin, SoftDeleteMixin):
     name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
     status = Column(
-        Enum(PackageDefinitionStatus, name="packagedefinitionstatus"),
+        Enum(PackageDefinitionStatus, name="packagedefinitionstatus",
+             values_callable=lambda obj: [e.value for e in obj]),
         nullable=False, default=PackageDefinitionStatus.DRAFT,
     )
     entitlement_type = Column(
-        Enum(EntitlementType, name="entitlementtype"), nullable=False,
+        Enum(EntitlementType, name="entitlementtype",
+             values_callable=lambda obj: [e.value for e in obj]),
+        nullable=False,
     )
     total_sessions = Column(Integer, nullable=True)
     shareability = Column(
-        Enum(Shareability, name="shareability"),
+        Enum(Shareability, name="shareability",
+             values_callable=lambda obj: [e.value for e in obj]),
         nullable=False, default=Shareability.OWNER_ONLY,
     )
     validity_days = Column(Integer, nullable=False)
@@ -121,17 +125,22 @@ class PackageSale(Base, ULIDMixin, TimestampMixin):
     expires_at = Column(DateTime(timezone=True), nullable=False, index=True)
 
     entitlement_type_snapshot = Column(
-        Enum(EntitlementType, name="entitlementtype"), nullable=False,
+        Enum(EntitlementType, name="entitlementtype",
+             values_callable=lambda obj: [e.value for e in obj]),
+        nullable=False,
     )
     shareability_snapshot = Column(
-        Enum(Shareability, name="shareability"), nullable=False,
+        Enum(Shareability, name="shareability",
+             values_callable=lambda obj: [e.value for e in obj]),
+        nullable=False,
     )
     cancellation_fee_pct_snapshot = Column(Numeric(5, 2), nullable=False)
     total_sessions_snapshot = Column(Integer, nullable=True)
     sessions_remaining = Column(Integer, nullable=True)
 
     status = Column(
-        Enum(PackageSaleStatus, name="packagesalestatus"),
+        Enum(PackageSaleStatus, name="packagesalestatus",
+             values_callable=lambda obj: [e.value for e in obj]),
         nullable=False, default=PackageSaleStatus.ACTIVE, index=True,
     )
     refunded_at = Column(DateTime(timezone=True), nullable=True)

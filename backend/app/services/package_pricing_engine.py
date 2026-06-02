@@ -8,8 +8,15 @@ from __future__ import annotations
 
 import enum
 from dataclasses import dataclass, replace
+from datetime import datetime, timezone
 from decimal import Decimal, ROUND_FLOOR
 from typing import List, Protocol
+
+from sqlalchemy import or_, and_
+from sqlalchemy.orm import Session
+from app.models.package import (
+    PackageSale, PackageSaleItem, PackageSaleStatus, EntitlementType, Shareability,
+)
 
 
 def _paise(d: Decimal) -> int:
@@ -174,3 +181,50 @@ def snapshot_at_sale(definition: _DefinitionProto) -> List[PackageSaleItemDraft]
         )
         for item in definition.items
     ]
+
+
+def find_eligible_packages(
+    customer_id: str,
+    service_id: str,
+    db: Session,
+) -> List[PackageSale]:
+    """Return active PackageSales where this customer can redeem this service.
+
+    Filters:
+      - status = 'active'
+      - expires_at > now()
+      - service_id is in the sale's snapshot items
+      - sessions_remaining > 0 OR entitlement_type='unlimited'
+      - shareability rule: owner_only requires customer_id == sale.customer_id;
+        shared allows any customer
+
+    Ordered: expires_at ASC (FIFO by soonest expiry).
+    """
+    now = datetime.now(timezone.utc)
+
+    base_filter = and_(
+        PackageSale.status == PackageSaleStatus.ACTIVE,
+        PackageSale.expires_at > now,
+        PackageSale.id.in_(
+            db.query(PackageSaleItem.package_sale_id)
+              .filter(PackageSaleItem.service_id == service_id)
+        ),
+        or_(
+            PackageSale.entitlement_type_snapshot == EntitlementType.UNLIMITED,
+            PackageSale.sessions_remaining > 0,
+        ),
+        or_(
+            and_(
+                PackageSale.shareability_snapshot == Shareability.OWNER_ONLY,
+                PackageSale.customer_id == customer_id,
+            ),
+            PackageSale.shareability_snapshot == Shareability.SHARED,
+        ),
+    )
+
+    return (
+        db.query(PackageSale)
+          .filter(base_filter)
+          .order_by(PackageSale.expires_at.asc())
+          .all()
+    )

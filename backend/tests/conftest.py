@@ -48,7 +48,7 @@ def test_engine(postgres_admin_engine, test_db_url):
     from app.models import (
         user, billing, customer, service,
         appointment, inventory, accounting, audit,
-        settings, expense, purchase, reconciliation, attendance
+        settings, expense, purchase, reconciliation, attendance, package
     )
 
     with postgres_admin_engine.connect() as conn:
@@ -293,3 +293,195 @@ def test_customer(db_session):
     db_session.flush()
 
     return customer
+
+
+@pytest.fixture
+def customer_factory(db_session):
+    """Factory that creates Customer objects."""
+    from app.models.customer import Customer
+    counter = [0]
+    def make(**kwargs):
+        counter[0] += 1
+        c = Customer(
+            first_name=kwargs.get("first_name", "Factory"),
+            last_name=kwargs.get("last_name", f"Customer{counter[0]}"),
+            phone=kwargs.get("phone", f"98765{counter[0]:05d}"),
+            total_visits=0,
+            total_spent=0,
+        )
+        db_session.add(c)
+        db_session.flush()
+        return c
+    return make
+
+
+@pytest.fixture
+def service_factory(db_session):
+    """Factory that creates Service objects (with auto-created ServiceCategory).
+
+    Note: Service model has no gst_rate_pct column — prices are tax-inclusive paise.
+    """
+    from app.models.service import Service, ServiceCategory
+    counter = [0]
+    def make(**kwargs):
+        counter[0] += 1
+        cat = ServiceCategory(
+            name=f"Factory Category {counter[0]}",
+            display_order=counter[0],
+            is_active=True,
+        )
+        db_session.add(cat)
+        db_session.flush()
+        svc = Service(
+            category_id=cat.id,
+            name=kwargs.get("name", f"Factory Service {counter[0]}"),
+            base_price=kwargs.get("base_price", 50000),
+            duration_minutes=kwargs.get("duration_minutes", 30),
+            is_active=True,
+            display_order=counter[0],
+        )
+        db_session.add(svc)
+        db_session.flush()
+        return svc
+    return make
+
+
+@pytest.fixture
+def package_definition_factory(db_session, test_user):
+    """Factory that creates PackageDefinition + PackageDefinitionItem objects."""
+    from decimal import Decimal
+    from app.models.package import (
+        PackageDefinition, PackageDefinitionItem,
+        PackageDefinitionStatus, EntitlementType, Shareability,
+    )
+    counter = [0]
+    def make(services, entitlement_type=EntitlementType.COUNTED, total_sessions=10,
+             shareability=Shareability.OWNER_ONLY, validity_days=90, **kwargs):
+        counter[0] += 1
+        defn = PackageDefinition(
+            name=f"Factory Package {counter[0]}",
+            status=PackageDefinitionStatus.PUBLISHED,
+            entitlement_type=entitlement_type,
+            total_sessions=total_sessions if entitlement_type == EntitlementType.COUNTED else None,
+            shareability=shareability,
+            validity_days=validity_days,
+            auto_apply=True,
+            cancellation_fee_pct=Decimal("20.00"),
+            created_by_user_id=test_user.id,
+        )
+        db_session.add(defn)
+        db_session.flush()
+
+        for i, svc in enumerate(services):
+            item = PackageDefinitionItem(
+                package_definition_id=defn.id,
+                service_id=svc.id,
+                quantity=1,
+                unit_price_paise=svc.base_price,
+                locked=False,
+                display_order=i,
+            )
+            db_session.add(item)
+        db_session.flush()
+        db_session.refresh(defn)
+        return defn
+    return make
+
+
+@pytest.fixture
+def package_sale_factory(db_session, test_user, package_definition_factory):
+    """Factory that creates a PackageSale with PackageSaleItems.
+
+    Creates a Bill (required FK) automatically. bill_id has unique=True so each
+    call creates its own Bill.
+    """
+    from datetime import datetime, timedelta, timezone
+    from decimal import Decimal
+    from app.models.billing import Bill, BillStatus, BillType
+    from app.models.package import (
+        PackageSale, PackageSaleItem, PackageSaleStatus, EntitlementType, Shareability,
+    )
+    counter = [0]
+
+    def make(
+        customer,
+        services,
+        sessions_remaining=5,
+        expires_at=None,
+        status=PackageSaleStatus.ACTIVE,
+        entitlement_type=EntitlementType.COUNTED,
+        total_sessions_snapshot=10,
+        shareability=Shareability.OWNER_ONLY,
+        **kwargs,
+    ):
+        counter[0] += 1
+        if expires_at is None:
+            expires_at = datetime.now(timezone.utc) + timedelta(days=90)
+
+        # Create minimal Bill — bill_id is non-nullable and unique on PackageSale
+        bill = Bill(
+            customer_id=customer.id,
+            subtotal=500000,
+            discount_amount=0,
+            tax_amount=90000,
+            cgst_amount=45000,
+            sgst_amount=45000,
+            total_amount=590000,
+            rounded_total=590000,
+            rounding_adjustment=0,
+            status=BillStatus.POSTED,
+            bill_type=BillType.NORMAL,
+            created_by=test_user.id,
+        )
+        db_session.add(bill)
+        db_session.flush()
+
+        # Create PackageDefinition
+        defn = package_definition_factory(
+            services=services,
+            entitlement_type=entitlement_type,
+            total_sessions=total_sessions_snapshot if entitlement_type == EntitlementType.COUNTED else None,
+            shareability=shareability,
+        )
+
+        # For UNLIMITED: sessions_remaining and total_sessions_snapshot must be None
+        actual_sessions = sessions_remaining
+        actual_total_snapshot = total_sessions_snapshot
+        if entitlement_type == EntitlementType.UNLIMITED:
+            actual_sessions = None
+            actual_total_snapshot = None
+
+        sale = PackageSale(
+            bill_id=bill.id,
+            package_definition_id=defn.id,
+            customer_id=customer.id,
+            sold_at=datetime.now(timezone.utc),
+            expires_at=expires_at,
+            entitlement_type_snapshot=entitlement_type,
+            shareability_snapshot=shareability,
+            cancellation_fee_pct_snapshot=Decimal("20.00"),
+            total_sessions_snapshot=actual_total_snapshot,
+            sessions_remaining=actual_sessions,
+            status=status,
+        )
+        db_session.add(sale)
+        db_session.flush()
+
+        # Create PackageSaleItems from definition items
+        for i, (svc, def_item) in enumerate(zip(services, defn.items)):
+            sale_item = PackageSaleItem(
+                package_sale_id=sale.id,
+                package_definition_item_id=def_item.id,
+                service_id=svc.id,
+                quantity=1,
+                snapshot_unit_price_paise=svc.base_price,
+                snapshot_gst_rate_pct=Decimal("18.00"),
+                locked=False,
+                display_order=i,
+            )
+            db_session.add(sale_item)
+        db_session.flush()
+
+        return sale
+
+    return make
