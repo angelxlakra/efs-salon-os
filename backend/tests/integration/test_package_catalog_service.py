@@ -190,8 +190,6 @@ def test_soft_delete_blocked_when_active_sales(
     from decimal import Decimal as D
     from app.models.billing import Bill, BillStatus, BillType
     from app.models.package import PackageSale, PackageSaleStatus, EntitlementType, Shareability
-    from app.models.user import User
-
     bill = Bill(
         customer_id=customer.id,
         subtotal=100000,
@@ -254,7 +252,7 @@ def test_update_definition_replaces_items(db_session, user_factory):
             PackageDefinitionItemCreate(service_id=svc2.id, quantity=2, unit_price_paise=200000),
         ],
     )
-    updated = update_definition(db_session, pkg.id, update_payload, user.id)
+    updated = update_definition(db_session, pkg.id, update_payload)
     assert updated.name == "Updated Pack"
     assert len(updated.items) == 1
     assert updated.items[0].service_id == svc2.id
@@ -276,4 +274,50 @@ def test_update_definition_not_found_raises(db_session, user_factory):
         items=[PackageDefinitionItemCreate(service_id=svc.id, quantity=1, unit_price_paise=100000)],
     )
     with pytest.raises(ValueError, match="not found"):
-        update_definition(db_session, "00000000000000000000000000", update_payload, user.id)
+        update_definition(db_session, "00000000000000000000000000", update_payload)
+
+
+def test_archive_already_archived_raises(db_session, user_factory):
+    """archive() on an already-ARCHIVED package raises ValueError."""
+    svc = _make_service(db_session, "M")
+    user = user_factory()
+    pkg = create_definition(db_session, _counted_payload(
+        items=[PackageDefinitionItemCreate(service_id=svc.id, quantity=1, unit_price_paise=100000)],
+    ), user.id)
+    publish(db_session, pkg.id)
+    archive(db_session, pkg.id)
+    with pytest.raises(ValueError, match="already archived"):
+        archive(db_session, pkg.id)
+
+
+def test_soft_delete_already_deleted_raises(db_session, user_factory):
+    """soft_delete() on an already-deleted package raises ValueError."""
+    svc = _make_service(db_session, "N")
+    user = user_factory()
+    pkg = create_definition(db_session, _counted_payload(
+        items=[PackageDefinitionItemCreate(service_id=svc.id, quantity=1, unit_price_paise=100000)],
+    ), user.id)
+    soft_delete(db_session, pkg.id)
+    with pytest.raises(ValueError, match="already deleted"):
+        soft_delete(db_session, pkg.id)
+
+
+def test_update_definition_with_discount(db_session, user_factory):
+    """update_definition applies discount distribution on update."""
+    svc = _make_service(db_session, "O")
+    user = user_factory()
+    pkg = create_definition(db_session, _counted_payload(
+        items=[PackageDefinitionItemCreate(service_id=svc.id, quantity=1, unit_price_paise=100000)],
+    ), user.id)
+    update_payload = PackageDefinitionUpdate(
+        name="Updated Pack",
+        entitlement_type=EntitlementType.COUNTED,
+        total_sessions=5,
+        validity_days=60,
+        shareability=Shareability.OWNER_ONLY,
+        items=[PackageDefinitionItemCreate(service_id=svc.id, quantity=1, unit_price_paise=100000)],
+        discount=DiscountInput(mode="pct", value=Decimal("10")),
+    )
+    updated = update_definition(db_session, pkg.id, update_payload)
+    # 10% off 100000 = 90000
+    assert updated.items[0].unit_price_paise == 90000

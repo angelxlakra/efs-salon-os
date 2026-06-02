@@ -39,7 +39,7 @@ def _build_items(payload_items, item_drafts):
             locked=draft.locked,
             display_order=src.display_order,
         )
-        for src, draft in zip(payload_items, item_drafts)
+        for src, draft in zip(payload_items, item_drafts, strict=True)
     ]
 
 
@@ -70,7 +70,7 @@ def create_definition(
 
 
 def update_definition(
-    db: Session, def_id: str, payload: PackageDefinitionUpdate, user_id: str
+    db: Session, def_id: str, payload: PackageDefinitionUpdate
 ) -> PackageDefinition:
     """Wholesale-replace a PackageDefinition's items in a single flush.
 
@@ -109,10 +109,15 @@ def publish(db: Session, def_id: str) -> PackageDefinition:
 
 
 def archive(db: Session, def_id: str) -> PackageDefinition:
-    """Archive a PackageDefinition (stops it appearing in new sales)."""
+    """Archive a PackageDefinition (stops it appearing in new sales).
+
+    Can be called on DRAFT or PUBLISHED. Raises if already ARCHIVED.
+    """
     pkg = db.get(PackageDefinition, def_id)
     if not pkg:
         raise ValueError(f"PackageDefinition {def_id} not found")
+    if pkg.status == PackageDefinitionStatus.ARCHIVED:
+        raise ValueError("Package is already archived")
     pkg.status = PackageDefinitionStatus.ARCHIVED
     db.flush()
     return pkg
@@ -126,6 +131,8 @@ def soft_delete(db: Session, def_id: str) -> None:
     pkg = db.get(PackageDefinition, def_id)
     if not pkg:
         raise ValueError(f"PackageDefinition {def_id} not found")
+    if pkg.deleted_at is not None:
+        raise ValueError(f"PackageDefinition {def_id} is already deleted")
     active_count = (
         db.query(PackageSale)
         .filter(
