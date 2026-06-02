@@ -2,7 +2,7 @@
 
 import pytest
 from datetime import datetime, timedelta, timezone
-from app.services.package_pricing_engine import find_eligible_packages
+from app.services.package_eligibility import find_eligible_packages
 from app.models.package import PackageSaleStatus, EntitlementType, Shareability
 
 
@@ -99,3 +99,21 @@ def test_shared_visible_to_other_customer(
     )
     eligible = find_eligible_packages(other.id, service.id, db_session)
     assert eligible[0].id == sale.id
+
+
+def test_excludes_counted_with_zero_sessions_but_active_status(
+    db_session, sample_setup, package_sale_factory,
+):
+    """A stale ACTIVE package with 0 sessions_remaining must not be returned.
+
+    This is the boundary case where the sale was never transitioned to EXHAUSTED
+    but still has no sessions left — the filter must catch it.
+    """
+    customer, service = sample_setup
+    package_sale_factory(
+        customer=customer, services=[service],
+        sessions_remaining=0,
+        status=PackageSaleStatus.ACTIVE,
+        expires_at=datetime.now(timezone.utc) + timedelta(days=30),
+    )
+    assert find_eligible_packages(customer.id, service.id, db_session) == []

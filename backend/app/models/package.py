@@ -190,6 +190,9 @@ class PackageSaleItem(Base, ULIDMixin, TimestampMixin):
     __table_args__ = (
         CheckConstraint("quantity >= 1", name="ck_package_sale_item_qty_positive"),
         CheckConstraint("snapshot_unit_price_paise >= 0", name="ck_package_sale_item_price_non_negative"),
+        # Covering index for the find_eligible_packages subquery:
+        #   SELECT package_sale_id FROM package_sale_items WHERE service_id = ?
+        Index("ix_package_sale_items_service_id_sale_id", "service_id", "package_sale_id"),
     )
 
 
