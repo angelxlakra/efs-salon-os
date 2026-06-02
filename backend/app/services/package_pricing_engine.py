@@ -209,6 +209,10 @@ def compute_refund(sale) -> RefundComputation:
 def _compute_counted_refund(sale) -> RefundComputation:
     total = sale.total_sessions_snapshot or 0
     remaining = sale.sessions_remaining or 0
+    if remaining > total:
+        raise DomainError(
+            f"sessions_remaining ({remaining}) exceeds total_sessions_snapshot ({total})"
+        )
     consumed = total - remaining
 
     # Per-session value: sum of all item MRPs (each item price is already per-session)
@@ -225,12 +229,17 @@ def _compute_counted_refund(sale) -> RefundComputation:
     )
     refund_paise = base_paise - fee_paise
 
+    pct_remaining = (
+        Decimal(remaining) / Decimal(max(total, 1)) * Decimal("100")
+    ).to_integral_value(rounding=ROUND_FLOOR)
+
     return RefundComputation(
         kind="counted",
         base_paise=base_paise,
         fee_paise=fee_paise,
         refund_paise=refund_paise,
         consumed_value_paise=consumed_value,
+        pct_remaining=pct_remaining,
         sessions_consumed=consumed,
         sessions_total=total,
     )

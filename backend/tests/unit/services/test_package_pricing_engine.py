@@ -207,6 +207,10 @@ def test_refund_counted_pro_rata():
     assert result.base_paise == 500000
     assert result.fee_paise == 100000
     assert result.refund_paise == 400000
+    assert result.sessions_consumed == 5
+    assert result.sessions_total == 10
+    assert result.consumed_value_paise == 500000
+    assert result.pct_remaining == Decimal("50")
 
 
 def test_refund_counted_all_redeemed_zero_refund():
@@ -232,3 +236,16 @@ def test_refund_counted_zero_fee():
     )
     result = compute_refund(sale)
     assert result.refund_paise == result.base_paise == 500000
+
+
+def test_refund_counted_remaining_exceeds_total_raises():
+    """Data corruption guard: sessions_remaining > total_sessions_snapshot."""
+    sale = MagicMock(
+        entitlement_type_snapshot=EntitlementType.COUNTED,
+        total_sessions_snapshot=5,
+        sessions_remaining=8,
+        cancellation_fee_pct_snapshot=Decimal("20.00"),
+        items=[MagicMock(snapshot_unit_price_paise=100000, quantity=1)],
+    )
+    with pytest.raises(DomainError, match="exceeds total_sessions_snapshot"):
+        compute_refund(sale)
