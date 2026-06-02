@@ -207,7 +207,9 @@ def compute_refund(sale) -> RefundComputation:
 
 
 def _compute_counted_refund(sale) -> RefundComputation:
-    total = sale.total_sessions_snapshot or 0
+    total = sale.total_sessions_snapshot
+    if not total:
+        raise DomainError("total_sessions_snapshot must be a positive int on a counted sale")
     remaining = sale.sessions_remaining or 0
     if remaining > total:
         raise DomainError(
@@ -216,12 +218,12 @@ def _compute_counted_refund(sale) -> RefundComputation:
     consumed = total - remaining
 
     # Per-session value: sum of all item MRPs (each item price is already per-session)
-    per_session_value = sum(
+    session_value_paise = sum(
         i.snapshot_unit_price_paise * i.quantity for i in sale.items
     )
 
-    base_paise = per_session_value * remaining
-    consumed_value = per_session_value * consumed
+    base_paise = session_value_paise * remaining
+    consumed_value_paise = session_value_paise * consumed
 
     fee_paise = int(
         (Decimal(base_paise) * sale.cancellation_fee_pct_snapshot / Decimal("100"))
@@ -238,7 +240,7 @@ def _compute_counted_refund(sale) -> RefundComputation:
         base_paise=base_paise,
         fee_paise=fee_paise,
         refund_paise=refund_paise,
-        consumed_value_paise=consumed_value,
+        consumed_value_paise=consumed_value_paise,
         pct_remaining=pct_remaining,
         sessions_consumed=consumed,
         sessions_total=total,

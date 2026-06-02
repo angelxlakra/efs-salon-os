@@ -249,3 +249,35 @@ def test_refund_counted_remaining_exceeds_total_raises():
     )
     with pytest.raises(DomainError, match="exceeds total_sessions_snapshot"):
         compute_refund(sale)
+
+
+def test_refund_counted_none_total_sessions_raises():
+    """total_sessions_snapshot=None on a counted sale must raise DomainError."""
+    sale = MagicMock(
+        entitlement_type_snapshot=EntitlementType.COUNTED,
+        total_sessions_snapshot=None,
+        sessions_remaining=3,
+        cancellation_fee_pct_snapshot=Decimal("0.00"),
+        items=[MagicMock(snapshot_unit_price_paise=100000, quantity=1)],
+    )
+    with pytest.raises(DomainError, match="total_sessions_snapshot must be a positive int"):
+        compute_refund(sale)
+
+
+def test_refund_counted_multi_item():
+    """Package with two service lines: the per-session value sums across all items."""
+    sale = MagicMock(
+        entitlement_type_snapshot=EntitlementType.COUNTED,
+        total_sessions_snapshot=6,
+        sessions_remaining=3,
+        cancellation_fee_pct_snapshot=Decimal("0.00"),
+        items=[
+            MagicMock(snapshot_unit_price_paise=50000, quantity=1),  # haircut
+            MagicMock(snapshot_unit_price_paise=30000, quantity=1),  # massage
+        ],
+    )
+    result = compute_refund(sale)
+    # session_value_paise = 50000 + 30000 = 80000; 3 remaining → base = 240000
+    assert result.base_paise == 240000
+    assert result.refund_paise == 240000
+    assert result.consumed_value_paise == 240000
