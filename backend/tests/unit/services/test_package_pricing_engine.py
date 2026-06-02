@@ -311,6 +311,10 @@ def test_refund_unlimited_pro_rata_time():
     assert result.base_paise == 110000
     assert result.fee_paise == 22000
     assert result.refund_paise == 88000
+    assert result.consumed_value_paise == 40000       # 150000 - 110000
+    assert result.pct_remaining == Decimal(22) / Decimal(30)
+    assert result.sessions_consumed is None
+    assert result.sessions_total is None
 
 
 def test_refund_unlimited_expired_zero():
@@ -329,3 +333,7 @@ def test_refund_unlimited_expired_zero():
     result = compute_refund(sale)
     assert result.base_paise == 0
     assert result.refund_paise == 0
+    assert result.consumed_value_paise == 150000      # full amount consumed
+    assert result.fee_paise == 0                      # 0 base × fee_pct = 0
+    assert result.sessions_consumed is None
+    assert result.sessions_total is None
