@@ -283,3 +283,16 @@ def _compute_unlimited_refund(sale) -> RefundComputation:
     )
 
 
+def can_extend_expiry(sale, new_expires_at: datetime) -> None:
+    """Validate an expiry extension request. Raises DomainError on violation.
+
+    Rules:
+    - new_expires_at must be strictly after sale.expires_at (always forward)
+    - new_expires_at must be strictly after now() (cannot set a past expiry)
+    """
+    if new_expires_at <= sale.expires_at:
+        raise DomainError("Extension must be forward in time")
+    if new_expires_at <= datetime.now(timezone.utc):
+        raise DomainError("Extension cannot be in the past")
+
+

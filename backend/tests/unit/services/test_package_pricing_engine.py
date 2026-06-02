@@ -334,3 +334,28 @@ def test_refund_unlimited_expired_zero():
     assert result.fee_paise == 0                      # 0 base × fee_pct = 0
     assert result.sessions_consumed is None
     assert result.sessions_total is None
+
+
+from app.services.package_pricing_engine import can_extend_expiry
+
+
+def test_extend_must_be_forward_in_time():
+    """new_expires_at must be strictly after sale.expires_at."""
+    sale = MagicMock(expires_at=datetime.now(timezone.utc) + timedelta(days=10))
+    new_expires = sale.expires_at - timedelta(days=1)
+    with pytest.raises(DomainError, match="forward"):
+        can_extend_expiry(sale, new_expires)
+
+
+def test_extend_must_be_future_relative_to_now():
+    """new_expires_at must be > now() even if it is > sale.expires_at (e.g. extending an already-expired package)."""
+    sale = MagicMock(expires_at=datetime.now(timezone.utc) - timedelta(days=5))
+    new_expires = datetime.now(timezone.utc) - timedelta(hours=1)
+    with pytest.raises(DomainError, match="past"):
+        can_extend_expiry(sale, new_expires)
+
+
+def test_extend_valid():
+    """A future date beyond current expiry raises nothing."""
+    sale = MagicMock(expires_at=datetime.now(timezone.utc) + timedelta(days=10))
+    can_extend_expiry(sale, sale.expires_at + timedelta(days=30))  # must not raise
