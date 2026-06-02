@@ -347,6 +347,27 @@ def service_factory(db_session):
 
 
 @pytest.fixture
+def user_factory(db_session, test_role):
+    """Factory that creates User objects."""
+    from app.models.user import User
+    counter = [0]
+    def make(**kwargs):
+        counter[0] += 1
+        u = User(
+            role_id=test_role.id,
+            username=kwargs.get("username", f"factory_user_{counter[0]}"),
+            email=kwargs.get("email", f"factory{counter[0]}@example.com"),
+            password_hash="fake_hash",
+            full_name=kwargs.get("full_name", f"Factory User {counter[0]}"),
+            is_active=True,
+        )
+        db_session.add(u)
+        db_session.flush()
+        return u
+    return make
+
+
+@pytest.fixture
 def package_definition_factory(db_session, test_user):
     """Factory that creates PackageDefinition + PackageDefinitionItem objects."""
     from decimal import Decimal
@@ -386,6 +407,12 @@ def package_definition_factory(db_session, test_user):
         db_session.refresh(defn)
         return defn
     return make
+
+
+@pytest.fixture
+def definition_factory(package_definition_factory):
+    """Alias for package_definition_factory (shorter name for catalog service tests)."""
+    return package_definition_factory
 
 
 @pytest.fixture
