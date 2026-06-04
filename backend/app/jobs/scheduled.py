@@ -630,3 +630,19 @@ def transfer_poll_job():
         logger.error(f"Transfer poll job failed: {e}", exc_info=True)
     finally:
         db.close()
+
+
+def package_expiry_transitions_job():
+    """Daily 2am IST: transition expired packages to status=expired."""
+    from app.services.package_expiry_service import run_expiry_transitions
+    db = SessionLocal()
+    logger.info("Starting package expiry transitions job...")
+    try:
+        result = run_expiry_transitions(db)
+        db.commit()
+        logger.info(f"Package expiry transitions: {result['transitioned']} sale(s) expired")
+    except Exception as e:
+        logger.error(f"Package expiry transitions failed: {str(e)}", exc_info=True)
+        db.rollback()
+    finally:
+        db.close()
