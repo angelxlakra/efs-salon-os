@@ -90,6 +90,12 @@ class PackageDefinitionItem(Base, ULIDMixin, TimestampMixin):
     display_order = Column(Integer, nullable=False, default=0)
 
     definition = relationship("PackageDefinition", back_populates="items")
+    service = relationship("Service")
+
+    @property
+    def service_name(self) -> str | None:
+        """Name of the linked service, for API serialization."""
+        return self.service.name if self.service else None
 
     __table_args__ = (
         CheckConstraint("quantity >= 1", name="ck_package_def_item_qty_positive"),

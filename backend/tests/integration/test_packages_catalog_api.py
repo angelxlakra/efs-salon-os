@@ -418,3 +418,17 @@ def test_list_filter_by_status(client_as_owner, service_factory):
     assert r2.status_code == 200
     names2 = [d["name"] for d in r2.json()]
     assert "Draft Pkg" not in names2
+
+
+# ---------------------------------------------------------------------------
+# Tests: service_name populated in item responses
+# ---------------------------------------------------------------------------
+
+def test_create_returns_service_name_in_items(client_as_owner, service_factory):
+    svc = service_factory()
+    r = client_as_owner.post("/api/packages/definitions", json=make_payload(svc.id))
+    assert r.status_code == 201
+    items = r.json()["items"]
+    assert len(items) == 1
+    assert items[0]["service_name"] is not None
+    assert isinstance(items[0]["service_name"], str)

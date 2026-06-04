@@ -2,11 +2,11 @@
 
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from app.database import get_db
 from app.auth.dependencies import require_permission
 from app.models.user import User
-from app.models.package import PackageDefinition, PackageDefinitionStatus
+from app.models.package import PackageDefinition, PackageDefinitionItem, PackageDefinitionStatus
 from app.schemas.package import (
     PackageDefinitionCreate, PackageDefinitionUpdate, PackageDefinitionResponse,
 )
@@ -20,11 +20,13 @@ router = APIRouter(prefix="/packages", tags=["packages"])
 @router.get("/definitions", response_model=List[PackageDefinitionResponse])
 def list_definitions(
     status_filter: Optional[PackageDefinitionStatus] = Query(None, alias="status"),
-    search: Optional[str] = None,
+    search: Optional[str] = Query(None, max_length=255),
     db: Session = Depends(get_db),
     _: User = Depends(require_permission("packages", "read")),
 ):
-    q = db.query(PackageDefinition).filter(PackageDefinition.deleted_at.is_(None))
+    q = db.query(PackageDefinition).options(
+        joinedload(PackageDefinition.items).joinedload(PackageDefinitionItem.service)
+    ).filter(PackageDefinition.deleted_at.is_(None))
     if status_filter:
         q = q.filter(PackageDefinition.status == status_filter)
     if search:
@@ -38,7 +40,9 @@ def get_definition(
     db: Session = Depends(get_db),
     _: User = Depends(require_permission("packages", "read")),
 ):
-    pkg = db.get(PackageDefinition, def_id)
+    pkg = db.query(PackageDefinition).options(
+        joinedload(PackageDefinition.items).joinedload(PackageDefinitionItem.service)
+    ).filter(PackageDefinition.id == def_id).first()
     if not pkg or pkg.deleted_at:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Package not found")
     return pkg
@@ -50,9 +54,12 @@ def create_definition(
     db: Session = Depends(get_db),
     user: User = Depends(require_permission("packages", "create")),
 ):
-    pkg = package_catalog_service.create_definition(db, payload, user.id)
-    db.commit()
-    return pkg
+    try:
+        pkg = package_catalog_service.create_definition(db, payload, user.id)
+        db.commit()
+        return pkg
+    except ValueError as e:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e))
 
 
 @router.put("/definitions/{def_id}", response_model=PackageDefinitionResponse)
