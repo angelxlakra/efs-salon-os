@@ -151,8 +151,9 @@ def undo_redemption(db: Session, audit_id: str, user_id: str) -> None:
         if sale.status == PackageSaleStatus.EXHAUSTED:
             sale.status = PackageSaleStatus.ACTIVE
 
-    # Find and delete the matching PACKAGE_REDEMPTION Payment row.
-    # Match on bill_id + payment_method + amount (package price, captured before restore).
+    # NOTE: Payment is matched by (bill_id, payment_method, amount). This triple is not
+    # unique if two redemptions of equal value occur on the same bill. A future migration
+    # should add payment_id to PackageRedemptionAudit to make the lookup exact.
     internal_pay = db.execute(
         select(Payment).where(
             Payment.bill_id == bill.id,
@@ -160,8 +161,12 @@ def undo_redemption(db: Session, audit_id: str, user_id: str) -> None:
             Payment.amount == expected_payment_amount,
         )
     ).scalar_one_or_none()
-    if internal_pay:
-        db.delete(internal_pay)
+    if internal_pay is None:
+        raise ValueError(
+            "Internal PACKAGE_REDEMPTION payment row not found — data integrity problem. "
+            "Undo aborted to avoid partial state."
+        )
+    db.delete(internal_pay)
 
     db.delete(audit)
     db.flush()
