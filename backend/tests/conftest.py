@@ -395,6 +395,31 @@ def bill_factory(db_session, test_user):
 
 
 @pytest.fixture
+def bill_item_factory(db_session, bill_factory, customer_factory, test_user):
+    """Factory that creates BillItem objects, creating a Bill + Customer automatically."""
+    from app.models.billing import BillItem, BillItemType
+    counter = [0]
+    def make(service_id, base_price=100000, quantity=1, bill=None, **kwargs):
+        counter[0] += 1
+        if bill is None:
+            customer = customer_factory()
+            bill = bill_factory(customer_id=customer.id)
+        item = BillItem(
+            bill_id=bill.id,
+            service_id=service_id,
+            item_name=kwargs.get("item_name", f"Test Service {counter[0]}"),
+            base_price=base_price,
+            quantity=quantity,
+            line_total=base_price * quantity,
+            item_type=BillItemType.SERVICE,
+        )
+        db_session.add(item)
+        db_session.flush()
+        return item
+    return make
+
+
+@pytest.fixture
 def package_definition_factory(db_session, test_user):
     """Factory that creates PackageDefinition + PackageDefinitionItem objects."""
     from decimal import Decimal
