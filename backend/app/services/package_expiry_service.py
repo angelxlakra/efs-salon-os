@@ -3,7 +3,7 @@
 from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from app.models.package import PackageSale, PackageSaleStatus, PackageExpiryExtension
-from app.services.package_pricing_engine import can_extend_expiry, DomainError  # noqa: F401
+from app.services.package_pricing_engine import can_extend_expiry
 
 
 def extend_expiry(

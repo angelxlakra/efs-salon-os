@@ -86,7 +86,7 @@ def test_run_expiry_transitions_marks_expired(
 
     result = run_expiry_transitions(db_session)
 
-    assert result["transitioned"] >= 1
+    assert result["transitioned"] == 1
     db_session.refresh(expired_sale)
     db_session.refresh(active_sale)
     assert expired_sale.status == PackageSaleStatus.EXPIRED
