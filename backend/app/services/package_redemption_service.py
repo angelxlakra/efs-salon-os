@@ -33,21 +33,18 @@ def apply_redemption(
     if not sale:
         raise ValueError(f"PackageSale {package_sale_id} not found")
 
-    # Check sessions first so EXHAUSTED (sessions=0) raises "no sessions remaining"
+    # 1. Status must be ACTIVE (EXHAUSTED, EXPIRED, REFUNDED are all disallowed here)
+    if sale.status != PackageSaleStatus.ACTIVE:
+        raise ValueError(f"Package not active (status={sale.status.value})")
+
+    # 2. Expiry check
+    if sale.expires_at <= now:
+        raise ValueError("Package expired")
+
+    # 3. Sessions check (COUNTED packages only)
     if sale.entitlement_type_snapshot == EntitlementType.COUNTED:
         if not sale.sessions_remaining or sale.sessions_remaining <= 0:
             raise ValueError("no sessions remaining")
-
-    # Non-active and non-exhausted states (EXPIRED, REFUNDED)
-    if sale.status not in (PackageSaleStatus.ACTIVE, PackageSaleStatus.EXHAUSTED):
-        raise ValueError(f"Package not active (status={sale.status.value})")
-
-    # Exhausted with sessions remaining would be a data inconsistency — treat as no sessions
-    if sale.status == PackageSaleStatus.EXHAUSTED:
-        raise ValueError("no sessions remaining")
-
-    if sale.expires_at <= now:
-        raise ValueError("Package expired")
 
     bill_item = db.get(BillItem, bill_item_id)
     if not bill_item:
