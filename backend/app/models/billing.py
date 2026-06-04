@@ -140,6 +140,11 @@ class Bill(Base, ULIDMixin, TimestampMixin):
         """Get total in rupees."""
         return self.rounded_total / 100.0
 
+    @property
+    def total_paise(self) -> int:
+        """Alias for total_amount, used by compute_refund for unlimited packages."""
+        return self.total_amount
+
 
 class BillItem(Base, ULIDMixin, TimestampMixin):
     """
