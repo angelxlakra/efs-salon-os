@@ -49,6 +49,8 @@ def issue_refund(
     sale.bill = original_bill
 
     breakdown = compute_refund(sale)
+    if breakdown.refund_paise == 0:
+        raise ValueError("No refundable value remaining on this package sale")
     now = datetime.now(timezone.utc)
 
     # Credit note total is negative: money owed back to the customer.
@@ -71,6 +73,7 @@ def issue_refund(
         rounding_adjustment=0,
         status=BillStatus.POSTED,
         created_by=user_id,
+        refund_reason=reason,
     )
     db.add(credit_note)
     db.flush()  # materialise credit_note.id before referencing it in FKs

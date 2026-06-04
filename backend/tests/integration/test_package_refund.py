@@ -75,5 +75,23 @@ def test_refund_payment_row_created(
     )
     assert pay is not None
     assert pay.payment_method == PaymentMethod.CASH
-    # Refund amount should be positive (cash paid out)
-    assert pay.amount > 0
+    # 5 unredeemed sessions × 200_000 × (1 − 20%) = 800_000
+    assert pay.amount == 800_000
+
+
+def test_refund_zero_remaining_raises(
+    db_session, service_factory, customer_factory,
+    package_sale_factory, user_factory,
+):
+    """issue_refund raises when there is no refundable value (all sessions consumed)."""
+    svc = service_factory(base_price=200000)
+    customer = customer_factory()
+    user = user_factory()
+    # All sessions consumed — sessions_remaining=0 → refund_paise=0
+    sale = package_sale_factory(
+        customer=customer, services=[svc],
+        sessions_remaining=0, total_sessions_snapshot=10,
+        status=PackageSaleStatus.EXHAUSTED,
+    )
+    with pytest.raises(ValueError, match="No refundable value"):
+        issue_refund(db_session, sale.id, "cash", "Test", user.id)
