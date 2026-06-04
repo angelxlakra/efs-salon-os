@@ -30,6 +30,7 @@ from app.api.reconciliation import router as reconciliation_router
 from app.api.expenses import router as expenses_router
 from app.api.purchases import router as purchases_router
 from app.api.attendance import router as attendance_router
+from app.api.packages import router as packages_router
 
 # Initialize FastAPI application
 app = FastAPI(
@@ -64,6 +65,7 @@ app.include_router(reconciliation_router, prefix="/api", tags=["Reconciliation"]
 app.include_router(expenses_router, prefix="/api/expenses", tags=["Expenses"])
 app.include_router(purchases_router, prefix="/api/purchases", tags=["Purchases"])
 app.include_router(attendance_router, prefix="/api/attendance", tags=["Attendance"])
+app.include_router(packages_router, prefix="/api", tags=["Packages"])
 
 
 # ========== Startup Event ==========
