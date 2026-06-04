@@ -7,7 +7,7 @@ from app.database import get_db
 from app.auth.dependencies import require_permission
 from app.models.user import User
 from app.models.package import PackageDefinition, PackageDefinitionItem, PackageDefinitionStatus
-from app.models.package import PackageSale, PackageSaleStatus
+from app.models.package import PackageSale, PackageSaleItem, PackageSaleStatus
 from app.schemas.package import (
     PackageDefinitionCreate, PackageDefinitionUpdate, PackageDefinitionResponse,
 )
@@ -143,7 +143,11 @@ def list_sales(
     db: Session = Depends(get_db),
     _: User = Depends(require_permission("packages", "read")),
 ):
-    q = db.query(PackageSale)
+    q = db.query(PackageSale).options(
+        joinedload(PackageSale.customer),
+        joinedload(PackageSale.definition),
+        joinedload(PackageSale.items).joinedload(PackageSaleItem.service),
+    )
     if customer_id:
         q = q.filter(PackageSale.customer_id == customer_id)
     if status_filter:
@@ -177,7 +181,11 @@ def get_sale(
     db: Session = Depends(get_db),
     _: User = Depends(require_permission("packages", "read")),
 ):
-    sale = db.get(PackageSale, sale_id)
+    sale = db.query(PackageSale).options(
+        joinedload(PackageSale.customer),
+        joinedload(PackageSale.definition),
+        joinedload(PackageSale.items).joinedload(PackageSaleItem.service),
+    ).filter(PackageSale.id == sale_id).first()
     if not sale:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Sale not found")
     return sale

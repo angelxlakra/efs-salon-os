@@ -100,11 +100,47 @@ def client_as_staff(db_session, staff_user, monkeypatch):
 # Tests: list sales
 # ---------------------------------------------------------------------------
 
-def test_all_roles_can_list_sales(client_as_owner, client_as_receptionist, client_as_staff):
-    for client in [client_as_owner, client_as_receptionist, client_as_staff]:
-        r = client.get("/api/packages/sales")
-        assert r.status_code == 200
-        assert isinstance(r.json(), list)
+def test_owner_can_list_sales(client_as_owner):
+    r = client_as_owner.get("/api/packages/sales")
+    assert r.status_code == 200
+    assert isinstance(r.json(), list)
+
+
+def test_receptionist_can_list_sales(client_as_receptionist):
+    r = client_as_receptionist.get("/api/packages/sales")
+    assert r.status_code == 200
+    assert isinstance(r.json(), list)
+
+
+def test_staff_can_list_sales(client_as_staff):
+    r = client_as_staff.get("/api/packages/sales")
+    assert r.status_code == 200
+    assert isinstance(r.json(), list)
+
+
+def test_list_sales_filter_by_status(
+    client_as_owner, package_sale_factory, customer_factory, service_factory
+):
+    cust = customer_factory()
+    svc = service_factory()
+    active_sale = package_sale_factory(customer=cust, services=[svc], status=PackageSaleStatus.ACTIVE)
+    expired_sale = package_sale_factory(
+        customer=cust, services=[svc],
+        status=PackageSaleStatus.EXPIRED,
+        expires_at=datetime.now(timezone.utc) - timedelta(days=1),
+    )
+
+    r = client_as_owner.get("/api/packages/sales?status=active")
+    assert r.status_code == 200
+    ids = [s["id"] for s in r.json()]
+    assert active_sale.id in ids
+    assert expired_sale.id not in ids
+
+    r2 = client_as_owner.get("/api/packages/sales?status=expired")
+    assert r2.status_code == 200
+    ids2 = [s["id"] for s in r2.json()]
+    assert expired_sale.id in ids2
+    assert active_sale.id not in ids2
 
 
 def test_list_sales_filter_by_customer(
@@ -242,7 +278,8 @@ def test_owner_can_refund_sale(
     )
     assert r.status_code == 200
     data = r.json()
-    assert "credit_note_bill_id" in data
+    assert data.get("credit_note_bill_id") is not None
+    assert len(data["credit_note_bill_id"]) == 26  # ULID
     assert data["status"] == "refunded"
 
 
