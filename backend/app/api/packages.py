@@ -62,6 +62,9 @@ def update_definition(
     db: Session = Depends(get_db),
     user: User = Depends(require_permission("packages", "update")),
 ):
+    pkg = db.get(PackageDefinition, def_id)
+    if not pkg or pkg.deleted_at:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Package not found")
     try:
         pkg = package_catalog_service.update_definition(db, def_id, payload)
         db.commit()
@@ -76,6 +79,9 @@ def publish_definition(
     db: Session = Depends(get_db),
     _: User = Depends(require_permission("packages", "update")),
 ):
+    pkg = db.get(PackageDefinition, def_id)
+    if not pkg or pkg.deleted_at:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Package not found")
     try:
         pkg = package_catalog_service.publish(db, def_id)
         db.commit()
@@ -90,6 +96,9 @@ def archive_definition(
     db: Session = Depends(get_db),
     _: User = Depends(require_permission("packages", "update")),
 ):
+    pkg = db.get(PackageDefinition, def_id)
+    if not pkg or pkg.deleted_at:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Package not found")
     try:
         pkg = package_catalog_service.archive(db, def_id)
         db.commit()
@@ -104,6 +113,9 @@ def delete_definition(
     db: Session = Depends(get_db),
     _: User = Depends(require_permission("packages", "delete")),
 ):
+    pkg = db.get(PackageDefinition, def_id)
+    if not pkg or pkg.deleted_at:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Package not found")
     try:
         package_catalog_service.soft_delete(db, def_id)
         db.commit()

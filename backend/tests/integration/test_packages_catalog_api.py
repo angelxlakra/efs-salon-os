@@ -247,6 +247,24 @@ def test_receptionist_cannot_update(client_as_owner, client_as_receptionist, ser
     assert r.status_code == 403
 
 
+def test_staff_cannot_update(client_as_owner, client_as_staff, service_factory):
+    svc = service_factory()
+    created = client_as_owner.post("/api/packages/definitions", json=make_payload(svc.id)).json()
+    def_id = created["id"]
+
+    r = client_as_staff.put(f"/api/packages/definitions/{def_id}", json=make_payload(svc.id))
+    assert r.status_code == 403
+
+
+def test_update_nonexistent_returns_404(client_as_owner, service_factory):
+    svc = service_factory()
+    r = client_as_owner.put(
+        "/api/packages/definitions/01AAAAAAAAAAAAAAAAAAAAAAA0",
+        json=make_payload(svc.id),
+    )
+    assert r.status_code == 404
+
+
 # ---------------------------------------------------------------------------
 # Tests: publish
 # ---------------------------------------------------------------------------
@@ -280,6 +298,20 @@ def test_receptionist_cannot_publish(client_as_owner, client_as_receptionist, se
     assert r.status_code == 403
 
 
+def test_staff_cannot_publish(client_as_owner, client_as_staff, service_factory):
+    svc = service_factory()
+    created = client_as_owner.post("/api/packages/definitions", json=make_payload(svc.id)).json()
+    def_id = created["id"]
+
+    r = client_as_staff.post(f"/api/packages/definitions/{def_id}/publish")
+    assert r.status_code == 403
+
+
+def test_publish_nonexistent_returns_404(client_as_owner):
+    r = client_as_owner.post("/api/packages/definitions/01AAAAAAAAAAAAAAAAAAAAAAA0/publish")
+    assert r.status_code == 404
+
+
 # ---------------------------------------------------------------------------
 # Tests: archive
 # ---------------------------------------------------------------------------
@@ -302,6 +334,29 @@ def test_archive_already_archived_returns_400(client_as_owner, service_factory):
 
     r = client_as_owner.post(f"/api/packages/definitions/{def_id}/archive")
     assert r.status_code == 400
+
+
+def test_receptionist_cannot_archive(client_as_owner, client_as_receptionist, service_factory):
+    svc = service_factory()
+    created = client_as_owner.post("/api/packages/definitions", json=make_payload(svc.id)).json()
+    def_id = created["id"]
+
+    r = client_as_receptionist.post(f"/api/packages/definitions/{def_id}/archive")
+    assert r.status_code == 403
+
+
+def test_staff_cannot_archive(client_as_owner, client_as_staff, service_factory):
+    svc = service_factory()
+    created = client_as_owner.post("/api/packages/definitions", json=make_payload(svc.id)).json()
+    def_id = created["id"]
+
+    r = client_as_staff.post(f"/api/packages/definitions/{def_id}/archive")
+    assert r.status_code == 403
+
+
+def test_archive_nonexistent_returns_404(client_as_owner):
+    r = client_as_owner.post("/api/packages/definitions/01AAAAAAAAAAAAAAAAAAAAAAA0/archive")
+    assert r.status_code == 404
 
 
 # ---------------------------------------------------------------------------
@@ -337,6 +392,11 @@ def test_staff_cannot_delete(client_as_owner, client_as_staff, service_factory):
 
     r = client_as_staff.delete(f"/api/packages/definitions/{def_id}")
     assert r.status_code == 403
+
+
+def test_delete_nonexistent_returns_404(client_as_owner):
+    r = client_as_owner.delete("/api/packages/definitions/01AAAAAAAAAAAAAAAAAAAAAAA0")
+    assert r.status_code == 404
 
 
 # ---------------------------------------------------------------------------
