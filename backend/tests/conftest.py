@@ -368,6 +368,33 @@ def user_factory(db_session, test_role):
 
 
 @pytest.fixture
+def bill_factory(db_session, test_user):
+    """Factory that creates minimal Bill objects for use as FKs in other factories."""
+    from app.models.billing import Bill, BillStatus, BillType
+    counter = [0]
+    def make(customer_id=None, **kwargs):
+        counter[0] += 1
+        b = Bill(
+            customer_id=customer_id,
+            subtotal=kwargs.get("subtotal", 100000),
+            discount_amount=0,
+            tax_amount=0,
+            cgst_amount=0,
+            sgst_amount=0,
+            total_amount=kwargs.get("subtotal", 100000),
+            rounded_total=kwargs.get("subtotal", 100000),
+            rounding_adjustment=0,
+            status=BillStatus.DRAFT,
+            bill_type=BillType.NORMAL,
+            created_by=test_user.id,
+        )
+        db_session.add(b)
+        db_session.flush()
+        return b
+    return make
+
+
+@pytest.fixture
 def package_definition_factory(db_session, test_user):
     """Factory that creates PackageDefinition + PackageDefinitionItem objects."""
     from decimal import Decimal
