@@ -7,10 +7,14 @@ from app.database import get_db
 from app.auth.dependencies import require_permission
 from app.models.user import User
 from app.models.package import PackageDefinition, PackageDefinitionItem, PackageDefinitionStatus
+from app.models.package import PackageSale, PackageSaleStatus
 from app.schemas.package import (
     PackageDefinitionCreate, PackageDefinitionUpdate, PackageDefinitionResponse,
 )
-from app.services import package_catalog_service
+from app.schemas.package import (
+    PackageSaleResponse, PackageSaleSummary, RefundRequest, ExtendExpiryRequest,
+)
+from app.services import package_catalog_service, package_refund_service, package_expiry_service
 
 router = APIRouter(prefix="/packages", tags=["packages"])
 
@@ -126,5 +130,88 @@ def delete_definition(
     try:
         package_catalog_service.soft_delete(db, def_id)
         db.commit()
+    except ValueError as e:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e))
+
+
+# ---------- Sales ----------
+
+@router.get("/sales", response_model=List[PackageSaleResponse])
+def list_sales(
+    customer_id: Optional[str] = None,
+    status_filter: Optional[PackageSaleStatus] = Query(None, alias="status"),
+    db: Session = Depends(get_db),
+    _: User = Depends(require_permission("packages", "read")),
+):
+    q = db.query(PackageSale)
+    if customer_id:
+        q = q.filter(PackageSale.customer_id == customer_id)
+    if status_filter:
+        q = q.filter(PackageSale.status == status_filter)
+    return q.order_by(PackageSale.sold_at.desc()).all()
+
+
+@router.get("/sales/active-for-customer/{customer_id}", response_model=List[PackageSaleSummary])
+def list_active_for_customer(
+    customer_id: str,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_permission("packages", "read")),
+):
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+    return (
+        db.query(PackageSale)
+        .filter(
+            PackageSale.customer_id == customer_id,
+            PackageSale.status == PackageSaleStatus.ACTIVE,
+            PackageSale.expires_at > now,
+        )
+        .order_by(PackageSale.expires_at.asc())
+        .all()
+    )
+
+
+@router.get("/sales/{sale_id}", response_model=PackageSaleResponse)
+def get_sale(
+    sale_id: str,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_permission("packages", "read")),
+):
+    sale = db.get(PackageSale, sale_id)
+    if not sale:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Sale not found")
+    return sale
+
+
+@router.post("/sales/{sale_id}/extend", response_model=PackageSaleResponse)
+def extend_sale(
+    sale_id: str,
+    payload: ExtendExpiryRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission("packages", "extend_expiry")),
+):
+    try:
+        sale = package_expiry_service.extend_expiry(
+            db, sale_id, payload.new_expires_at, payload.reason, user.id,
+        )
+        db.commit()
+        return sale
+    except ValueError as e:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e))
+
+
+@router.post("/sales/{sale_id}/refund", response_model=dict)
+def refund_sale(
+    sale_id: str,
+    payload: RefundRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission("packages", "refund")),
+):
+    try:
+        credit_note = package_refund_service.issue_refund(
+            db, sale_id, payload.payment_method, payload.reason, user.id,
+        )
+        db.commit()
+        return {"credit_note_bill_id": credit_note.id, "status": "refunded"}
     except ValueError as e:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e))

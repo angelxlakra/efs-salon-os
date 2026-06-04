@@ -158,6 +158,21 @@ class PackageSale(Base, ULIDMixin, TimestampMixin):
         cascade="all, delete-orphan",
         order_by="PackageSaleItem.display_order",
     )
+    customer = relationship("Customer", foreign_keys=[customer_id])
+    definition = relationship("PackageDefinition", foreign_keys=[package_definition_id])
+
+    @property
+    def customer_name(self) -> str | None:
+        """Full name of customer, for API serialization."""
+        if not self.customer:
+            return None
+        parts = [self.customer.first_name, self.customer.last_name]
+        return " ".join(p for p in parts if p)
+
+    @property
+    def package_definition_name(self) -> str | None:
+        """Name of the package definition, for API serialization."""
+        return self.definition.name if self.definition else None
 
     __table_args__ = (
         Index("ix_package_sales_customer_status", "customer_id", "status"),
@@ -192,6 +207,12 @@ class PackageSaleItem(Base, ULIDMixin, TimestampMixin):
     display_order = Column(Integer, nullable=False)
 
     sale = relationship("PackageSale", back_populates="items")
+    service = relationship("Service")
+
+    @property
+    def service_name(self) -> str | None:
+        """Name of the linked service, for API serialization."""
+        return self.service.name if self.service else None
 
     __table_args__ = (
         CheckConstraint("quantity >= 1", name="ck_package_sale_item_qty_positive"),
