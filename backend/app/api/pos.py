@@ -47,7 +47,6 @@ from app.schemas.billing import (
     BillItemResponse,
 )
 from app.auth.dependencies import get_current_user
-from app.auth.dependencies import get_current_user
 from app.auth.permissions import PermissionChecker
 from fastapi.responses import Response
 from app.services.receipt_service import ReceiptService
@@ -1380,7 +1379,6 @@ def add_bill_item(
             notes=item_data.notes,
             user_id=current_user.id,
         )
-        db.commit()
         return AddBillItemResponse(
             bill_item=BillItemResponse.model_validate(result["bill_item"]),
             auto_applied_package_sale_id=result["auto_applied_package_sale_id"],

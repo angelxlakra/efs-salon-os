@@ -114,11 +114,6 @@ class BillItemResponse(BaseModel):
     notes: Optional[str] = None
     staff_contributions: List[BillItemStaffContributionResponse] = []  # Multi-staff tracking
 
-    # Package redemption metadata — populated only on add_bill_item responses
-    eligible_packages: List[str] = []           # sale IDs when 2+ packages match
-    auto_applied_package_sale_id: Optional[str] = None  # sale ID if auto-applied
-    item_type: Optional[str] = None             # expose item_type so UI can branch on it
-
     class Config:
         from_attributes = True
 

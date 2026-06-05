@@ -317,6 +317,7 @@ class BillingService:
         cogs_amount = self._calculate_service_cogs(service.id, quantity)
 
         bill_item = BillItem(
+            id=str(ULID()),  # explicit ULID, consistent with create_bill
             bill_id=bill_id,
             service_id=service.id,
             item_name=service.name,
@@ -371,6 +372,8 @@ class BillingService:
                 eligible_package_ids = [s.id for s in eligible]
 
         self.db.flush()
+        self.db.refresh(bill_item)   # ensure item_type reflects apply_redemption mutations
+        self.db.commit()
 
         return {
             "bill_item": bill_item,
