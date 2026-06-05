@@ -1,8 +1,10 @@
 "use client";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { Loader2, ShoppingBag } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { ExpiryBadge } from "@/components/ui/ExpiryBadge";
 import { SessionsLeft } from "@/components/ui/SessionsLeft";
 import { RefundPackageModal } from "@/components/packages/RefundPackageModal";
@@ -65,9 +67,20 @@ export default function SoldPackagesPage() {
       </div>
 
       {loading ? (
-        <p className="text-muted-foreground text-sm">Loading...</p>
+        <div className="flex items-center justify-center py-16">
+          <Loader2 size={24} className="animate-spin text-muted-foreground" />
+        </div>
       ) : sales.length === 0 ? (
-        <p className="text-muted-foreground text-sm">No packages found.</p>
+        <EmptyState
+          icon={<ShoppingBag size={32} />}
+          title="No sold packages"
+          body={
+            statusFilter !== "all"
+              ? `No ${statusFilter} packages. Switch the filter to see others.`
+              : "Packages will appear here once a customer purchases one from the POS."
+          }
+          headingLevel={2}
+        />
       ) : (
         <div className="rounded-xl border border-border overflow-hidden">
           <table className="w-full text-sm">

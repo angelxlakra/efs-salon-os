@@ -2,10 +2,11 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, Archive } from "lucide-react";
+import { Plus, Archive, Loader2, Layers } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/empty-state";
 import { useAuthStore } from "@/stores/auth-store";
 import { packagesApi } from "@/lib/api/packages";
 import { SessionsLeft } from "@/components/ui/SessionsLeft";
@@ -98,16 +99,29 @@ export function PackageCatalogList() {
 
       {/* Table */}
       {loading ? (
-        <p className="text-muted-foreground text-sm">Loading...</p>
+        <div className="flex items-center justify-center py-16">
+          <Loader2 size={24} className="animate-spin text-muted-foreground" />
+        </div>
       ) : filtered.length === 0 ? (
-        <p className="text-muted-foreground text-sm">
-          No packages.{" "}
-          {canCreate && (
-            <Link href="/dashboard/packages/new" className="underline">
-              Create one.
-            </Link>
-          )}
-        </p>
+        <EmptyState
+          icon={<Layers size={32} />}
+          title="No packages yet"
+          body={
+            filter !== "all"
+              ? `No ${filter} packages. Switch the filter to see others.`
+              : canCreate
+              ? "Create your first package bundle to start pre-selling sessions."
+              : "No packages have been published. Ask an owner to create one."
+          }
+          headingLevel={2}
+          primaryAction={
+            canCreate && filter === "all" ? (
+              <Button onClick={() => router.push("/dashboard/packages/new")}>
+                <Plus size={16} className="mr-1" /> New package
+              </Button>
+            ) : undefined
+          }
+        />
       ) : (
         <div className="rounded-xl border border-border overflow-hidden">
           <table className="w-full text-sm">
