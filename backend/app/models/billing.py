@@ -202,6 +202,12 @@ class BillItem(Base, ULIDMixin, TimestampMixin):
         String(26), ForeignKey("package_sale_items.id", ondelete="RESTRICT"),
         nullable=True, index=True,
     )
+    # FK to PackageDefinition — set when item_type=PACKAGE_SALE_LINE; used at bill
+    # finalization to create the PackageSale row. NULL for all other item types.
+    package_definition_id = Column(
+        String(26), ForeignKey("package_definitions.id", ondelete="RESTRICT"),
+        nullable=True, index=True,
+    )
 
     # Relationships
     bill = relationship("Bill", back_populates="items")

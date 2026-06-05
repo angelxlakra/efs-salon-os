@@ -477,6 +477,26 @@ class BillingService:
                         user_id=confirmed_by_id
                     )
 
+            # Create PackageSale rows for any package_sale_line items on this bill
+            from app.services import package_sales_service
+            from app.models.billing import BillItemType
+
+            for item in bill.items:
+                if (
+                    item.item_type == BillItemType.PACKAGE_SALE_LINE
+                    and not item.package_sale_id
+                    and item.package_definition_id
+                ):
+                    sale = package_sales_service.create_sale(
+                        self.db,
+                        package_definition_id=item.package_definition_id,
+                        bill_id=bill.id,
+                        customer_id=bill.customer_id,
+                        selling_staff_id=item.staff_id,
+                    )
+                    item.package_sale_id = sale.id
+                    self.db.flush()
+
             # Update customer stats
             if bill.customer_id:
                 self._update_customer_stats(bill.customer_id, bill.rounded_total, increment=True)
