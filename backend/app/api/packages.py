@@ -15,7 +15,10 @@ from app.schemas.package import (
 from app.schemas.package import (
     PackageSaleResponse, PackageSaleSummary, RefundRequest, ExtendExpiryRequest, RefundResponse,
 )
+from app.schemas.package import RedemptionEligibilityRequest, EligiblePackageResponse
 from app.services import package_catalog_service, package_refund_service, package_expiry_service
+from app.services.package_eligibility import find_eligible_packages
+from app.services import package_redemption_service
 
 router = APIRouter(prefix="/packages", tags=["packages"])
 
@@ -232,5 +235,55 @@ def refund_sale(
         )
         db.commit()
         return RefundResponse(credit_note_bill_id=credit_note.id, status="refunded")
+    except ValueError as e:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e))
+
+
+# ---------- Eligibility ----------
+
+@router.post("/eligibility/check", response_model=List[EligiblePackageResponse])
+def check_eligibility(
+    payload: RedemptionEligibilityRequest,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_permission("packages", "read")),
+):
+    sales = find_eligible_packages(payload.customer_id, payload.service_id, db)
+    if not sales:
+        return []
+
+    # Reload with eager relationships for PackageSaleSummary serialization
+    sale_ids = [s.id for s in sales]
+    loaded_sales = (
+        db.query(PackageSale)
+        .options(
+            joinedload(PackageSale.customer),
+            joinedload(PackageSale.definition),
+        )
+        .filter(PackageSale.id.in_(sale_ids))
+        .order_by(PackageSale.expires_at.asc())
+        .all()
+    )
+
+    out = []
+    for sale in loaded_sales:
+        snapshot = next(
+            (i.snapshot_unit_price_paise for i in sale.items if i.service_id == payload.service_id),
+            0,
+        )
+        out.append(EligiblePackageResponse(package_sale=sale, snapshot_price_paise=snapshot))
+    return out
+
+
+# ---------- Redemptions ----------
+
+@router.post("/redemptions/{audit_id}/undo", status_code=204)
+def undo_redemption(
+    audit_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission("packages", "redeem")),
+):
+    try:
+        package_redemption_service.undo_redemption(db, audit_id, user.id)
+        db.commit()
     except ValueError as e:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e))
