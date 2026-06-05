@@ -96,7 +96,9 @@ class PermissionChecker:
             "schedule": ["view_all"],
             "services": ["mark_complete", "add_notes"],
             "purchases": ["create", "read", "update", "delete"],
-            "expenses": ["create", "read", "update", "delete", "approve"]
+            "expenses": ["create", "read", "update", "delete", "approve"],
+            "packages": ["read", "create", "update", "delete", "sell", "redeem",
+                         "redeem_for_other", "refund", "extend_expiry", "override_price"]
         },
         RoleEnum.RECEPTIONIST: {
             "billing": ["create", "read", "update", "discount", "view_totals"],
@@ -108,13 +110,15 @@ class PermissionChecker:
             "schedule": ["view_all"],
             "services": ["mark_complete", "add_notes"],
             "purchases": ["create", "read", "update"],
-            "expenses": ["create", "read", "update"]
+            "expenses": ["create", "read", "update"],
+            "packages": ["read", "sell", "redeem", "redeem_for_other"]
         },
         RoleEnum.STAFF: {
             "billing": ["create", "read"],
             "schedule": ["view_own", "view_all"],
             "services": ["mark_complete", "add_notes"],
-            "walkins": ["create", "read", "start", "complete"]
+            "walkins": ["create", "read", "start", "complete"],
+            "packages": ["read", "redeem"]
         }
     }
 

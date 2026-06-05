@@ -15,7 +15,7 @@ export interface Appointment {
   customer_id: string | null;
   customer_name: string;
   customer_phone: string | null;
-  service_id: string;
+  service_id: string | null;
   assigned_staff_id: string | null;
   scheduled_at: string;
   duration_minutes: number;
@@ -34,7 +34,7 @@ export interface AppointmentCreate {
   customer_name: string;
   customer_phone: string;
   customer_id?: string;
-  service_id: string;
+  service_id?: string;
   assigned_staff_id?: string;
   scheduled_at: string;
   duration_minutes: number;

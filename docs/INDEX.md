@@ -50,6 +50,7 @@ Documentation for specific feature implementations.
 | 07 | [Pending Balance](./features/07-pending-balance.md) | Pending balance and free service feature: partial payments, overpayments |
 | 08 | [Pending Payment Tracking](./features/08-pending-payment-tracking.md) | Payment collection audit trail, bill resolution, and payment methods |
 | 09 | [Centralized Backups](./features/09-centralized-backups.md) | Nightly pg_dump to B2, daily metrics JSON push, multi-branch support |
+| 10 | [Bundles & Session Packages](./features/10-packages.md) | Multi-service bundles: create, sell, redeem, refund, and extend |
 
 ---
 
@@ -69,6 +70,7 @@ SQLAlchemy model documentation for all 34+ tables.
 | 07 | [Inventory](./models/07-inventory.md) | SKU, Supplier, InventoryChangeRequest, StockLedger |
 | 08 | [Accounting](./models/08-accounting.md) | CashDrawer, DaySummary, ExportLog |
 | 09 | [Audit](./models/09-audit.md) | Event, AuditLog models |
+| 10 | [Packages](./models/10-packages.md) | PackageDefinition, PackageSale, PackageSaleItem, redemption audit, expiry extension |
 
 ---
 
@@ -106,4 +108,4 @@ Technical audits and improvement tracking.
 ---
 
 **Last Updated:** February 2026
-**Total Documents:** 34
+**Total Documents:** 36

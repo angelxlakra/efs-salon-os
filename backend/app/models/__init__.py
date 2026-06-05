@@ -20,7 +20,21 @@ from app.models.service import ServiceCategory, Service, ServiceAddon, ServiceMa
 from app.models.appointment import Appointment, AppointmentStatus, WalkIn
 
 # Billing
-from app.models.billing import Bill, BillItem, BillItemStaffContribution, BillStatus, Payment, PaymentMethod
+from app.models.billing import Bill, BillItem, BillItemStaffContribution, BillStatus, BillType, BillItemType, Payment, PaymentMethod
+
+# Packages
+from app.models.package import (
+    PackageDefinition,
+    PackageDefinitionItem,
+    PackageDefinitionStatus,
+    EntitlementType,
+    Shareability,
+    PackageSale,
+    PackageSaleItem,
+    PackageSaleStatus,
+    PackageRedemptionAudit,
+    PackageExpiryExtension,
+)
 
 # Inventory
 from app.models.inventory import (
@@ -84,8 +98,21 @@ __all__ = [
     "BillItem",
     "BillItemStaffContribution",
     "BillStatus",
+    "BillType",
+    "BillItemType",
     "Payment",
     "PaymentMethod",
+    # Packages
+    "PackageDefinition",
+    "PackageDefinitionItem",
+    "PackageDefinitionStatus",
+    "EntitlementType",
+    "Shareability",
+    "PackageSale",
+    "PackageSaleItem",
+    "PackageSaleStatus",
+    "PackageRedemptionAudit",
+    "PackageExpiryExtension",
     # Inventory
     "InventoryCategory",
     "Supplier",

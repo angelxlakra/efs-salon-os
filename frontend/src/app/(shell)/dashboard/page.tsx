@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
-import { Cake } from 'lucide-react';
+import { Cake, ArrowUpDown } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import { toast } from 'sonner';
 import { useCartStore } from '@/stores/cart-store';
@@ -103,6 +103,21 @@ export default function DashboardPage() {
   const [comparison, setComparison] = useState<ComparisonData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [birthdayUsers, setBirthdayUsers] = useState<{ id: string; full_name: string }[]>([]);
+  const [revenueHidden, setRevenueHidden] = useState(false);
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+
+  // Restore per-user revenue visibility preference from localStorage
+  const revenueStorageKey = user?.id ? `dashboard:revenue-hidden:${user.id}` : null;
+  useEffect(() => {
+    if (!revenueStorageKey) return;
+    if (localStorage.getItem(revenueStorageKey) === 'true') setRevenueHidden(true);
+  }, [revenueStorageKey]);
+
+  const toggleRevenue = () => {
+    const next = !revenueHidden;
+    setRevenueHidden(next);
+    if (revenueStorageKey) localStorage.setItem(revenueStorageKey, String(next));
+  };
 
   useEffect(() => {
     if (user?.role === 'staff') router.push('/dashboard/staff');
@@ -189,6 +204,11 @@ export default function DashboardPage() {
     [activeSessions]
   );
 
+  const sortedSessions = useMemo(() => {
+    const multiplier = sortOrder === 'asc' ? -1 : 1;
+    return [...activeSessions].sort((a, b) => multiplier * (a.time_since_checkin - b.time_since_checkin));
+  }, [activeSessions, sortOrder]);
+
   const avgBillTodayPaise = stats.today_customers > 0
     ? Math.round(stats.today_revenue / stats.today_customers)
     : 0;
@@ -199,33 +219,21 @@ export default function DashboardPage() {
   return (
     <div className="dashboard-page" style={{ display: 'flex', flexDirection: 'column', minHeight: '100dvh' }}>
 
-      {/* Topbar */}
-      <div className="db-topbar">
-        <span style={{ fontFamily: "'DM Sans', system-ui, sans-serif", fontSize: 22, fontWeight: 800, letterSpacing: '-0.5px', color: 'var(--db-ink)' }}>
-          Today
-        </span>
-        <span style={{ fontFamily: "'DM Sans', system-ui, sans-serif", fontSize: 11, color: 'var(--db-ink-5)', whiteSpace: 'nowrap' }}>
-          {format(new Date(), 'h:mm a · EEE, d MMM yyyy')}
-        </span>
-        <input
-          type="search"
-          className="db-search"
-          placeholder="Search customers, bills, services…"
-          aria-label="Search"
-        />
-        <button
-          style={{ background: 'var(--db-ink)', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 16px', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: "'DM Sans', system-ui, sans-serif" }}
-          onClick={() => router.push('/dashboard/pos')}
-        >
-          + New Walk-in
-        </button>
-      </div>
-
       {/* Main layout: content + right sidebar */}
-      <div style={{ display: 'flex', flex: 1, alignItems: 'flex-start' }}>
+      <div style={{ display: 'flex', flex: 1, alignItems: 'stretch' }}>
 
         {/* Main content */}
         <div style={{ flex: 1, padding: 14, display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
+
+          {/* Page action row — "+ New Walk-in" lives here since shell TopBar handles nav/search */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <button
+              style={{ background: 'var(--db-ink)', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: "'DM Sans', system-ui, sans-serif" }}
+              onClick={() => router.push('/dashboard/pos')}
+            >
+              + New Walk-in
+            </button>
+          </div>
 
           {/* Birthday banner */}
           {birthdayUsers.length > 0 && (
@@ -260,6 +268,8 @@ export default function DashboardPage() {
               checkedInWaiting={checkedInWaiting}
               pendingBills={stats.pending_bills}
               avgBillTodayPaise={avgBillTodayPaise}
+              revenueHidden={revenueHidden}
+              onToggleRevenue={toggleRevenue}
             />
           )}
 
@@ -276,6 +286,7 @@ export default function DashboardPage() {
               currentCustomers={stats.today_customers}
               weekdayName={weekdayName}
               revenuePct={revenuePct}
+              revenueHidden={revenueHidden}
             />
           )}
 
@@ -289,7 +300,15 @@ export default function DashboardPage() {
               {checkedInWaiting > 0 && (
                 <span className="db-badge-muted">{checkedInWaiting} Checked in</span>
               )}
-              <span style={{ fontFamily: "'DM Sans', system-ui, sans-serif", fontSize: 11, color: 'var(--db-ink-5)', fontStyle: 'italic', marginLeft: 'auto' }}>
+              <button
+                onClick={() => setSortOrder(o => o === 'asc' ? 'desc' : 'asc')}
+                style={{ display: 'flex', alignItems: 'center', gap: 3, marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', fontFamily: "'DM Sans', system-ui, sans-serif", fontSize: 10, color: 'var(--db-ink-5)', padding: '2px 4px', borderRadius: 4 }}
+                title={sortOrder === 'asc' ? 'Showing oldest first — click for newest first' : 'Showing newest first — click for oldest first'}
+              >
+                <ArrowUpDown size={11} />
+                {sortOrder === 'asc' ? 'Oldest first' : 'Newest first'}
+              </button>
+              <span style={{ fontFamily: "'DM Sans', system-ui, sans-serif", fontSize: 11, color: 'var(--db-ink-5)', fontStyle: 'italic' }}>
                 Tap to checkout
               </span>
             </div>
@@ -307,7 +326,7 @@ export default function DashboardPage() {
               </div>
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                {activeSessions.map(session => (
+                {sortedSessions.map(session => (
                   <ActiveCustomerCard
                     key={session.session_id}
                     session={session}

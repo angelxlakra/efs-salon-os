@@ -27,7 +27,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 from ulid import ULID
 
-from app.models.billing import Bill, BillItem, BillStatus, Payment, PaymentMethod, BillItemStaffContribution
+from app.models.billing import Bill, BillItem, BillItemType, BillStatus, Payment, PaymentMethod, BillItemStaffContribution
 from app.models.customer import Customer
 from app.models.pending_payment import PendingPaymentCollection
 from app.utils import IST
@@ -273,6 +273,114 @@ class BillingService:
         self.db.refresh(bill)
         return bill
 
+    def add_bill_item(
+        self,
+        bill_id: str,
+        service_id: str,
+        quantity: int = 1,
+        staff_id: Optional[str] = None,
+        appointment_id: Optional[str] = None,
+        walkin_id: Optional[str] = None,
+        notes: Optional[str] = None,
+        user_id: Optional[str] = None,
+    ) -> dict:
+        """Add a single service item to an existing DRAFT bill.
+
+        After creating the BillItem, recalculates bill totals and runs a
+        package eligibility check. If exactly one eligible package with
+        auto_apply=True, applies the redemption automatically.
+
+        Returns:
+            dict with keys:
+              - bill_item: the new BillItem ORM object
+              - auto_applied_package_sale_id: str or None
+              - eligible_packages: list of sale IDs (when 2+ eligible, no auto-apply)
+
+        Raises:
+            ValueError: Bill not found, bill not DRAFT, service not found.
+        """
+        bill = self.db.get(Bill, bill_id)
+        if not bill:
+            raise ValueError(f"Bill {bill_id} not found")
+        if bill.status != BillStatus.DRAFT:
+            raise ValueError("Can only add items to DRAFT bills")
+
+        service = self.db.query(Service).filter(
+            Service.id == service_id,
+            Service.is_active,  # noqa: E712
+            Service.deleted_at.is_(None),
+        ).first()
+        if not service:
+            raise ValueError(f"Service {service_id} not found or inactive")
+
+        line_total = service.base_price * quantity
+        cogs_amount = self._calculate_service_cogs(service.id, quantity)
+
+        bill_item = BillItem(
+            id=str(ULID()),  # explicit ULID, consistent with create_bill
+            bill_id=bill_id,
+            service_id=service.id,
+            item_name=service.name,
+            base_price=service.base_price,
+            quantity=quantity,
+            line_total=line_total,
+            cogs_amount=cogs_amount,
+            staff_id=staff_id,
+            appointment_id=appointment_id,
+            walkin_id=walkin_id,
+            notes=notes,
+            item_type=BillItemType.SERVICE,
+        )
+        self.db.add(bill_item)
+        self.db.flush()  # Get bill_item.id
+
+        # Recalculate bill totals
+        new_subtotal = bill.subtotal + line_total
+        amount_after_discount = new_subtotal - (bill.discount_amount or 0)
+        tax_breakdown = TaxCalculator.calculate_tax_breakdown(amount_after_discount)
+        rounded_total, rounding_adjustment = TaxCalculator.round_to_rupee(amount_after_discount)
+
+        bill.subtotal = new_subtotal
+        bill.tax_amount = tax_breakdown["total_tax"]
+        bill.cgst_amount = tax_breakdown["cgst"]
+        bill.sgst_amount = tax_breakdown["sgst"]
+        bill.total_amount = amount_after_discount
+        bill.rounded_total = rounded_total
+        bill.rounding_adjustment = rounding_adjustment
+        self.db.flush()
+
+        # Package eligibility check
+        auto_applied_package_sale_id = None
+        eligible_package_ids: list[str] = []
+
+        if bill.customer_id and service.id:
+            from app.services.package_eligibility import find_eligible_packages
+            from app.services import package_redemption_service
+
+            eligible = find_eligible_packages(bill.customer_id, service.id, self.db)
+
+            if len(eligible) == 1 and eligible[0].definition and eligible[0].definition.auto_apply:
+                package_redemption_service.apply_redemption(
+                    db=self.db,
+                    package_sale_id=eligible[0].id,
+                    bill_item_id=bill_item.id,
+                    redeemed_for_customer_id=bill.customer_id,
+                    user_id=user_id or bill.created_by,
+                )
+                auto_applied_package_sale_id = eligible[0].id
+            elif len(eligible) >= 2:
+                eligible_package_ids = [s.id for s in eligible]
+
+        self.db.flush()
+        self.db.refresh(bill_item)   # ensure item_type reflects apply_redemption mutations
+        self.db.commit()
+
+        return {
+            "bill_item": bill_item,
+            "auto_applied_package_sale_id": auto_applied_package_sale_id,
+            "eligible_packages": eligible_package_ids,
+        }
+
     def _create_staff_contributions(
         self,
         bill_item_id: str,
@@ -477,6 +585,9 @@ class BillingService:
                         user_id=confirmed_by_id
                     )
 
+            # Create PackageSale rows for any package_sale_line items on this bill
+            self._create_package_sales_for_bill(bill, confirmed_by_id)
+
             # Update customer stats
             if bill.customer_id:
                 self._update_customer_stats(bill.customer_id, bill.rounded_total, increment=True)
@@ -639,6 +750,9 @@ class BillingService:
                     bill_id=bill.id,
                     user_id=completed_by_id
                 )
+
+        # Create PackageSale rows for any package_sale_line items on this bill
+        self._create_package_sales_for_bill(bill, completed_by_id)
 
         # Update customer stats (use actual paid amount, not bill total)
         if bill.customer_id:
@@ -1041,6 +1155,9 @@ class BillingService:
                     if bill.customer_id:
                         self._update_customer_stats(bill.customer_id, bill.rounded_total, increment=True)
 
+                    # Create PackageSale rows for any package_sale_line items on this bill
+                    self._create_package_sales_for_bill(bill, updated_by_id)
+
             elif total_payments < bill.rounded_total:
                 # If was posted and now underpaid, revert to draft
                 if bill.status == BillStatus.POSTED:
@@ -1265,6 +1382,39 @@ class BillingService:
         if first_collection:
             self.db.refresh(first_collection)
         return first_collection
+
+    def _create_package_sales_for_bill(self, bill: "Bill", user_id: str) -> None:
+        """Create PackageSale rows for all PACKAGE_SALE_LINE items not yet linked.
+
+        Called from every code path that transitions a bill to POSTED.
+        Uses db.flush() only — caller owns the transaction commit.
+
+        Raises ValueError if a PACKAGE_SALE_LINE item exists but the bill has no customer_id,
+        since PackageSale.customer_id is non-nullable.
+        """
+        from app.services import package_sales_service
+
+        for item in bill.items:
+            if (
+                item.item_type == BillItemType.PACKAGE_SALE_LINE
+                and not item.package_sale_id
+                and item.package_definition_id
+            ):
+                if not bill.customer_id:
+                    raise ValueError(
+                        f"BillItem {item.id} is a PACKAGE_SALE_LINE but bill {bill.id} "
+                        "has no linked customer. Package sales require a customer account."
+                    )
+                sale = package_sales_service.create_sale(
+                    self.db,
+                    package_definition_id=item.package_definition_id,
+                    bill_id=bill.id,
+                    customer_id=bill.customer_id,
+                    selling_staff_id=item.staff_id,
+                )
+                item.package_sale_id = sale.id
+                # flush so FK assignment is visible before the outer commit
+                self.db.flush()
 
     def _update_customer_stats(
         self,

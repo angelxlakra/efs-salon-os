@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { apiClient } from '@/lib/api-client';
 import { toast } from 'sonner';
+import { BillDetailsDialog } from '@/components/bills/bill-details-dialog';
 import { titleCase } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth-store';
 
@@ -51,6 +52,8 @@ export default function BillsPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const router = useRouter();
+  const [selectedBillId, setSelectedBillId] = useState<string | null>(null);
+  const [showBillDetails, setShowBillDetails] = useState(false);
   const [searchDebounced, setSearchDebounced] = useState('');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
@@ -147,7 +150,8 @@ export default function BillsPage() {
     bill.total_paid + (bill.write_off_amount ?? 0) < bill.rounded_total;
 
   const handleViewBill = (billId: string) => {
-    router.push(`/dashboard/bills/${billId}`);
+    setSelectedBillId(billId);
+    setShowBillDetails(true);
   };
 
   const handleReprintReceipt = async (billId: string) => {
@@ -181,6 +185,7 @@ export default function BillsPage() {
       });
       toast.success('Bill voided successfully');
       fetchBills(); // Refresh the list
+      setShowBillDetails(false);
     } catch (error: unknown) {
       console.error('Error voiding bill:', error);
       const msg = error instanceof Error ? error.message : 'Failed to void bill';
@@ -546,6 +551,14 @@ export default function BillsPage() {
         </CardContent>
       </Card>
 
+      <BillDetailsDialog
+        billId={selectedBillId}
+        open={showBillDetails}
+        onOpenChange={setShowBillDetails}
+        onVoid={handleVoidBill}
+        onRefund={handleRefund}
+        onReprint={handleReprintReceipt}
+      />
     </div>
   );
 }

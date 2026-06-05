@@ -162,7 +162,9 @@ def _check_scheduling_conflict(
 
     end_time = scheduled_at + timedelta(minutes=duration_minutes)
 
-    # Check for overlapping appointments
+    # Check for overlapping appointments.
+    # Use func.make_interval to compute the end time of each stored appointment entirely
+    # in SQL — timedelta(minutes=Column) would fail because Column is not a Python int.
     conflict_query = db.query(Appointment).filter(
         Appointment.assigned_staff_id == staff_id,
         Appointment.status.in_([
@@ -171,8 +173,7 @@ def _check_scheduling_conflict(
             AppointmentStatus.IN_PROGRESS
         ]),
         Appointment.scheduled_at < end_time,
-        # Check if appointment end time overlaps with new start time
-        (Appointment.scheduled_at + timedelta(minutes=Appointment.duration_minutes)) > scheduled_at
+        (Appointment.scheduled_at + func.make_interval(mins=Appointment.duration_minutes)) > scheduled_at
     )
 
     if exclude_appointment_id:
@@ -259,13 +260,14 @@ def create_appointment(
         400: Invalid service_id or assigned_staff_id
         409: Scheduling conflict for staff member
     """
-    # Validate service exists
-    service = db.query(Service).filter(Service.id == appointment_data.service_id).first()
-    if not service:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Service not found: {appointment_data.service_id}"
-        )
+    # Validate service exists (only when provided)
+    if appointment_data.service_id:
+        service = db.query(Service).filter(Service.id == appointment_data.service_id).first()
+        if not service:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Service not found: {appointment_data.service_id}"
+            )
 
     # Check for scheduling conflicts
     if _check_scheduling_conflict(

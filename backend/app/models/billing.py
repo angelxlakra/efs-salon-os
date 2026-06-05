@@ -7,6 +7,20 @@ from app.database import Base
 from app.models.base import TimestampMixin, ULIDMixin
 
 
+class BillType(str, enum.Enum):
+    """Bill kind: normal sale or credit note (refund)."""
+    NORMAL = "normal"
+    CREDIT_NOTE = "credit_note"
+
+
+class BillItemType(str, enum.Enum):
+    """BillItem kind: existing service/product or new package item types."""
+    SERVICE = "service"
+    PRODUCT = "product"
+    PACKAGE_SALE_LINE = "package_sale_line"
+    PACKAGE_REDEMPTION = "package_redemption"
+
+
 class ContributionSplitType(str, enum.Enum):
     """How contribution is calculated for multi-staff services."""
     PERCENTAGE = "percentage"  # Percentage of line total
@@ -22,6 +36,7 @@ class PaymentMethod(str, enum.Enum):
     UPI = "upi"
     CARD = "card"
     OTHER = "other"
+    PACKAGE_REDEMPTION = "package_redemption"  # NEW: session package redemption
 
 
 class BillStatus(str, enum.Enum):
@@ -82,10 +97,29 @@ class Bill(Base, ULIDMixin, TimestampMixin):
     refunded_at = Column(DateTime(timezone=True))
     refund_reason = Column(Text)
     refund_approved_by = Column(String(26), ForeignKey("users.id"))
-    original_bill_id = Column(String(26), ForeignKey("bills.id"))  # For refund bills
+    original_bill_id = Column(
+        String(26), ForeignKey("bills.id", ondelete="RESTRICT"), nullable=True
+    )
 
     # Audit
     created_by = Column(String(26), ForeignKey("users.id"), nullable=False)
+
+    # Package discriminators
+    bill_type = Column(
+        Enum(BillType, name="billtype",
+             values_callable=lambda obj: [e.value for e in obj]),
+        nullable=False, default=BillType.NORMAL, server_default="normal",
+        index=True,
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "(bill_type = 'credit_note' AND original_bill_id IS NOT NULL) "
+            "OR (bill_type = 'normal' AND original_bill_id IS NULL)",
+            name="ck_bill_credit_note_has_original",
+        ),
+        {},  # sentinel required by SQLAlchemy when tuple has a single constraint
+    )
 
     # Relationships
     customer = relationship("Customer", foreign_keys=[customer_id])
@@ -106,19 +140,27 @@ class Bill(Base, ULIDMixin, TimestampMixin):
         """Get total in rupees."""
         return self.rounded_total / 100.0
 
+    @property
+    def total_paise(self) -> int:
+        """Alias for total_amount, used by compute_refund for unlimited packages."""
+        return self.total_amount
+
 
 class BillItem(Base, ULIDMixin, TimestampMixin):
     """
     Individual line items on a bill.
 
-    Links to services OR retail products (SKUs).
-    Exactly one of service_id or sku_id must be set.
+    For SERVICE/PRODUCT items: exactly one of service_id or sku_id must be set.
+    For PACKAGE_SALE_LINE and PACKAGE_REDEMPTION items: both service_id and sku_id
+    may be null; the item links via package_sale_id / package_sale_item_id instead.
     """
     __tablename__ = "bill_items"
     __table_args__ = (
         CheckConstraint(
-            "(service_id IS NOT NULL AND sku_id IS NULL) OR (service_id IS NULL AND sku_id IS NOT NULL)",
-            name="bill_item_service_or_sku_check"
+            "(service_id IS NOT NULL AND sku_id IS NULL)"
+            " OR (service_id IS NULL AND sku_id IS NOT NULL)"
+            " OR item_type IN ('package_sale_line', 'package_redemption')",
+            name="bill_item_service_or_sku_check",
         ),
     )
 
@@ -144,6 +186,28 @@ class BillItem(Base, ULIDMixin, TimestampMixin):
 
     # Notes
     notes = Column(Text)
+
+    # Package discriminators
+    item_type = Column(
+        Enum(BillItemType, name="billitemtype",
+             values_callable=lambda obj: [e.value for e in obj]),
+        nullable=False, default=BillItemType.SERVICE, server_default="service",
+        index=True,
+    )
+    package_sale_id = Column(
+        String(26), ForeignKey("package_sales.id", ondelete="RESTRICT"),
+        nullable=True, index=True,
+    )
+    package_sale_item_id = Column(
+        String(26), ForeignKey("package_sale_items.id", ondelete="RESTRICT"),
+        nullable=True, index=True,
+    )
+    # FK to PackageDefinition — set when item_type=PACKAGE_SALE_LINE; used at bill
+    # finalization to create the PackageSale row. NULL for all other item types.
+    package_definition_id = Column(
+        String(26), ForeignKey("package_definitions.id", ondelete="RESTRICT"),
+        nullable=True, index=True,
+    )
 
     # Relationships
     bill = relationship("Bill", back_populates="items")

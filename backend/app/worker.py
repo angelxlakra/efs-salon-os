@@ -35,6 +35,7 @@ from app.jobs.scheduled import (
     central_heartbeat_job,
     metrics_push_job,
     transfer_poll_job,
+    package_expiry_transitions_job,
 )
 
 # Configure logging
@@ -96,6 +97,19 @@ def start_worker():
         misfire_grace_time=300  # 5 minutes grace period
     )
     logger.info("✅ Scheduled: Recurring Expenses Generation (00:05 IST)")
+
+    # Package Expiry Transitions (02:00 IST)
+    # Bulk-marks ACTIVE sales with past expires_at as EXPIRED
+    scheduler.add_job(
+        package_expiry_transitions_job,
+        trigger=CronTrigger(hour=2, minute=0, timezone=IST),
+        id='package_expiry_transitions',
+        name='Package Expiry Transitions',
+        replace_existing=True,
+        max_instances=1,
+        misfire_grace_time=300  # 5 minutes grace period
+    )
+    logger.info("✅ Scheduled: Package Expiry Transitions (02:00 IST)")
 
     # Nightly Backup (22:00 IST)
     # Runs late at night for database backup

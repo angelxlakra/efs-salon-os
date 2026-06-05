@@ -149,6 +149,8 @@ function RingItem({ label, pct, value, color }: RingItemProps) {
   );
 }
 
+const HIDDEN = '₹ ••••';
+
 interface GoalsRingsProps {
   revenueTarget: number;    // paise — accepted for future display; currently unused in rendering
   currentRevenue: number;   // paise
@@ -158,6 +160,7 @@ interface GoalsRingsProps {
   currentCustomers: number;
   weekdayName: string;
   revenuePct: number;       // pre-computed percentage (0–100)
+  revenueHidden: boolean;
 }
 
 export function GoalsRings({
@@ -169,6 +172,7 @@ export function GoalsRings({
   currentCustomers,
   weekdayName,
   revenuePct,
+  revenueHidden,
 }: GoalsRingsProps) {
   const svcPct = servicesTarget > 0
     ? Math.min(100, Math.round((currentServices / servicesTarget) * 100))
@@ -185,7 +189,7 @@ export function GoalsRings({
         <RingItem
           label="Revenue"
           pct={revenuePct}
-          value={formatRupees(currentRevenue)}
+          value={revenueHidden ? HIDDEN : formatRupees(currentRevenue)}
           color="var(--db-gold)"
         />
         <RingItem

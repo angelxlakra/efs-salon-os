@@ -1,5 +1,9 @@
 'use client';
 
+import { Eye, EyeOff } from 'lucide-react';
+
+const HIDDEN = '₹ ••••';
+
 interface StatsBarProps {
   revenueToday: number;       // paise
   revenueTarget: number;      // paise
@@ -8,10 +12,16 @@ interface StatsBarProps {
   checkedInWaiting: number;
   pendingBills: number;
   avgBillTodayPaise: number;  // paise; 0 if no bills yet
+  revenueHidden: boolean;
+  onToggleRevenue: () => void;
 }
 
 function formatRupees(paise: number): string {
   return `₹${Math.round(paise / 100).toLocaleString('en-IN')}`;
+}
+
+function mask(value: string, hidden: boolean): string {
+  return hidden ? HIDDEN : value;
 }
 
 interface GlanceRowProps { label: string; value: string | number }
@@ -32,6 +42,8 @@ export function StatsBar({
   checkedInWaiting,
   pendingBills,
   avgBillTodayPaise,
+  revenueHidden,
+  onToggleRevenue,
 }: StatsBarProps) {
   const pct = revenueTarget > 0
     ? Math.min(100, Math.round((revenueToday / revenueTarget) * 100))
@@ -44,11 +56,20 @@ export function StatsBar({
     <div className="db-stats-bar">
       {/* Panel 1: Revenue */}
       <div className="db-stats-panel">
-        <span className="db-label">Today&apos;s Revenue</span>
-        <span className="db-num db-num-hero">{formatRupees(revenueToday)}</span>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span className="db-label">Today&apos;s Revenue</span>
+          <button
+            onClick={onToggleRevenue}
+            aria-label={revenueHidden ? 'Show revenue' : 'Hide revenue'}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px', color: 'var(--db-ink-4)', display: 'flex', alignItems: 'center' }}
+          >
+            {revenueHidden ? <EyeOff size={14} /> : <Eye size={14} />}
+          </button>
+        </div>
+        <span className="db-num db-num-hero">{mask(formatRupees(revenueToday), revenueHidden)}</span>
         <p className="db-stats-sub">
           <span className={isAhead ? 'db-text-ahead' : 'db-text-behind'} style={{ fontWeight: 600 }}>
-            {isAhead ? '↑' : '↓'} {formatRupees(deltaAbs)}
+            {isAhead ? '↑' : '↓'} {mask(formatRupees(deltaAbs), revenueHidden)}
           </span>
           {' '}vs same time yesterday
         </p>
@@ -63,7 +84,7 @@ export function StatsBar({
           <div className="db-progress-fill" style={{ width: `${pct}%` }} />
         </div>
         <p className="db-stats-sub" style={{ marginTop: 4 }}>
-          {pct}% of {formatRupees(revenueTarget)} target · {formatRupees(toGo)} to go
+          {pct}% of {formatRupees(revenueTarget)} target · {mask(formatRupees(toGo), revenueHidden)} to go
         </p>
       </div>
 
@@ -74,7 +95,7 @@ export function StatsBar({
           {isAhead ? 'Ahead by' : 'Behind by'}
         </span>
         <span className={`db-num db-num-warn ${isAhead ? 'db-text-ahead' : 'db-text-behind'}`}>
-          ~{formatRupees(deltaAbs)}
+          ~{mask(formatRupees(deltaAbs), revenueHidden)}
         </span>
         <p className="db-stats-sub" style={{ marginTop: 8 }}>
           {isAhead

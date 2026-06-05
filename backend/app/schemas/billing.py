@@ -528,3 +528,22 @@ class BillAssignCustomer(BaseModel):
     """Schema for assigning a customer to a walk-in bill."""
 
     customer_id: str = Field(..., description="Customer ID to assign to walk-in bill")
+
+
+class AddBillItemRequest(BaseModel):
+    """Schema for adding a single service item to an existing draft bill."""
+
+    service_id: str = Field(..., min_length=26, max_length=26)
+    quantity: int = Field(default=1, ge=1)
+    staff_id: Optional[str] = Field(None, min_length=26, max_length=26)
+    appointment_id: Optional[str] = Field(None, min_length=26, max_length=26)
+    walkin_id: Optional[str] = Field(None, min_length=26, max_length=26)
+    notes: Optional[str] = Field(None, max_length=500)
+
+
+class AddBillItemResponse(BaseModel):
+    """Response for add_bill_item with package auto-redemption metadata."""
+
+    bill_item: BillItemResponse
+    auto_applied_package_sale_id: Optional[str] = None
+    eligible_packages: List[str] = []
