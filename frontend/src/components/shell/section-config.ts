@@ -57,8 +57,9 @@ export const SHELL_SECTIONS: ShellSection[] = [
     items: [
       { label: "Services",   href: "/dashboard/services",   icon: Tag },
       { label: "Inventory",  href: "/dashboard/inventory",  icon: Package },
-      { label: "Packages",   href: "/dashboard/packages",   icon: Gift },
-      { label: "Purchases",  href: "/dashboard/purchases",  icon: FileText },
+      { label: "Packages",       href: "/dashboard/packages",       icon: Gift },
+      { label: "Sold Packages",  href: "/dashboard/packages/sold",  icon: Receipt },
+      { label: "Purchases",      href: "/dashboard/purchases",      icon: FileText },
     ],
   },
   {
