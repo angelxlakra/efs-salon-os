@@ -1,5 +1,6 @@
 """Packages HTTP API — catalog, sales, eligibility, redemption endpoints."""
 
+from datetime import datetime, timezone
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session, joinedload
@@ -12,7 +13,7 @@ from app.schemas.package import (
     PackageDefinitionCreate, PackageDefinitionUpdate, PackageDefinitionResponse,
 )
 from app.schemas.package import (
-    PackageSaleResponse, PackageSaleSummary, RefundRequest, ExtendExpiryRequest,
+    PackageSaleResponse, PackageSaleSummary, RefundRequest, ExtendExpiryRequest, RefundResponse,
 )
 from app.services import package_catalog_service, package_refund_service, package_expiry_service
 
@@ -161,10 +162,13 @@ def list_active_for_customer(
     db: Session = Depends(get_db),
     _: User = Depends(require_permission("packages", "read")),
 ):
-    from datetime import datetime, timezone
     now = datetime.now(timezone.utc)
     return (
         db.query(PackageSale)
+        .options(
+            joinedload(PackageSale.customer),
+            joinedload(PackageSale.definition),
+        )
         .filter(
             PackageSale.customer_id == customer_id,
             PackageSale.status == PackageSaleStatus.ACTIVE,
@@ -199,16 +203,23 @@ def extend_sale(
     user: User = Depends(require_permission("packages", "extend_expiry")),
 ):
     try:
-        sale = package_expiry_service.extend_expiry(
+        package_expiry_service.extend_expiry(
             db, sale_id, payload.new_expires_at, payload.reason, user.id,
         )
         db.commit()
-        return sale
     except ValueError as e:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e))
 
+    # Re-query with eager relationships for response serialization
+    sale = db.query(PackageSale).options(
+        joinedload(PackageSale.customer),
+        joinedload(PackageSale.definition),
+        joinedload(PackageSale.items).joinedload(PackageSaleItem.service),
+    ).filter(PackageSale.id == sale_id).first()
+    return sale
 
-@router.post("/sales/{sale_id}/refund", response_model=dict)
+
+@router.post("/sales/{sale_id}/refund", response_model=RefundResponse)
 def refund_sale(
     sale_id: str,
     payload: RefundRequest,
@@ -220,6 +231,6 @@ def refund_sale(
             db, sale_id, payload.payment_method, payload.reason, user.id,
         )
         db.commit()
-        return {"credit_note_bill_id": credit_note.id, "status": "refunded"}
+        return RefundResponse(credit_note_bill_id=credit_note.id, status="refunded")
     except ValueError as e:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e))

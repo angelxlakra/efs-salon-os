@@ -251,14 +251,14 @@ def test_staff_cannot_extend(
     assert r.status_code == 403
 
 
-def test_extend_missing_sale_returns_400_or_404(client_as_owner):
+def test_extend_missing_sale_returns_400(client_as_owner):
     new_expires = (datetime.now(timezone.utc) + timedelta(days=180)).isoformat()
     r = client_as_owner.post(
         "/api/packages/sales/01AAAAAAAAAAAAAAAAAAAAAAA0/extend",
         json={"new_expires_at": new_expires, "reason": "Test"}
     )
     # Service raises ValueError for missing sale -> 400 (endpoint has no 404 pre-check for this)
-    assert r.status_code in (400, 404)
+    assert r.status_code == 400
 
 
 # ---------------------------------------------------------------------------
@@ -323,3 +323,24 @@ def test_refund_invalid_method_returns_422(
         json={"payment_method": "bitcoin", "reason": "Test"}
     )
     assert r.status_code == 422
+
+
+def test_double_refund_returns_400(
+    client_as_owner, package_sale_factory, customer_factory, service_factory
+):
+    """Refunding the same sale twice must return 400 on the second call."""
+    cust = customer_factory()
+    svc = service_factory()
+    sale = package_sale_factory(customer=cust, services=[svc], sessions_remaining=5)
+
+    r1 = client_as_owner.post(
+        f"/api/packages/sales/{sale.id}/refund",
+        json={"payment_method": "cash", "reason": "First refund"}
+    )
+    assert r1.status_code == 200
+
+    r2 = client_as_owner.post(
+        f"/api/packages/sales/{sale.id}/refund",
+        json={"payment_method": "cash", "reason": "Duplicate"}
+    )
+    assert r2.status_code == 400

@@ -166,3 +166,8 @@ class RefundBreakdown(BaseModel):
 class ExtendExpiryRequest(BaseModel):
     new_expires_at: datetime
     reason: str = Field(..., min_length=1)
+
+
+class RefundResponse(BaseModel):
+    credit_note_bill_id: str
+    status: Literal["refunded"]
