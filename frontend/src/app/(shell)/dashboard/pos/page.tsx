@@ -9,13 +9,76 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { ShoppingCart } from 'lucide-react';
 import { useCartStore } from '@/stores/cart-store';
+import { EntitlementsRail } from '@/components/packages/EntitlementsRail';
+import { PackageSelectorChip } from '@/components/packages/PackageSelectorChip';
+import { usePackagesStore } from '@/stores/packages-store';
 
+// ---------------------------------------------------------------------------
+// Inline component: grid of published packages for POS selection
+// ---------------------------------------------------------------------------
+function PackagesSelectorView() {
+  const definitions = usePackagesStore((s) => s.definitions);
+
+  if (!definitions || definitions.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <p className="text-muted-foreground">No published packages</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-2 gap-3 p-1">
+      {definitions
+        .filter((d) => d.status === 'published')
+        .map((pkg) => (
+          <button
+            key={pkg.id}
+            type="button"
+            className="rounded-xl border border-border bg-card p-4 text-left hover:border-accent transition-colors"
+            onClick={() => {
+              // TODO: add package_sale_line item to bill (requires backend integration)
+            }}
+          >
+            <p className="font-medium text-sm">{pkg.name}</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {pkg.entitlement_type === 'counted'
+                ? `${pkg.total_sessions} sessions · ${pkg.validity_days}d`
+                : `Unlimited · ${pkg.validity_days}d`}
+            </p>
+            <p className="text-sm font-semibold tabular-nums mt-2">
+              ₹
+              {(
+                pkg.items.reduce(
+                  (s, i) => s + i.unit_price_paise * i.quantity,
+                  0
+                ) / 100
+              ).toFixed(0)}
+            </p>
+          </button>
+        ))}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main POS page
+// ---------------------------------------------------------------------------
 export default function POSPage() {
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
-  const { items } = useCartStore();
+  const [activeTab, setActiveTab] = useState<'services' | 'products' | 'packages'>('services');
+  const { items, customerId } = useCartStore();
   const serviceSearchRef = useRef<HTMLInputElement>(null);
   const customerSearchRef = useRef<{ openSearch: () => void }>(null);
+
+  // Load published package definitions for the chip count + grid
+  const definitions = usePackagesStore((s) => s.definitions);
+  const packageCount = definitions?.length ?? 0;
+
+  useEffect(() => {
+    usePackagesStore.getState().loadDefinitions();
+  }, []);
 
   const handleCheckout = () => {
     if (items.length === 0) return;
@@ -58,7 +121,7 @@ export default function POSPage() {
   return (
     <div className="relative p-4 md:p-6">
       <div className="flex gap-4">
-        {/* Main Area - Service/Product Selection */}
+        {/* Main Area - Service/Product/Package Selection */}
         <div className="flex-1 flex flex-col min-w-0">
           <div className="mb-4">
             <div className="flex items-center justify-between">
@@ -76,22 +139,42 @@ export default function POSPage() {
             </div>
           </div>
 
-          {/* Tabs for Services and Products */}
-          <Tabs defaultValue="services" className="flex-1">
-            <TabsList className="mb-4">
-              <TabsTrigger value="services">Services</TabsTrigger>
-              <TabsTrigger value="products">Products</TabsTrigger>
-            </TabsList>
+          {/* Tabs for Services, Products, and Packages */}
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-4">
+              <Tabs
+                value={activeTab === 'packages' ? 'services' : activeTab}
+                onValueChange={(v) => setActiveTab(v as 'services' | 'products')}
+                className="flex-1"
+              >
+                <TabsList>
+                  <TabsTrigger value="services">Services</TabsTrigger>
+                  <TabsTrigger value="products">Products</TabsTrigger>
+                </TabsList>
+              </Tabs>
+              <PackageSelectorChip
+                active={activeTab === 'packages'}
+                onClick={() =>
+                  setActiveTab(activeTab === 'packages' ? 'services' : 'packages')
+                }
+                count={packageCount}
+              />
+            </div>
 
-            <TabsContent value="services" className="mt-0">
+            {activeTab === 'services' && (
               <ServiceGrid searchInputRef={serviceSearchRef} />
-            </TabsContent>
-
-            <TabsContent value="products" className="mt-0">
-              <ProductGrid />
-            </TabsContent>
-          </Tabs>
+            )}
+            {activeTab === 'products' && <ProductGrid />}
+            {activeTab === 'packages' && <PackagesSelectorView />}
+          </div>
         </div>
+
+        {/* Entitlements Rail — desktop only, only when a customer is selected */}
+        {customerId && (
+          <div className="hidden lg:block">
+            <EntitlementsRail customerId={customerId} />
+          </div>
+        )}
 
         {/* Right Sidebar - Cart (Desktop Only) */}
         <div className="w-96 flex-shrink-0 hidden md:block">
