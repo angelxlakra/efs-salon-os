@@ -19,7 +19,7 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from sqlalchemy.orm import Session
 
-from app.models.billing import Bill
+from app.models.billing import Bill, BillItemType
 from app.models.settings import SalonSettings
 from app.utils import IST
 
@@ -268,6 +268,27 @@ class ReceiptService:
                 Paragraph(ReceiptService.format_currency(item.line_total, show_symbol=False), ParagraphStyle('Amt', parent=styles['Normal'], fontSize=8, alignment=TA_RIGHT))
             ])
 
+            # Sub-note rows for package items
+            note_style = ParagraphStyle('Note', parent=styles['Normal'], fontSize=7, textColor=colors.HexColor('#555555'))
+
+            if item.item_type == BillItemType.PACKAGE_SALE_LINE:
+                # Note: this is a package sale — sub-services are included
+                items_data.append([
+                    Paragraph("  * Package sale", note_style),
+                    Paragraph("", note_style),
+                    Paragraph("", note_style),
+                    Paragraph("", note_style),
+                ])
+
+            elif item.item_type == BillItemType.PACKAGE_REDEMPTION:
+                # Note: this service is covered by a package
+                items_data.append([
+                    Paragraph("  * Paid via package", note_style),
+                    Paragraph("", note_style),
+                    Paragraph("", note_style),
+                    Paragraph("", note_style),
+                ])
+
         items_table = Table(items_data, colWidths=[26 * mm, 10 * mm, 19 * mm, 19 * mm])
         items_table.setStyle(TableStyle([
             # Header styling
@@ -363,15 +384,34 @@ class ReceiptService:
 
             # Show payments if any
             if bill.payments:
+                # Separate package redemption payments from regular payments.
+                # PACKAGE_REDEMPTION rows are internal accounting entries; each redeemed
+                # item already shows "Paid via package" in the items section.
+                # We group them into a single summary line instead.
+                regular_payments = [
+                    p for p in bill.payments
+                    if p.payment_method.value != "package_redemption"
+                ]
+                package_redemption_total = sum(
+                    p.amount for p in bill.payments
+                    if p.payment_method.value == "package_redemption"
+                )
+
                 payment_data = [[
                     Paragraph("<b>Payment Method</b>", ParagraphStyle('PH', parent=styles['Normal'], fontSize=8)),
                     Paragraph("<b>Amount</b>", ParagraphStyle('PH', parent=styles['Normal'], fontSize=8, alignment=TA_RIGHT))
                 ]]
 
-                for payment in bill.payments:
+                for payment in regular_payments:
                     payment_data.append([
                         Paragraph(payment.payment_method.value.upper(), ParagraphStyle('PM', parent=styles['Normal'], fontSize=8)),
                         Paragraph(ReceiptService.format_currency(payment.amount, show_symbol=False), ParagraphStyle('PA', parent=styles['Normal'], fontSize=8, alignment=TA_RIGHT))
+                    ])
+
+                if package_redemption_total > 0:
+                    payment_data.append([
+                        Paragraph("PACKAGE REDEMPTION", ParagraphStyle('PM', parent=styles['Normal'], fontSize=8)),
+                        Paragraph(ReceiptService.format_currency(package_redemption_total, show_symbol=False), ParagraphStyle('PA', parent=styles['Normal'], fontSize=8, alignment=TA_RIGHT))
                     ])
 
                 payment_table = Table(payment_data, colWidths=[44 * mm, 30 * mm])
