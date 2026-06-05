@@ -27,7 +27,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 from ulid import ULID
 
-from app.models.billing import Bill, BillItem, BillStatus, Payment, PaymentMethod, BillItemStaffContribution
+from app.models.billing import Bill, BillItem, BillItemType, BillStatus, Payment, PaymentMethod, BillItemStaffContribution
 from app.models.customer import Customer
 from app.models.pending_payment import PendingPaymentCollection
 from app.utils import IST
@@ -478,24 +478,7 @@ class BillingService:
                     )
 
             # Create PackageSale rows for any package_sale_line items on this bill
-            from app.services import package_sales_service
-            from app.models.billing import BillItemType
-
-            for item in bill.items:
-                if (
-                    item.item_type == BillItemType.PACKAGE_SALE_LINE
-                    and not item.package_sale_id
-                    and item.package_definition_id
-                ):
-                    sale = package_sales_service.create_sale(
-                        self.db,
-                        package_definition_id=item.package_definition_id,
-                        bill_id=bill.id,
-                        customer_id=bill.customer_id,
-                        selling_staff_id=item.staff_id,
-                    )
-                    item.package_sale_id = sale.id
-                    self.db.flush()
+            self._create_package_sales_for_bill(bill, confirmed_by_id)
 
             # Update customer stats
             if bill.customer_id:
@@ -659,6 +642,9 @@ class BillingService:
                     bill_id=bill.id,
                     user_id=completed_by_id
                 )
+
+        # Create PackageSale rows for any package_sale_line items on this bill
+        self._create_package_sales_for_bill(bill, completed_by_id)
 
         # Update customer stats (use actual paid amount, not bill total)
         if bill.customer_id:
@@ -1061,6 +1047,9 @@ class BillingService:
                     if bill.customer_id:
                         self._update_customer_stats(bill.customer_id, bill.rounded_total, increment=True)
 
+                    # Create PackageSale rows for any package_sale_line items on this bill
+                    self._create_package_sales_for_bill(bill, updated_by_id)
+
             elif total_payments < bill.rounded_total:
                 # If was posted and now underpaid, revert to draft
                 if bill.status == BillStatus.POSTED:
@@ -1285,6 +1274,39 @@ class BillingService:
         if first_collection:
             self.db.refresh(first_collection)
         return first_collection
+
+    def _create_package_sales_for_bill(self, bill: "Bill", user_id: str) -> None:
+        """Create PackageSale rows for all PACKAGE_SALE_LINE items not yet linked.
+
+        Called from every code path that transitions a bill to POSTED.
+        Uses db.flush() only — caller owns the transaction commit.
+
+        Raises ValueError if a PACKAGE_SALE_LINE item exists but the bill has no customer_id,
+        since PackageSale.customer_id is non-nullable.
+        """
+        from app.services import package_sales_service
+
+        for item in bill.items:
+            if (
+                item.item_type == BillItemType.PACKAGE_SALE_LINE
+                and not item.package_sale_id
+                and item.package_definition_id
+            ):
+                if not bill.customer_id:
+                    raise ValueError(
+                        f"BillItem {item.id} is a PACKAGE_SALE_LINE but bill {bill.id} "
+                        "has no linked customer. Package sales require a customer account."
+                    )
+                sale = package_sales_service.create_sale(
+                    self.db,
+                    package_definition_id=item.package_definition_id,
+                    bill_id=bill.id,
+                    customer_id=bill.customer_id,
+                    selling_staff_id=item.staff_id,
+                )
+                item.package_sale_id = sale.id
+                # flush so FK assignment is visible before the outer commit
+                self.db.flush()
 
     def _update_customer_stats(
         self,

@@ -18,17 +18,19 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Add package_definition_id FK column to bill_items.
-    # Set when item_type=PACKAGE_SALE_LINE; used at finalization to create the PackageSale row.
     op.add_column('bill_items', sa.Column('package_definition_id', sa.String(length=26), nullable=True))
-    op.create_index(op.f('ix_bill_items_package_definition_id'), 'bill_items', ['package_definition_id'], unique=False)
+    op.create_index(
+        op.f('ix_bill_items_package_definition_id'),
+        'bill_items', ['package_definition_id'], unique=False
+    )
     op.create_foreign_key(
-        None, 'bill_items', 'package_definitions',
+        'fk_bill_items_package_definition_id',
+        'bill_items', 'package_definitions',
         ['package_definition_id'], ['id'], ondelete='RESTRICT',
     )
 
 
 def downgrade() -> None:
-    op.drop_constraint(None, 'bill_items', type_='foreignkey')
+    op.drop_constraint('fk_bill_items_package_definition_id', 'bill_items', type_='foreignkey')
     op.drop_index(op.f('ix_bill_items_package_definition_id'), table_name='bill_items')
     op.drop_column('bill_items', 'package_definition_id')
