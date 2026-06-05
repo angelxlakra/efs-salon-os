@@ -273,6 +273,111 @@ class BillingService:
         self.db.refresh(bill)
         return bill
 
+    def add_bill_item(
+        self,
+        bill_id: str,
+        service_id: str,
+        quantity: int = 1,
+        staff_id: Optional[str] = None,
+        appointment_id: Optional[str] = None,
+        walkin_id: Optional[str] = None,
+        notes: Optional[str] = None,
+        user_id: Optional[str] = None,
+    ) -> dict:
+        """Add a single service item to an existing DRAFT bill.
+
+        After creating the BillItem, recalculates bill totals and runs a
+        package eligibility check. If exactly one eligible package with
+        auto_apply=True, applies the redemption automatically.
+
+        Returns:
+            dict with keys:
+              - bill_item: the new BillItem ORM object
+              - auto_applied_package_sale_id: str or None
+              - eligible_packages: list of sale IDs (when 2+ eligible, no auto-apply)
+
+        Raises:
+            ValueError: Bill not found, bill not DRAFT, service not found.
+        """
+        bill = self.db.get(Bill, bill_id)
+        if not bill:
+            raise ValueError(f"Bill {bill_id} not found")
+        if bill.status != BillStatus.DRAFT:
+            raise ValueError("Can only add items to DRAFT bills")
+
+        service = self.db.query(Service).filter(
+            Service.id == service_id,
+            Service.is_active,  # noqa: E712
+            Service.deleted_at.is_(None),
+        ).first()
+        if not service:
+            raise ValueError(f"Service {service_id} not found or inactive")
+
+        line_total = service.base_price * quantity
+        cogs_amount = self._calculate_service_cogs(service.id, quantity)
+
+        bill_item = BillItem(
+            bill_id=bill_id,
+            service_id=service.id,
+            item_name=service.name,
+            base_price=service.base_price,
+            quantity=quantity,
+            line_total=line_total,
+            cogs_amount=cogs_amount,
+            staff_id=staff_id,
+            appointment_id=appointment_id,
+            walkin_id=walkin_id,
+            notes=notes,
+            item_type=BillItemType.SERVICE,
+        )
+        self.db.add(bill_item)
+        self.db.flush()  # Get bill_item.id
+
+        # Recalculate bill totals
+        new_subtotal = bill.subtotal + line_total
+        amount_after_discount = new_subtotal - (bill.discount_amount or 0)
+        tax_breakdown = TaxCalculator.calculate_tax_breakdown(amount_after_discount)
+        rounded_total, rounding_adjustment = TaxCalculator.round_to_rupee(amount_after_discount)
+
+        bill.subtotal = new_subtotal
+        bill.tax_amount = tax_breakdown["total_tax"]
+        bill.cgst_amount = tax_breakdown["cgst"]
+        bill.sgst_amount = tax_breakdown["sgst"]
+        bill.total_amount = amount_after_discount
+        bill.rounded_total = rounded_total
+        bill.rounding_adjustment = rounding_adjustment
+        self.db.flush()
+
+        # Package eligibility check
+        auto_applied_package_sale_id = None
+        eligible_package_ids: list[str] = []
+
+        if bill.customer_id and service.id:
+            from app.services.package_eligibility import find_eligible_packages
+            from app.services import package_redemption_service
+
+            eligible = find_eligible_packages(bill.customer_id, service.id, self.db)
+
+            if len(eligible) == 1 and eligible[0].definition and eligible[0].definition.auto_apply:
+                package_redemption_service.apply_redemption(
+                    db=self.db,
+                    package_sale_id=eligible[0].id,
+                    bill_item_id=bill_item.id,
+                    redeemed_for_customer_id=bill.customer_id,
+                    user_id=user_id or bill.created_by,
+                )
+                auto_applied_package_sale_id = eligible[0].id
+            elif len(eligible) >= 2:
+                eligible_package_ids = [s.id for s in eligible]
+
+        self.db.flush()
+
+        return {
+            "bill_item": bill_item,
+            "auto_applied_package_sale_id": auto_applied_package_sale_id,
+            "eligible_packages": eligible_package_ids,
+        }
+
     def _create_staff_contributions(
         self,
         bill_item_id: str,

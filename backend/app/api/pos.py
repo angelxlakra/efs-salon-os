@@ -42,6 +42,9 @@ from app.schemas.billing import (
     BillAssignCustomer,
     BillDiscountUpdate,
     BillWriteOff,
+    AddBillItemRequest,
+    AddBillItemResponse,
+    BillItemResponse,
 )
 from app.auth.dependencies import get_current_user
 from app.auth.dependencies import get_current_user
@@ -1333,3 +1336,55 @@ def assign_customer_to_bill(
     db.refresh(bill)
 
     return bill
+
+
+@router.post(
+    "/bills/{bill_id}/items",
+    response_model=AddBillItemResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Add a service item to a draft bill with auto-redemption check",
+)
+def add_bill_item(
+    bill_id: str,
+    item_data: AddBillItemRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Add a single service item to an existing DRAFT bill.
+
+    Recalculates bill totals after adding the item. Runs a package eligibility
+    check for the customer; if exactly one eligible package has auto_apply=True,
+    the redemption is applied automatically.
+
+    **Permissions**: Receptionist or Owner (billing.create)
+
+    Returns:
+        AddBillItemResponse: new BillItem + auto-apply metadata.
+
+    Raises:
+        400: Bill not found, not in DRAFT state, or service not found/inactive.
+        403: Insufficient permissions.
+    """
+    if not PermissionChecker.has_permission(current_user.role.name, "billing", "create"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
+
+    billing_svc = BillingService(db)
+    try:
+        result = billing_svc.add_bill_item(
+            bill_id=bill_id,
+            service_id=item_data.service_id,
+            quantity=item_data.quantity,
+            staff_id=item_data.staff_id,
+            appointment_id=item_data.appointment_id,
+            walkin_id=item_data.walkin_id,
+            notes=item_data.notes,
+            user_id=current_user.id,
+        )
+        db.commit()
+        return AddBillItemResponse(
+            bill_item=BillItemResponse.model_validate(result["bill_item"]),
+            auto_applied_package_sale_id=result["auto_applied_package_sale_id"],
+            eligible_packages=result["eligible_packages"],
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
