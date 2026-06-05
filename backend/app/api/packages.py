@@ -258,6 +258,7 @@ def check_eligibility(
         .options(
             joinedload(PackageSale.customer),
             joinedload(PackageSale.definition),
+            joinedload(PackageSale.items),  # needed — prevents N+1 on sale.items access
         )
         .filter(PackageSale.id.in_(sale_ids))
         .order_by(PackageSale.expires_at.asc())

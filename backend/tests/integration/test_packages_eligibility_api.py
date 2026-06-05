@@ -15,8 +15,6 @@ from app.main import app
 from app.database import get_db
 from app.auth.jwt import JWTHandler
 from app.models.user import User, Role, RoleEnum
-from app.models.billing import BillStatus
-
 
 # ---------------------------------------------------------------------------
 # Role/user/client fixtures (same pattern as other integration test files)
@@ -217,6 +215,29 @@ def test_receptionist_can_undo_redemption(
     db_session.flush()
 
     r = client_as_receptionist.post(f"/api/packages/redemptions/{audit.id}/undo")
+    assert r.status_code == 204
+
+
+def test_staff_can_undo_redemption(
+    client_as_staff, db_session, owner_user,
+    package_sale_factory, customer_factory, service_factory, bill_item_factory,
+):
+    from app.services.package_redemption_service import apply_redemption
+
+    cust = customer_factory()
+    svc = service_factory()
+    sale = package_sale_factory(customer=cust, services=[svc])
+    bi = bill_item_factory(service_id=svc.id)
+    audit = apply_redemption(
+        db=db_session,
+        package_sale_id=sale.id,
+        bill_item_id=bi.id,
+        redeemed_for_customer_id=cust.id,
+        user_id=owner_user.id,
+    )
+    db_session.flush()
+
+    r = client_as_staff.post(f"/api/packages/redemptions/{audit.id}/undo")
     assert r.status_code == 204
 
 
