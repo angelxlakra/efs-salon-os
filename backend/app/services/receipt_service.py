@@ -19,7 +19,7 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from sqlalchemy.orm import Session
 
-from app.models.billing import Bill, BillItemType
+from app.models.billing import Bill, BillItemType, PaymentMethod as PaymentMethodEnum
 from app.models.settings import SalonSettings
 from app.utils import IST
 
@@ -68,6 +68,19 @@ class ReceiptService:
         else:
             # Just the amount, no symbol
             return f"{rupees:.2f}"
+
+    @staticmethod
+    def _split_payments(
+        payments: list,
+    ) -> tuple[list, int]:
+        """Split payments into regular and package-redemption categories.
+
+        Returns:
+            (regular_payments, package_redemption_total_paise)
+        """
+        regular = [p for p in payments if p.payment_method != PaymentMethodEnum.PACKAGE_REDEMPTION]
+        redemption_total = sum(p.amount for p in payments if p.payment_method == PaymentMethodEnum.PACKAGE_REDEMPTION)
+        return regular, redemption_total
 
     @staticmethod
     def generate_receipt_pdf(bill: Bill, db: Optional[Session] = None) -> BytesIO:
@@ -388,14 +401,7 @@ class ReceiptService:
                 # PACKAGE_REDEMPTION rows are internal accounting entries; each redeemed
                 # item already shows "Paid via package" in the items section.
                 # We group them into a single summary line instead.
-                regular_payments = [
-                    p for p in bill.payments
-                    if p.payment_method.value != "package_redemption"
-                ]
-                package_redemption_total = sum(
-                    p.amount for p in bill.payments
-                    if p.payment_method.value == "package_redemption"
-                )
+                regular_payments, package_redemption_total = ReceiptService._split_payments(bill.payments)
 
                 payment_data = [[
                     Paragraph("<b>Payment Method</b>", ParagraphStyle('PH', parent=styles['Normal'], fontSize=8)),
@@ -422,7 +428,10 @@ class ReceiptService:
                 ]))
                 elements.append(payment_table)
 
-                # Calculate and show pending balance
+                # Include PACKAGE_REDEMPTION payments in total_paid — these are internal accounting
+                # entries that offset the cost of redeemed services. The balance calculation is:
+                #   pending = rounded_total - (cash/upi/card payments) - (package redemption payments)
+                # This is correct: package-covered services are already "paid" by the package.
                 total_paid = sum(payment.amount for payment in bill.payments)
                 pending_balance = bill.rounded_total - total_paid
 

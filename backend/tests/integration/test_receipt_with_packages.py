@@ -128,6 +128,36 @@ def test_receipt_renders_package_redemption_item(
     assert len(result.getvalue()) > 0
 
 
+def test_split_payments_groups_package_redemption(db_session, minimal_posted_bill, test_user):
+    """_split_payments correctly separates PACKAGE_REDEMPTION from regular payments."""
+    from datetime import datetime, timezone
+    from app.models.billing import Payment, PaymentMethod
+
+    now = datetime.now(timezone.utc)
+    cash_pay = Payment(
+        bill_id=minimal_posted_bill.id,
+        payment_method=PaymentMethod.CASH,
+        amount=50000,
+        confirmed_at=now,
+        confirmed_by=test_user.id,
+    )
+    redemption_pay = Payment(
+        bill_id=minimal_posted_bill.id,
+        payment_method=PaymentMethod.PACKAGE_REDEMPTION,
+        amount=30000,
+        confirmed_at=now,
+        confirmed_by=test_user.id,
+    )
+    db_session.add_all([cash_pay, redemption_pay])
+    db_session.flush()
+
+    regular, redemption_total = ReceiptService._split_payments([cash_pay, redemption_pay])
+
+    assert len(regular) == 1
+    assert regular[0].payment_method == PaymentMethod.CASH
+    assert redemption_total == 30000
+
+
 def test_receipt_handles_mixed_items(
     db_session, minimal_posted_bill, test_user,
     package_definition_factory, package_sale_factory, customer_factory, service_factory
