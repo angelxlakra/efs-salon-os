@@ -65,6 +65,8 @@ def create_sale(
             snapshot_gst_rate_pct=Decimal("0"),  # prices are tax-inclusive; no separate GST rate
             locked=def_item.locked,
             display_order=def_item.display_order,
+            max_redemptions=def_item.max_redemptions,
+            remaining=def_item.max_redemptions,  # initial counter == cap; null if uncapped
         )
         db.add(item)
 

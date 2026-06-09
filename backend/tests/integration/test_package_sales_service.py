@@ -152,3 +152,63 @@ class TestCreateSaleMultiItem:
 
         assert svc2.id in items_by_service
         assert items_by_service[svc2.id].snapshot_unit_price_paise == svc2.base_price
+
+
+def test_create_sale_snapshots_max_redemptions_and_initialises_remaining(
+    db_session, service_factory, customer_factory, test_user,
+):
+    """When a PackageDefinitionItem has max_redemptions, the PackageSaleItem
+    stores max_redemptions (snapshotted) and remaining = max_redemptions.
+    For uncapped items, both columns stay null."""
+    from datetime import datetime, timezone
+    from app.models.billing import Bill, BillStatus, BillType
+    from app.models.package import (
+        PackageDefinition, PackageDefinitionItem, PackageDefinitionStatus,
+        EntitlementType, Shareability,
+    )
+    from app.services.package_sales_service import create_sale
+    from decimal import Decimal
+
+    svc_a = service_factory(base_price=100000)
+    svc_b = service_factory(base_price=50000)
+    customer = customer_factory()
+
+    pkg = PackageDefinition(
+        name="Royal", status=PackageDefinitionStatus.PUBLISHED,
+        entitlement_type=EntitlementType.COUNTED, total_sessions=12,
+        shareability=Shareability.OWNER_ONLY, validity_days=180,
+        auto_apply=True, cancellation_fee_pct=Decimal("20.00"),
+        created_by_user_id=test_user.id,
+    )
+    pkg.items = [
+        PackageDefinitionItem(
+            service_id=svc_a.id, quantity=1, unit_price_paise=100000,
+            locked=False, display_order=0, max_redemptions=3,
+        ),
+        PackageDefinitionItem(
+            service_id=svc_b.id, quantity=1, unit_price_paise=50000,
+            locked=False, display_order=1, max_redemptions=None,
+        ),
+    ]
+    db_session.add(pkg)
+    db_session.flush()
+
+    bill = Bill(
+        customer_id=customer.id, subtotal=150000, discount_amount=0,
+        tax_amount=27000, cgst_amount=13500, sgst_amount=13500,
+        total_amount=177000, rounded_total=177000, rounding_adjustment=0,
+        status=BillStatus.POSTED, bill_type=BillType.NORMAL,
+        created_by=test_user.id,
+    )
+    db_session.add(bill)
+    db_session.flush()
+
+    sale = create_sale(
+        db_session, package_definition_id=pkg.id, bill_id=bill.id,
+        customer_id=customer.id, selling_staff_id=None,
+    )
+    by_svc = {it.service_id: it for it in sale.items}
+    assert by_svc[svc_a.id].max_redemptions == 3
+    assert by_svc[svc_a.id].remaining == 3
+    assert by_svc[svc_b.id].max_redemptions is None
+    assert by_svc[svc_b.id].remaining is None
