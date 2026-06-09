@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.models.package import (
-    PackageSale, PackageRedemptionAudit, PackageSaleStatus, EntitlementType,
+    PackageSale, PackageSaleItem, PackageRedemptionAudit, PackageSaleStatus, EntitlementType,
 )
 from app.models.billing import BillItem, BillItemType, Bill, BillStatus, Payment, PaymentMethod
 
@@ -58,6 +58,10 @@ def apply_redemption(
     if not sale_item:
         raise ValueError("Service not covered by this package")
 
+    # Per-line cap enforcement
+    if sale_item.remaining is not None and sale_item.remaining <= 0:
+        raise ValueError("Per-line redemption cap exhausted for this service.")
+
     # Update BillItem — set price to the snapshotted package price
     bill_item.item_type = BillItemType.PACKAGE_REDEMPTION
     bill_item.package_sale_id = sale.id
@@ -74,6 +78,10 @@ def apply_redemption(
         sale.sessions_remaining -= 1
         if sale.sessions_remaining == 0:
             sale.status = PackageSaleStatus.EXHAUSTED
+
+    # Decrement per-line counter
+    if sale_item.remaining is not None:
+        sale_item.remaining -= 1
 
     # Audit row
     audit = PackageRedemptionAudit(
@@ -150,6 +158,11 @@ def undo_redemption(db: Session, audit_id: str, user_id: str) -> None:
         sale.sessions_remaining = (sale.sessions_remaining or 0) + 1
         if sale.status == PackageSaleStatus.EXHAUSTED:
             sale.status = PackageSaleStatus.ACTIVE
+
+    # Restore per-line counter
+    sale_item = db.get(PackageSaleItem, audit.package_sale_item_id)
+    if sale_item is not None and sale_item.remaining is not None:
+        sale_item.remaining += 1
 
     # NOTE: Payment is matched by (bill_id, payment_method, amount). This triple is not
     # unique if two redemptions of equal value occur on the same bill. A future migration
