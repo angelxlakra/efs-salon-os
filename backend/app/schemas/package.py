@@ -19,6 +19,7 @@ class PackageDefinitionItemCreate(BaseModel):
     unit_price_paise: int = Field(..., ge=0)
     locked: bool = False
     display_order: int = 0
+    max_redemptions: Optional[int] = Field(default=None, ge=1)
 
 
 class DiscountInput(BaseModel):
@@ -61,6 +62,7 @@ class PackageDefinitionItemResponse(BaseModel):
     unit_price_paise: int
     locked: bool
     display_order: int
+    max_redemptions: Optional[int] = None
 
 
 class PackageDefinitionResponse(BaseModel):
@@ -91,6 +93,8 @@ class PackageSaleItemResponse(BaseModel):
     snapshot_unit_price_paise: int
     snapshot_gst_rate_pct: Decimal
     locked: bool
+    max_redemptions: Optional[int] = None
+    remaining: Optional[int] = None
 
 
 class PackageSaleResponse(BaseModel):

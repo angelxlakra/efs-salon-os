@@ -81,3 +81,31 @@ def test_extend_expiry_request_requires_reason():
             new_expires_at="2027-01-01T00:00:00+00:00",
             reason="",
         )
+
+
+def test_definition_item_create_accepts_max_redemptions():
+    item = PackageDefinitionItemCreate(
+        service_id="01HXYZ0000000000000000ABCD",
+        quantity=1,
+        unit_price_paise=10000,
+        max_redemptions=3,
+    )
+    assert item.max_redemptions == 3
+
+
+def test_definition_item_create_defaults_max_redemptions_null():
+    item = PackageDefinitionItemCreate(
+        service_id="01HXYZ0000000000000000ABCD",
+        quantity=1,
+        unit_price_paise=10000,
+    )
+    assert item.max_redemptions is None
+
+
+def test_definition_item_create_rejects_zero_max_redemptions():
+    with pytest.raises(ValidationError):
+        PackageDefinitionItemCreate(
+            service_id="01HXYZ0000000000000000ABCD",
+            quantity=1, unit_price_paise=10000,
+            max_redemptions=0,
+        )
