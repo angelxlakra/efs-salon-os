@@ -1,5 +1,12 @@
 """Smoke test: model classes exist with expected columns."""
 
+import pytest
+from datetime import datetime, timedelta, timezone
+from decimal import Decimal
+
+from sqlalchemy.exc import IntegrityError
+
+from app.models.billing import Bill, BillStatus, BillType
 from app.models.package import (
     EntitlementType,
     PackageDefinition,
@@ -43,6 +50,7 @@ def test_package_definition_item_shape():
     assert hasattr(PackageDefinitionItem, "unit_price_paise")
     assert hasattr(PackageDefinitionItem, "locked")
     assert hasattr(PackageDefinitionItem, "display_order")
+    assert hasattr(PackageDefinitionItem, "max_redemptions")
 
 
 def test_package_sale_model_shape():
@@ -79,6 +87,8 @@ def test_package_sale_item_shape():
     assert hasattr(PackageSaleItem, "snapshot_gst_rate_pct")
     assert hasattr(PackageSaleItem, "locked")
     assert hasattr(PackageSaleItem, "sale")
+    assert hasattr(PackageSaleItem, "max_redemptions")
+    assert hasattr(PackageSaleItem, "remaining")
 
 
 def test_package_sale_compound_indexes():
@@ -134,11 +144,6 @@ def test_package_expiry_extension_forward_constraint():
 
 def test_package_definition_item_max_redemptions_defaults_null(db_session, test_user, service_factory):
     """A definition item without max_redemptions stores NULL."""
-    from app.models.package import (
-        PackageDefinition, PackageDefinitionItem, EntitlementType, Shareability,
-        PackageDefinitionStatus,
-    )
-    from decimal import Decimal
     svc = service_factory()
     pkg = PackageDefinition(
         name="t", status=PackageDefinitionStatus.DRAFT,
@@ -161,13 +166,6 @@ def test_package_definition_item_max_redemptions_defaults_null(db_session, test_
 
 def test_package_definition_item_max_redemptions_rejects_zero(db_session, test_user, service_factory):
     """The CHECK constraint rejects max_redemptions=0."""
-    import pytest
-    from sqlalchemy.exc import IntegrityError
-    from app.models.package import (
-        PackageDefinition, PackageDefinitionItem, EntitlementType, Shareability,
-        PackageDefinitionStatus,
-    )
-    from decimal import Decimal
     svc = service_factory()
     pkg = PackageDefinition(
         name="t", status=PackageDefinitionStatus.DRAFT,
@@ -195,16 +193,6 @@ def test_package_sale_item_remaining_must_match_cap_presence(
     package_definition_factory,
 ):
     """remaining must be NULL iff max_redemptions is NULL."""
-    import pytest
-    from sqlalchemy.exc import IntegrityError
-    from decimal import Decimal
-    from datetime import datetime, timedelta, timezone
-    from app.models.package import (
-        PackageSale, PackageSaleItem, PackageSaleStatus, EntitlementType, Shareability,
-    )
-    from app.models.billing import BillStatus, BillType
-    from app.models.billing import Bill
-
     svc = service_factory()
     customer = customer_factory()
     defn = package_definition_factory(services=[svc])
