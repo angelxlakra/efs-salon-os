@@ -88,6 +88,7 @@ class PackageDefinitionItem(Base, ULIDMixin, TimestampMixin):
     unit_price_paise = Column(Integer, nullable=False)
     locked = Column(Boolean, nullable=False, default=False)
     display_order = Column(Integer, nullable=False, default=0)
+    max_redemptions = Column(Integer, nullable=True)  # null = no per-line cap
 
     definition = relationship("PackageDefinition", back_populates="items")
     service = relationship("Service")
@@ -100,6 +101,10 @@ class PackageDefinitionItem(Base, ULIDMixin, TimestampMixin):
     __table_args__ = (
         CheckConstraint("quantity >= 1", name="ck_package_def_item_qty_positive"),
         CheckConstraint("unit_price_paise >= 0", name="ck_package_def_item_price_non_negative"),
+        CheckConstraint(
+            "max_redemptions IS NULL OR max_redemptions >= 1",
+            name="ck_package_def_item_max_redemptions_positive",
+        ),
     )
 
 
@@ -205,6 +210,8 @@ class PackageSaleItem(Base, ULIDMixin, TimestampMixin):
     snapshot_gst_rate_pct = Column(Numeric(5, 2), nullable=False)
     locked = Column(Boolean, nullable=False)
     display_order = Column(Integer, nullable=False)
+    max_redemptions = Column(Integer, nullable=True)  # null = no per-line cap
+    remaining = Column(Integer, nullable=True)        # null iff max_redemptions is null
 
     sale = relationship("PackageSale", back_populates="items")
     service = relationship("Service")
@@ -220,6 +227,19 @@ class PackageSaleItem(Base, ULIDMixin, TimestampMixin):
         # Covering index for the find_eligible_packages subquery:
         #   SELECT package_sale_id FROM package_sale_items WHERE service_id = ?
         Index("ix_package_sale_items_service_id_sale_id", "service_id", "package_sale_id"),
+        CheckConstraint(
+            "max_redemptions IS NULL OR max_redemptions >= 1",
+            name="ck_package_sale_item_max_redemptions_positive",
+        ),
+        CheckConstraint(
+            "remaining IS NULL OR remaining >= 0",
+            name="ck_package_sale_item_remaining_non_negative",
+        ),
+        CheckConstraint(
+            "(max_redemptions IS NULL AND remaining IS NULL) "
+            "OR (max_redemptions IS NOT NULL AND remaining IS NOT NULL)",
+            name="ck_package_sale_item_remaining_matches_cap",
+        ),
     )
 
 
