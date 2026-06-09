@@ -38,6 +38,7 @@ def _build_items(payload_items, item_drafts):
             unit_price_paise=draft.unit_price_paise,
             locked=draft.locked,
             display_order=src.display_order,
+            max_redemptions=src.max_redemptions,
         )
         for src, draft in zip(payload_items, item_drafts, strict=True)
     ]

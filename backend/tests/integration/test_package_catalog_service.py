@@ -321,3 +321,38 @@ def test_update_definition_with_discount(db_session, user_factory):
     updated = update_definition(db_session, pkg.id, update_payload)
     # 10% off 100000 = 90000
     assert updated.items[0].unit_price_paise == 90000
+
+
+# ---------------------------------------------------------------------------
+# max_redemptions (per-line cap)
+# ---------------------------------------------------------------------------
+
+def test_create_definition_persists_per_line_max_redemptions(
+    db_session, service_factory, test_user,
+):
+    """create_definition stores max_redemptions on each PackageDefinitionItem."""
+    svc_a = service_factory(base_price=100000)
+    svc_b = service_factory(base_price=50000)
+    payload = PackageDefinitionCreate(
+        name="Salon Royal Pass",
+        entitlement_type="counted",
+        total_sessions=12,
+        validity_days=180,
+        shareability="owner_only",
+        cancellation_fee_pct="20.00",
+        items=[
+            PackageDefinitionItemCreate(
+                service_id=svc_a.id, quantity=1, unit_price_paise=100000,
+                max_redemptions=3,
+            ),
+            PackageDefinitionItemCreate(
+                service_id=svc_b.id, quantity=1, unit_price_paise=50000,
+                max_redemptions=None,
+            ),
+        ],
+    )
+    pkg = create_definition(db_session, payload, user_id=test_user.id)
+    db_session.flush()
+    by_svc = {it.service_id: it for it in pkg.items}
+    assert by_svc[svc_a.id].max_redemptions == 3
+    assert by_svc[svc_b.id].max_redemptions is None
