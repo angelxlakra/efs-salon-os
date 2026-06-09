@@ -117,3 +117,46 @@ def test_excludes_counted_with_zero_sessions_but_active_status(
         expires_at=datetime.now(timezone.utc) + timedelta(days=30),
     )
     assert find_eligible_packages(customer.id, service.id, db_session) == []
+
+
+def test_per_line_exhausted_item_excluded_from_eligibility(
+    db_session, service_factory, customer_factory, package_sale_factory,
+):
+    """A sale item with remaining=0 must NOT appear in eligibility results."""
+    svc = service_factory(base_price=100000)
+    customer = customer_factory()
+    sale = package_sale_factory(
+        customer=customer,
+        services=[svc],
+        sessions_remaining=5,
+    )
+    # Exhaust the per-line cap
+    item = next(it for it in sale.items if it.service_id == svc.id)
+    item.max_redemptions = 3
+    item.remaining = 0
+    db_session.flush()
+
+    result = find_eligible_packages(customer.id, svc.id, db_session)
+    sale_ids = [r.id for r in result]
+    assert sale.id not in sale_ids
+
+
+def test_per_line_with_remaining_included_in_eligibility(
+    db_session, service_factory, customer_factory, package_sale_factory,
+):
+    """A sale item with remaining > 0 MUST appear in eligibility results."""
+    svc = service_factory(base_price=100000)
+    customer = customer_factory()
+    sale = package_sale_factory(
+        customer=customer,
+        services=[svc],
+        sessions_remaining=5,
+    )
+    item = next(it for it in sale.items if it.service_id == svc.id)
+    item.max_redemptions = 3
+    item.remaining = 2  # 1 used, 2 left
+    db_session.flush()
+
+    result = find_eligible_packages(customer.id, svc.id, db_session)
+    sale_ids = [r.id for r in result]
+    assert sale.id in sale_ids

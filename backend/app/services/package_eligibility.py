@@ -46,6 +46,12 @@ def find_eligible_packages(
               PackageSale.id.in_(
                   db.query(PackageSaleItem.package_sale_id)
                     .filter(PackageSaleItem.service_id == service_id)
+                    .filter(
+                        or_(
+                            PackageSaleItem.max_redemptions.is_(None),
+                            PackageSaleItem.remaining > 0,
+                        )
+                    )
               ),
               or_(
                   PackageSale.entitlement_type_snapshot == EntitlementType.UNLIMITED,
