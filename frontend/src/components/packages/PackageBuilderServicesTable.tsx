@@ -139,7 +139,10 @@ export function PackageBuilderServicesTable({ items, onChange, entitlementType }
             placeholder="Unlimited"
             onChange={(e) =>
               update(i, {
-                max_redemptions: e.target.value === "" ? null : Number(e.target.value),
+                max_redemptions:
+                  e.target.value === ""
+                    ? null
+                    : Math.max(1, Math.round(Number(e.target.value))) || null,
               })
             }
             className={cn(inlineInput, "text-center")}

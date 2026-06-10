@@ -98,9 +98,7 @@ export function PackageBuilder({ initial, onSaved }: Props) {
         unit_price_paise: it.unit_price_paise,
         locked: it.locked,
         display_order: i,
-        // TODO(T12): thread max_redemptions through LineItem state so editing
-        // an existing package does not silently reset per-line caps to null.
-        max_redemptions: null,
+        max_redemptions: it.max_redemptions ?? null,
       })),
       discount,
     };
