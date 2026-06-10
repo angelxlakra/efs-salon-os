@@ -59,6 +59,7 @@ describe("ServicePicker", () => {
     expect(mockFn).toHaveBeenCalledWith({
       service_id: "s1",
       service_name: "Haircut",
+      base_price_paise: 50000,
     });
   });
 

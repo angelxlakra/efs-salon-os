@@ -8,7 +8,7 @@ import { useServicesList } from "@/hooks/useServicesList";
 
 interface ServicePickerProps {
   value: string | null;
-  onChange: (selection: { service_id: string; service_name: string } | null) => void;
+  onChange: (selection: { service_id: string; service_name: string; base_price_paise: number } | null) => void;
   disabled?: boolean;
   placeholder?: string;
 }
@@ -46,7 +46,7 @@ export function ServicePicker({
     }
     const service = services.find((s) => s.id === selectedValue);
     if (service) {
-      onChange({ service_id: service.id, service_name: service.name });
+      onChange({ service_id: service.id, service_name: service.name, base_price_paise: service.base_price });
     } else {
       onChange(null);
     }

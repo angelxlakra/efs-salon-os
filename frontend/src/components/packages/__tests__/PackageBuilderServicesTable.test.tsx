@@ -18,12 +18,19 @@ if (!Element.prototype.scrollIntoView) {
 
 // Mock ServicePicker so tests are isolated from the combobox / hook internals
 vi.mock("@/components/packages/ServicePicker", () => ({
-  ServicePicker: ({ value, onChange }: { value: string | null; onChange: (sel: { service_id: string; service_name: string } | null) => void }) => (
+  ServicePicker: ({ value, onChange }: {
+    value: string | null;
+    onChange: (sel: { service_id: string; service_name: string; base_price_paise: number } | null) => void;
+  }) => (
     <input
       data-testid="service-picker"
       value={value ?? ""}
       onChange={(e) =>
-        onChange(e.target.value ? { service_id: e.target.value, service_name: e.target.value } : null)
+        onChange(
+          e.target.value
+            ? { service_id: e.target.value, service_name: e.target.value, base_price_paise: 75000 }
+            : null
+        )
       }
     />
   ),
@@ -170,6 +177,27 @@ describe("PackageBuilderServicesTable", () => {
     expect(onChangeMock).toHaveBeenCalledWith(
       expect.arrayContaining([
         expect.objectContaining({ max_redemptions: 5 }),
+      ])
+    );
+  });
+
+  it("auto-populates unit_price_paise from base_price_paise when a service is selected", () => {
+    // Regression: selecting a service used to leave price at 0
+    const onChangeMock = vi.fn();
+    render(
+      <PackageBuilderServicesTable
+        items={[makeItem({ service_id: "", service_name: "", unit_price_paise: 0 })]}
+        onChange={onChangeMock}
+        entitlementType="counted"
+      />
+    );
+    const picker = screen.getByTestId("service-picker");
+    // The mock now needs to emit base_price_paise — simulate a ServicePicker
+    // that returns { service_id, service_name, base_price_paise: 75000 }
+    fireEvent.change(picker, { target: { value: "svc-haircut" } });
+    expect(onChangeMock).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({ unit_price_paise: 75000 }),
       ])
     );
   });

@@ -113,7 +113,12 @@ export function PackageBuilderServicesTable({ items, onChange, entitlementType }
           <ServicePicker
             value={item.service_id || null}
             onChange={(sel) => {
-              if (sel) update(i, { service_id: sel.service_id, service_name: sel.service_name });
+              if (sel)
+                update(i, {
+                  service_id: sel.service_id,
+                  service_name: sel.service_name,
+                  unit_price_paise: sel.base_price_paise,
+                });
             }}
           />
 
