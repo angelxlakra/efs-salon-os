@@ -3,14 +3,16 @@ import { Lock, Unlock, Trash2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { EntitlementType } from "@/types/package";
+import { ServicePicker } from "@/components/packages/ServicePicker";
 
-interface LineItem {
+export interface LineItem {
   service_id: string;
   service_name: string; // display only
   quantity: number;
   unit_price_paise: number;
   locked: boolean;
   display_order: number;
+  max_redemptions: number | null;
 }
 
 interface Props {
@@ -55,6 +57,7 @@ export function PackageBuilderServicesTable({ items, onChange, entitlementType }
         unit_price_paise: 0,
         locked: false,
         display_order: items.length,
+        max_redemptions: null,
       },
     ]);
   }
@@ -75,12 +78,18 @@ export function PackageBuilderServicesTable({ items, onChange, entitlementType }
         className={cn(
           "grid gap-2 text-[10px] font-medium text-muted-foreground uppercase",
           isUnlimited
-            ? "grid-cols-[1fr_100px_40px_32px]"
-            : "grid-cols-[1fr_48px_100px_40px_32px]"
+            ? "grid-cols-[1fr_56px_100px_40px_32px]"
+            : "grid-cols-[1fr_48px_56px_100px_40px_32px]"
         )}
       >
         <span>Service</span>
         {!isUnlimited && <span className="text-center">Qty</span>}
+        <span
+          className="text-center"
+          title="Max uses per client. Leave blank for unlimited."
+        >
+          Limit
+        </span>
         <span className="text-right">Price (₹)</span>
         <span className="text-center">Lock</span>
         <span />
@@ -93,19 +102,19 @@ export function PackageBuilderServicesTable({ items, onChange, entitlementType }
           className={cn(
             "grid gap-2 items-center rounded-lg border px-2 py-1.5",
             isUnlimited
-              ? "grid-cols-[1fr_100px_40px_32px]"
-              : "grid-cols-[1fr_48px_100px_40px_32px]",
+              ? "grid-cols-[1fr_56px_100px_40px_32px]"
+              : "grid-cols-[1fr_48px_56px_100px_40px_32px]",
             item.locked
               ? "bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800"
               : "border-border"
           )}
         >
-          {/* Service name */}
-          <input
-            value={item.service_name}
-            onChange={(e) => update(i, { service_name: e.target.value })}
-            placeholder="Service name"
-            className={cn(inlineInput, "border-0 bg-transparent p-0 focus-visible:shadow-none focus-visible:border-transparent")}
+          {/* Service picker */}
+          <ServicePicker
+            value={item.service_id || null}
+            onChange={(sel) => {
+              if (sel) update(i, { service_id: sel.service_id, service_name: sel.service_name });
+            }}
           />
 
           {/* Qty (hidden for unlimited) */}
@@ -120,6 +129,21 @@ export function PackageBuilderServicesTable({ items, onChange, entitlementType }
               className={cn(inlineInput, "text-center")}
             />
           )}
+
+          {/* Limit (max_redemptions) */}
+          <input
+            aria-label="Limit"
+            type="number"
+            min={1}
+            value={item.max_redemptions ?? ""}
+            placeholder="Unlimited"
+            onChange={(e) =>
+              update(i, {
+                max_redemptions: e.target.value === "" ? null : Number(e.target.value),
+              })
+            }
+            className={cn(inlineInput, "text-center")}
+          />
 
           {/* Price */}
           <input

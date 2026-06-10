@@ -25,6 +25,7 @@ interface LineItem {
   unit_price_paise: number;
   locked: boolean;
   display_order: number;
+  max_redemptions: number | null;
 }
 
 interface Props {
@@ -61,6 +62,7 @@ export function PackageBuilder({ initial, onSaved }: Props) {
       unit_price_paise: it.unit_price_paise,
       locked: it.locked,
       display_order: it.display_order ?? i,
+      max_redemptions: it.max_redemptions ?? null,
     }))
   );
   const [discount, setDiscount] = useState<
