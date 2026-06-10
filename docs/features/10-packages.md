@@ -63,6 +63,32 @@ When a package is sold, all per-line prices are snapshotted into `PackageSaleIte
 ### FIFO conflict resolution
 When two packages both cover the same service, the system selects the one expiring soonest (FIFO). If `auto_apply` is on and only one eligible package exists, it is applied silently. If two or more exist, the cashier sees the `MultiPackageSelector` to pick one.
 
+### Per-line redemption caps
+
+A package line item can optionally cap how many times that specific service can
+be redeemed within a single sold package, independent of the package's global
+session budget.
+
+**Example:**  
+*Salon Royal Pass* — 12 sessions total, but Hair Spa capped at 3 uses per package.
+A client can redeem Haircut freely up to the 12-session limit, but Hair Spa is
+blocked after 3 uses even if sessions remain.
+
+**How it works:**
+
+1. Set `max_redemptions` on a `PackageDefinitionItem` when building the catalog
+   entry (the `PackageBuilder` UI exposes a "Limit" input per line).
+2. On sale, `max_redemptions` is snapshotted into `PackageSaleItem.max_redemptions`
+   and `PackageSaleItem.remaining` is seeded to the same value.
+3. On each redemption, `remaining` decrements by 1. When `remaining` reaches 0,
+   further redemptions of that service from this package are rejected with a
+   `ValueError` (surfaced as HTTP 400 by the POS endpoint).
+4. Undoing a redemption restores `remaining` by 1.
+5. Eligibility queries automatically exclude exhausted lines.
+
+**Uncapped lines** (`max_redemptions = NULL`): draw from the global `sessions_remaining`
+pool only, with no per-line restriction. This is the default behaviour.
+
 ### Shared redemption
 A `shared` package can be redeemed by any registered customer, not just the buyer. The audit log (`PackageRedemptionAudit`) records both the buyer and the recipient for each redemption. Staff role users do not see the buyer's name (PII redaction).
 

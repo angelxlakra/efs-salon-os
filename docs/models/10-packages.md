@@ -57,6 +57,7 @@ PackageSale ─────────────────── Bill (orig
 | `unit_price_paise` | `Integer` | ≥ 0; snapshotted to PackageSaleItem at sale |
 | `locked` | `Boolean` | Locked lines are skipped during package-level discount distribution |
 | `display_order` | `Integer` | |
+| `max_redemptions` | `Integer` | Optional. Per-line cap: max times this line can be redeemed across the package's lifetime. `NULL` = no per-line cap (draws from global sessions pool only). CHECK >= 1. |
 
 ---
 
@@ -105,8 +106,21 @@ PackageSale ─────────────────── Bill (orig
 | `snapshot_gst_rate_pct` | `Numeric(5,2)` | Always `0.00` (tax-inclusive prices) |
 | `locked` | `Boolean` | |
 | `display_order` | `Integer` | |
+| `max_redemptions` | `Integer` | Optional. Snapshot of the definition item's cap at sale time. `NULL` = uncapped. |
+| `remaining` | `Integer` | Optional. Redemption counter that decrements on each use. Starts equal to `max_redemptions`; `NULL` iff `max_redemptions` is `NULL`. CHECK >= 0. |
 
 **Index**: `(service_id, package_sale_id)` — covering index for eligibility sub-query.
+
+### Per-line cap invariants
+
+- `max_redemptions` and `remaining` are always NULL together or NOT NULL together
+  (enforced by `ck_package_sale_item_remaining_matches_cap`).
+- `remaining` starts equal to `max_redemptions` at sale time (snapshotted in
+  `package_sales_service.create_sale`).
+- `remaining` is decremented by 1 on each successful `apply_redemption` call and
+  restored by `undo_redemption`.
+- The eligibility query (`find_eligible_packages`) only returns sale items where
+  `max_redemptions IS NULL OR remaining > 0`.
 
 ---
 
