@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { PackageBuilderEntitlementMatrix } from "./PackageBuilderEntitlementMatrix";
-import { PackageBuilderServicesTable } from "./PackageBuilderServicesTable";
+import { PackageBuilderServicesTable, type LineItem } from "./PackageBuilderServicesTable";
 import { PackageBuilderDiscountControl } from "./PackageBuilderDiscountControl";
 import { packagesApi } from "@/lib/api/packages";
 import type {
@@ -17,16 +17,6 @@ import type {
   Shareability,
   DiscountMode,
 } from "@/types/package";
-
-interface LineItem {
-  service_id: string;
-  service_name: string;
-  quantity: number;
-  unit_price_paise: number;
-  locked: boolean;
-  display_order: number;
-  max_redemptions: number | null;
-}
 
 interface Props {
   initial?: PackageDefinitionCreate;
@@ -57,7 +47,7 @@ export function PackageBuilder({ initial, onSaved }: Props) {
   const [items, setItems] = useState<LineItem[]>(
     (initial?.items ?? []).map((it, i) => ({
       service_id: it.service_id,
-      service_name: "",
+      service_name: (it as { service_name?: string }).service_name ?? "",
       quantity: it.quantity,
       unit_price_paise: it.unit_price_paise,
       locked: it.locked,
@@ -79,6 +69,10 @@ export function PackageBuilder({ initial, onSaved }: Props) {
       toast.error("Add at least one service");
       return;
     }
+    if (items.some((it) => !it.service_id)) {
+      toast.error("Select a service for every line");
+      return;
+    }
 
     const payload: PackageDefinitionCreate = {
       name: name.trim(),
@@ -93,7 +87,7 @@ export function PackageBuilder({ initial, onSaved }: Props) {
       cancellation_fee_pct: cancellationFeePct,
       auto_apply: autoApply,
       items: items.map((it, i) => ({
-        service_id: it.service_id || it.service_name, // fallback for manually-entered names
+        service_id: it.service_id,
         quantity: entitlementType === "unlimited" ? 1 : it.quantity,
         unit_price_paise: it.unit_price_paise,
         locked: it.locked,
