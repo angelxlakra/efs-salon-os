@@ -59,8 +59,11 @@ def apply_redemption(
         raise ValueError("Service not covered by this package")
 
     # Per-line cap enforcement
+    # TODO: all ValueError in this codebase maps to HTTP 400 at the router layer.
+    # When router-layer exception handling is unified to 422 for domain rule
+    # violations, this will surface with the correct status code.
     if sale_item.remaining is not None and sale_item.remaining <= 0:
-        raise ValueError("Per-line redemption cap exhausted for this service.")
+        raise ValueError("Per-line redemption cap exhausted for this service")
 
     # Update BillItem — set price to the snapshotted package price
     bill_item.item_type = BillItemType.PACKAGE_REDEMPTION

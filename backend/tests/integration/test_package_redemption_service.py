@@ -51,7 +51,7 @@ def test_apply_redemption_rejects_when_per_line_remaining_zero(
 
     bi = bill_item_factory(service_id=svc.id, base_price=100000)
 
-    with pytest.raises(Exception):  # ValueError or HTTPException
+    with pytest.raises(ValueError, match="cap exhausted"):
         apply_redemption(db_session, sale.id, bi.id, customer.id, user.id)
 
 
