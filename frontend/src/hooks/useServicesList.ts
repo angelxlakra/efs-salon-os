@@ -1,12 +1,12 @@
 // frontend/src/hooks/useServicesList.ts
 import { useState, useEffect } from "react";
-import type { Service } from "@/types/service";
+import type { ServiceItem } from "@/types/service";
 import { fetchServicesList } from "@/lib/api/services";
 
-let cachedServices: Service[] | null = null;
+let cachedServices: ServiceItem[] | null = null;
 
 export function useServicesList() {
-  const [services, setServices] = useState<Service[]>(cachedServices ?? []);
+  const [services, setServices] = useState<ServiceItem[]>(cachedServices ?? []);
   const [loading, setLoading] = useState(cachedServices === null);
   const [error, setError] = useState<string | null>(null);
 
