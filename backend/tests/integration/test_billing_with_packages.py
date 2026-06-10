@@ -148,8 +148,6 @@ def test_finalize_raises_when_no_customer_on_package_sale_line(
     package_definition_factory, service_factory,
 ):
     """A PACKAGE_SALE_LINE on an anonymous (no-customer) bill must raise ValueError."""
-    import pytest
-
     svc = service_factory()
     pkg = package_definition_factory(services=[svc], validity_days=90)
     total_paise = pkg.items[0].unit_price_paise
@@ -406,11 +404,8 @@ def test_e2e_salon_royal_pass_per_line_cap_lifecycle(
         svc_b_max_redemptions=None,
     )
 
-    # --- Step 3/4: Verify sale-time snapshots ---
-    assert sale_item_a.max_redemptions == 3
-    assert sale_item_a.remaining == 3
-    assert sale_item_b.max_redemptions is None
-    assert sale_item_b.remaining is None
+    # Seeding verified by test_create_sale_snapshots_max_redemptions_and_initialises_remaining
+    # in test_package_sales_service.py. This E2E test focuses on the lifecycle.
 
     # --- Step 5: Redeem svc_a 3 times, check remaining goes 3→2→1→0 ---
     for expected_remaining_after in (2, 1, 0):
@@ -427,12 +422,18 @@ def test_e2e_salon_royal_pass_per_line_cap_lifecycle(
 
     # --- Step 6: 4th redemption of svc_a must raise ValueError ---
     bi_over = _make_bill_item_for_service(db_session, customer, svc_a, test_user)
-    with pytest.raises(ValueError, match="cap exhausted"):
+    with pytest.raises(ValueError, match="(?i)per-line redemption cap exhausted"):
         apply_redemption(db_session, sale.id, bi_over.id, customer.id, test_user.id)
 
     # sessions_remaining must be unchanged after the failed attempt
     db_session.refresh(sale)
     assert sale.sessions_remaining == 9
+
+    # svc_a must be excluded from eligibility now that remaining=0
+    eligible_a_after_cap = find_eligible_packages(customer.id, svc_a.id, db_session)
+    assert all(e.id != sale.id for e in eligible_a_after_cap), (
+        "svc_a per-line cap exhausted — package must not appear for svc_a"
+    )
 
     # --- Step 7: svc_b is still redeemable (not capped) ---
     eligible_b = find_eligible_packages(customer.id, svc_b.id, db_session)
@@ -491,11 +492,8 @@ def test_e2e_glow_and_refresh_unlimited_with_per_line_cap(
         svc_b_max_redemptions=None,
     )
 
-    # Verify snapshot fields
-    assert sale_item_facial.max_redemptions == 2
-    assert sale_item_facial.remaining == 2
-    assert sale_item_massage.max_redemptions is None
-    assert sale_item_massage.remaining is None
+    # Seeding verified by test_create_sale_snapshots_max_redemptions_and_initialises_remaining
+    # in test_package_sales_service.py. This E2E test focuses on the lifecycle.
     assert sale.entitlement_type_snapshot == EntitlementType.UNLIMITED
     assert sale.sessions_remaining is None
 
@@ -513,7 +511,7 @@ def test_e2e_glow_and_refresh_unlimited_with_per_line_cap(
 
     # --- Step 3: 3rd redemption of svc_facial must raise ValueError ---
     bi_over = _make_bill_item_for_service(db_session, customer, svc_facial, test_user)
-    with pytest.raises(ValueError, match="cap exhausted"):
+    with pytest.raises(ValueError, match="(?i)per-line redemption cap exhausted"):
         apply_redemption(db_session, sale.id, bi_over.id, customer.id, test_user.id)
 
     # --- Step 4: svc_massage is still redeemable after both svc_facial exhaustions ---
