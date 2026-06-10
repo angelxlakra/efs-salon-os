@@ -31,6 +31,7 @@ export default function EditPackagePage() {
             unit_price_paise: it.unit_price_paise,
             locked: it.locked,
             display_order: it.display_order,
+            max_redemptions: it.max_redemptions,
           })),
         });
       })

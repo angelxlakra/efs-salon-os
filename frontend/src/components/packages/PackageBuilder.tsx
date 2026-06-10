@@ -96,6 +96,7 @@ export function PackageBuilder({ initial, onSaved }: Props) {
         unit_price_paise: it.unit_price_paise,
         locked: it.locked,
         display_order: i,
+        max_redemptions: null,
       })),
       discount,
     };

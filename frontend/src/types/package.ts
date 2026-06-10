@@ -14,6 +14,7 @@ export interface PackageDefinitionItem {
   unit_price_paise: number;
   locked: boolean;
   display_order: number;
+  max_redemptions: number | null;
 }
 
 export interface PackageDefinition {
@@ -56,6 +57,8 @@ export interface PackageSaleItem {
   snapshot_unit_price_paise: number;
   snapshot_gst_rate_pct: string;
   locked: boolean;
+  max_redemptions: number | null;
+  remaining: number | null;
 }
 
 export interface PackageSale {
