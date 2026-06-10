@@ -52,7 +52,13 @@ def test_locked_lines_preserved():
 
 def test_all_locked_with_discount_raises():
     items = [_make(200000, locked=True), _make(200000, locked=True)]
-    with pytest.raises(DomainError, match="no unlocked lines"):
+    with pytest.raises(DomainError, match="all lines are locked"):
+        distribute_discount(items, DiscountMode.PCT, Decimal("10"))
+
+
+def test_zero_price_unlocked_with_discount_raises():
+    items = [_make(0), _make(0)]  # unlocked but price=0 — distinct from all-locked
+    with pytest.raises(DomainError, match="zero price"):
         distribute_discount(items, DiscountMode.PCT, Decimal("10"))
 
 

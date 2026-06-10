@@ -94,7 +94,7 @@ export function PackageBuilder({ initial, onSaved }: Props) {
         display_order: i,
         max_redemptions: it.max_redemptions ?? null,
       })),
-      discount,
+      discount: discount?.value ? discount : undefined,
     };
 
     setSaving(true);

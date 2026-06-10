@@ -77,7 +77,10 @@ def distribute_discount(
     total_mrp = locked_weight + unlocked_weight
 
     if unlocked_weight == 0:
-        raise DomainError("Cannot distribute discount: no unlocked lines")
+        # Triggers both when all lines are locked AND when all unlocked lines have price=0
+        if all(i.locked for i in items):
+            raise DomainError("Cannot distribute discount: all lines are locked")
+        raise DomainError("Cannot distribute discount: all unlocked lines have zero price")
 
     # Compute total final paise across unlocked lines
     if mode == DiscountMode.PCT:
