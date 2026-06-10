@@ -16,15 +16,17 @@ if (!Element.prototype.scrollIntoView) {
   Element.prototype.scrollIntoView = function scrollIntoView() {};
 }
 
-const MOCK_SERVICES = [
-  {
-    id: "s1",
-    name: "Haircut",
-    base_price: 50000,
-    duration_minutes: 30,
-    category_name: "Hair",
-  },
-];
+const { MOCK_SERVICES } = vi.hoisted(() => ({
+  MOCK_SERVICES: [
+    {
+      id: "s1",
+      name: "Haircut",
+      base_price: 50000,
+      duration_minutes: 30,
+      category_name: "Hair",
+    },
+  ],
+}));
 
 vi.mock("@/hooks/useServicesList", () => ({
   useServicesList: () => ({
@@ -58,5 +60,25 @@ describe("ServicePicker", () => {
       service_id: "s1",
       service_name: "Haircut",
     });
+  });
+
+  it("calls onChange with null when selection is cleared", async () => {
+    const mockFn = vi.fn();
+    const user = userEvent.setup();
+
+    // Render with an already-selected value
+    render(<ServicePicker value="s1" onChange={mockFn} />);
+
+    // Open the combobox
+    const trigger = screen.getByRole("combobox");
+    await user.click(trigger);
+
+    // Click the already-selected "Haircut" option — Combobox deselects when
+    // the clicked option matches the current value (opt.value === value ? null : opt.value).
+    // Use findByRole("option") to disambiguate from the trigger button label.
+    const option = await screen.findByRole("option", { name: /Haircut/i });
+    await user.click(option);
+
+    expect(mockFn).toHaveBeenCalledWith(null);
   });
 });

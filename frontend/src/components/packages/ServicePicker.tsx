@@ -26,7 +26,7 @@ export function ServicePicker({
       services.map((s) => ({
         value: s.id,
         label: s.name,
-        keywords: [s.category_name],
+        keywords: s.category_name ? [s.category_name] : [],
       })),
     [services],
   );
@@ -47,6 +47,8 @@ export function ServicePicker({
     const service = services.find((s) => s.id === selectedValue);
     if (service) {
       onChange({ service_id: service.id, service_name: service.name });
+    } else {
+      onChange(null);
     }
   }
 
