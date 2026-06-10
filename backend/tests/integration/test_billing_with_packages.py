@@ -1,10 +1,17 @@
 """Integration tests for PackageSale creation at billing finalization."""
 
 import pytest
+from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 
 from app.services.billing_service import BillingService
+from app.services.package_redemption_service import apply_redemption
+from app.services.package_eligibility import find_eligible_packages
 from app.models.billing import Bill, BillItem, BillItemType, BillStatus, BillType, Payment, PaymentMethod
-from app.models.package import PackageSale
+from app.models.package import (
+    PackageDefinition, PackageDefinitionItem, PackageSale, PackageSaleItem,
+    EntitlementType, Shareability, PackageDefinitionStatus, PackageSaleStatus,
+)
 
 
 @pytest.fixture
@@ -203,3 +210,326 @@ def test_complete_bill_creates_package_sale(
     sale = db_session.get(PackageSale, bill_item.package_sale_id)
     assert sale is not None
     assert sale.bill_id == bill.id
+
+
+# ---------------------------------------------------------------------------
+# Helpers shared by the E2E lifecycle tests below
+# ---------------------------------------------------------------------------
+
+def _make_bill_item_for_service(db_session, customer, svc, test_user):
+    """Create a minimal DRAFT Bill + SERVICE BillItem for the given service."""
+    price = svc.base_price
+    bill = Bill(
+        customer_id=customer.id,
+        subtotal=price,
+        discount_amount=0,
+        tax_amount=0,
+        cgst_amount=0,
+        sgst_amount=0,
+        total_amount=price,
+        rounded_total=price,
+        rounding_adjustment=0,
+        status=BillStatus.DRAFT,
+        bill_type=BillType.NORMAL,
+        created_by=test_user.id,
+    )
+    db_session.add(bill)
+    db_session.flush()
+
+    item = BillItem(
+        bill_id=bill.id,
+        service_id=svc.id,
+        item_name=svc.name,
+        base_price=price,
+        quantity=1,
+        line_total=price,
+        item_type=BillItemType.SERVICE,
+    )
+    db_session.add(item)
+    db_session.flush()
+    return item
+
+
+def _build_sale_with_caps(
+    db_session,
+    test_user,
+    customer,
+    svc_a,
+    svc_b,
+    entitlement_type,
+    total_sessions,
+    sessions_remaining,
+    svc_a_max_redemptions,
+    svc_b_max_redemptions,
+):
+    """Build a PackageSale with two services where per-line caps can be set independently.
+
+    Returns (sale, sale_item_a, sale_item_b).
+    """
+    # --- PackageDefinition ---
+    defn = PackageDefinition(
+        name="E2E Test Package",
+        status=PackageDefinitionStatus.PUBLISHED,
+        entitlement_type=entitlement_type,
+        total_sessions=total_sessions,
+        shareability=Shareability.OWNER_ONLY,
+        validity_days=365,
+        auto_apply=True,
+        cancellation_fee_pct=Decimal("20.00"),
+        created_by_user_id=test_user.id,
+    )
+    db_session.add(defn)
+    db_session.flush()
+
+    defn_item_a = PackageDefinitionItem(
+        package_definition_id=defn.id,
+        service_id=svc_a.id,
+        quantity=1,
+        unit_price_paise=svc_a.base_price,
+        locked=False,
+        display_order=0,
+        max_redemptions=svc_a_max_redemptions,
+    )
+    defn_item_b = PackageDefinitionItem(
+        package_definition_id=defn.id,
+        service_id=svc_b.id,
+        quantity=1,
+        unit_price_paise=svc_b.base_price,
+        locked=False,
+        display_order=1,
+        max_redemptions=svc_b_max_redemptions,
+    )
+    db_session.add_all([defn_item_a, defn_item_b])
+    db_session.flush()
+
+    # --- Bill for the sale ---
+    sale_bill = Bill(
+        customer_id=customer.id,
+        subtotal=svc_a.base_price + svc_b.base_price,
+        discount_amount=0,
+        tax_amount=0,
+        cgst_amount=0,
+        sgst_amount=0,
+        total_amount=svc_a.base_price + svc_b.base_price,
+        rounded_total=svc_a.base_price + svc_b.base_price,
+        rounding_adjustment=0,
+        status=BillStatus.POSTED,
+        bill_type=BillType.NORMAL,
+        created_by=test_user.id,
+    )
+    db_session.add(sale_bill)
+    db_session.flush()
+
+    # --- PackageSale ---
+    sale = PackageSale(
+        bill_id=sale_bill.id,
+        package_definition_id=defn.id,
+        customer_id=customer.id,
+        sold_at=datetime.now(timezone.utc),
+        expires_at=datetime.now(timezone.utc) + timedelta(days=365),
+        entitlement_type_snapshot=entitlement_type,
+        shareability_snapshot=Shareability.OWNER_ONLY,
+        cancellation_fee_pct_snapshot=Decimal("20.00"),
+        total_sessions_snapshot=total_sessions,
+        sessions_remaining=sessions_remaining,
+        status=PackageSaleStatus.ACTIVE,
+    )
+    db_session.add(sale)
+    db_session.flush()
+
+    # --- PackageSaleItems with explicit per-line caps ---
+    sale_item_a = PackageSaleItem(
+        package_sale_id=sale.id,
+        package_definition_item_id=defn_item_a.id,
+        service_id=svc_a.id,
+        quantity=1,
+        snapshot_unit_price_paise=svc_a.base_price,
+        snapshot_gst_rate_pct=Decimal("18.00"),
+        locked=False,
+        display_order=0,
+        max_redemptions=svc_a_max_redemptions,
+        remaining=svc_a_max_redemptions,  # None if uncapped
+    )
+    sale_item_b = PackageSaleItem(
+        package_sale_id=sale.id,
+        package_definition_item_id=defn_item_b.id,
+        service_id=svc_b.id,
+        quantity=1,
+        snapshot_unit_price_paise=svc_b.base_price,
+        snapshot_gst_rate_pct=Decimal("18.00"),
+        locked=False,
+        display_order=1,
+        max_redemptions=svc_b_max_redemptions,
+        remaining=svc_b_max_redemptions,  # None if uncapped
+    )
+    db_session.add_all([sale_item_a, sale_item_b])
+    db_session.flush()
+
+    db_session.refresh(sale)
+    return sale, sale_item_a, sale_item_b
+
+
+# ---------------------------------------------------------------------------
+# E2E Scenario 1: "Salon Royal Pass" — 12-session COUNTED + per-line cap
+# ---------------------------------------------------------------------------
+
+def test_e2e_salon_royal_pass_per_line_cap_lifecycle(
+    db_session, service_factory, customer_factory, test_user,
+):
+    """E2E: COUNTED package with total_sessions=12.
+
+    svc_a has max_redemptions=3 (premium add-on, capped at 3 uses).
+    svc_b has max_redemptions=None (uncapped).
+
+    Verifies:
+    - Sale snapshot fields are correct.
+    - svc_a can be redeemed 3 times (remaining 3→2→1→0).
+    - 4th redemption of svc_a raises ValueError (per-line cap exhausted).
+    - sessions_remaining decrements by 1 for each valid redemption.
+    - svc_b remains eligible while global sessions remain.
+    - svc_b is NOT eligible after package status is flipped to EXHAUSTED.
+    """
+    svc_a = service_factory(name="Premium Add-on", base_price=80000)
+    svc_b = service_factory(name="Regular Service", base_price=50000)
+    customer = customer_factory()
+
+    sale, sale_item_a, sale_item_b = _build_sale_with_caps(
+        db_session=db_session,
+        test_user=test_user,
+        customer=customer,
+        svc_a=svc_a,
+        svc_b=svc_b,
+        entitlement_type=EntitlementType.COUNTED,
+        total_sessions=12,
+        sessions_remaining=12,
+        svc_a_max_redemptions=3,
+        svc_b_max_redemptions=None,
+    )
+
+    # --- Step 3/4: Verify sale-time snapshots ---
+    assert sale_item_a.max_redemptions == 3
+    assert sale_item_a.remaining == 3
+    assert sale_item_b.max_redemptions is None
+    assert sale_item_b.remaining is None
+
+    # --- Step 5: Redeem svc_a 3 times, check remaining goes 3→2→1→0 ---
+    for expected_remaining_after in (2, 1, 0):
+        bi = _make_bill_item_for_service(db_session, customer, svc_a, test_user)
+        apply_redemption(db_session, sale.id, bi.id, customer.id, test_user.id)
+        db_session.flush()
+        db_session.refresh(sale_item_a)
+        assert sale_item_a.remaining == expected_remaining_after
+
+    # Sessions should have decremented by 3 (12 → 9)
+    db_session.refresh(sale)
+    assert sale.sessions_remaining == 9
+    assert sale.status == PackageSaleStatus.ACTIVE
+
+    # --- Step 6: 4th redemption of svc_a must raise ValueError ---
+    bi_over = _make_bill_item_for_service(db_session, customer, svc_a, test_user)
+    with pytest.raises(ValueError, match="cap exhausted"):
+        apply_redemption(db_session, sale.id, bi_over.id, customer.id, test_user.id)
+
+    # sessions_remaining must be unchanged after the failed attempt
+    db_session.refresh(sale)
+    assert sale.sessions_remaining == 9
+
+    # --- Step 7: svc_b is still redeemable (not capped) ---
+    eligible_b = find_eligible_packages(customer.id, svc_b.id, db_session)
+    assert any(e.id == sale.id for e in eligible_b), (
+        "svc_b should still be eligible — it is uncapped and global sessions remain"
+    )
+
+    # --- Step 8: exhaust global sessions (9 remaining, redeem svc_b 9 times) ---
+    for _ in range(9):
+        bi_b = _make_bill_item_for_service(db_session, customer, svc_b, test_user)
+        apply_redemption(db_session, sale.id, bi_b.id, customer.id, test_user.id)
+        db_session.flush()
+
+    db_session.refresh(sale)
+    assert sale.sessions_remaining == 0
+    assert sale.status == PackageSaleStatus.EXHAUSTED
+
+    # svc_b must no longer appear in eligibility — package is exhausted
+    eligible_b_after = find_eligible_packages(customer.id, svc_b.id, db_session)
+    assert all(e.id != sale.id for e in eligible_b_after), (
+        "Exhausted package must not appear in eligibility results"
+    )
+
+
+# ---------------------------------------------------------------------------
+# E2E Scenario 2: "Glow & Refresh" — UNLIMITED + partial per-line cap
+# ---------------------------------------------------------------------------
+
+def test_e2e_glow_and_refresh_unlimited_with_per_line_cap(
+    db_session, service_factory, customer_factory, test_user,
+):
+    """E2E: UNLIMITED package with per-line cap on one service.
+
+    svc_facial has max_redemptions=2 (only 2 facials allowed per package).
+    svc_massage has max_redemptions=None (unlimited massages).
+
+    Verifies:
+    - svc_facial can be redeemed exactly 2 times (remaining 2→1→0).
+    - 3rd redemption of svc_facial raises ValueError.
+    - svc_massage remains redeemable after both svc_facial exhaustions.
+    """
+    svc_facial = service_factory(name="Facial", base_price=120000)
+    svc_massage = service_factory(name="Massage", base_price=90000)
+    customer = customer_factory()
+
+    sale, sale_item_facial, sale_item_massage = _build_sale_with_caps(
+        db_session=db_session,
+        test_user=test_user,
+        customer=customer,
+        svc_a=svc_facial,
+        svc_b=svc_massage,
+        entitlement_type=EntitlementType.UNLIMITED,
+        total_sessions=None,
+        sessions_remaining=None,
+        svc_a_max_redemptions=2,
+        svc_b_max_redemptions=None,
+    )
+
+    # Verify snapshot fields
+    assert sale_item_facial.max_redemptions == 2
+    assert sale_item_facial.remaining == 2
+    assert sale_item_massage.max_redemptions is None
+    assert sale_item_massage.remaining is None
+    assert sale.entitlement_type_snapshot == EntitlementType.UNLIMITED
+    assert sale.sessions_remaining is None
+
+    # --- Step 2: Redeem svc_facial twice (remaining 2→1→0) ---
+    for expected_remaining_after in (1, 0):
+        bi = _make_bill_item_for_service(db_session, customer, svc_facial, test_user)
+        apply_redemption(db_session, sale.id, bi.id, customer.id, test_user.id)
+        db_session.flush()
+        db_session.refresh(sale_item_facial)
+        assert sale_item_facial.remaining == expected_remaining_after
+
+    # Package status must still be ACTIVE (UNLIMITED packages are never EXHAUSTED via sessions)
+    db_session.refresh(sale)
+    assert sale.status == PackageSaleStatus.ACTIVE
+
+    # --- Step 3: 3rd redemption of svc_facial must raise ValueError ---
+    bi_over = _make_bill_item_for_service(db_session, customer, svc_facial, test_user)
+    with pytest.raises(ValueError, match="cap exhausted"):
+        apply_redemption(db_session, sale.id, bi_over.id, customer.id, test_user.id)
+
+    # --- Step 4: svc_massage is still redeemable after both svc_facial exhaustions ---
+    eligible_massage = find_eligible_packages(customer.id, svc_massage.id, db_session)
+    assert any(e.id == sale.id for e in eligible_massage), (
+        "svc_massage should still be eligible — its line is uncapped"
+    )
+
+    # Actually perform a massage redemption to confirm no error is raised
+    bi_massage = _make_bill_item_for_service(db_session, customer, svc_massage, test_user)
+    audit = apply_redemption(db_session, sale.id, bi_massage.id, customer.id, test_user.id)
+    db_session.flush()
+    assert audit is not None
+
+    # svc_facial must NOT appear in eligibility (per-line cap exhausted)
+    eligible_facial_after = find_eligible_packages(customer.id, svc_facial.id, db_session)
+    assert all(e.id != sale.id for e in eligible_facial_after), (
+        "svc_facial line is per-line exhausted — package must not appear for facial"
+    )
