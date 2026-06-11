@@ -86,8 +86,13 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
   // GST split-billing mode: preview math mirrors the server exactly
   const gstMode = isGstMode();
   const gstBreakdown = gstMode ? computeGstBreakdown(items, discount) : null;
-  // Total bill amount in paise (server grand total wins once bills are created)
-  const total = serverGrandTotal ?? (gstBreakdown ? gstBreakdown.grandTotal : getTotal());
+  // Live total the customer will pay — always reflects the current cart so the
+  // displayed amount can never drift from what's quoted. (The cart is visible
+  // beside the modal, so a discount can change after bills were created; the
+  // stale server bills are invalidated by the effect below so payment recreates
+  // them to match.)
+  const liveTotal = gstBreakdown ? gstBreakdown.grandTotal : getTotal();
+  const total = liveTotal;
   const totalPaid = payments.reduce((sum, p) => sum + (p.amount * 100), 0);
   const remainingPaise = Math.max(0, total - totalPaid);
   
@@ -103,6 +108,22 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
       setAmountToPay((totalPaise / 100).toString());
     }
   }, [isOpen]);
+
+  // Invalidate already-created draft bills if the cart changes (e.g. a discount
+  // is applied while the modal is open beside the cart). Otherwise payment
+  // would settle the stale bills instead of the amount now shown. Cleared bills
+  // are recreated to match the current cart on the next print/pay action.
+  useEffect(() => {
+    if (!isOpen || serverGrandTotal === null || payments.length > 0) return;
+    if (liveTotal !== serverGrandTotal) {
+      setBillId(null);
+      setGroupId(null);
+      setGroupBills([]);
+      setServerGrandTotal(null);
+      setAmountToPay((liveTotal / 100).toString());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveTotal, isOpen]);
 
   // Check for incomplete services and fetch customer pending balance when modal opens
   useEffect(() => {
