@@ -87,6 +87,76 @@ class TaxCalculator:
             "sgst": int(sgst.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
         }
 
+    # ------------------------------------------------------------------
+    # GST-mode functions (post GST registration, 2026-06).
+    # Owner-confirmed rules: services 5% exclusive, products 18% inclusive
+    # in MRP, CGST/SGST equal halves, ALL tax floors to the paise, payable
+    # floors to the rupee. Legacy methods above keep ROUND_HALF_UP so
+    # pre-registration bills remain reproducible.
+    # ------------------------------------------------------------------
+
+    @classmethod
+    def calculate_line_tax(cls, amount: int, rate_percent: int, mode: str) -> dict:
+        """Calculate per-line GST with floor rounding.
+
+        Args:
+            amount: Line total after discount, in paise.
+                - exclusive mode: the taxable base (tax added on top)
+                - inclusive mode: the customer-facing price (tax extracted)
+            rate_percent: Whole-percent GST rate (5 for services, 18 for products).
+            mode: 'exclusive' | 'inclusive' | 'none'.
+
+        Returns:
+            dict with taxable_value, cgst, sgst, total_tax, gross — all int paise.
+
+        Invariants:
+            - cgst == sgst (equal halves, each floored independently)
+            - exclusive: gross == taxable_value + cgst + sgst
+            - inclusive: taxable_value + cgst + sgst == amount == gross
+              (taxable_value absorbs the floor residue so the bill sums exactly)
+        """
+        if amount < 0:
+            raise ValueError("Amount cannot be negative")
+        if rate_percent < 0:
+            raise ValueError("Tax rate cannot be negative")
+
+        if mode == "none":
+            cgst = sgst = 0
+            taxable = gross = amount
+        elif mode == "exclusive":
+            # floor(amount * rate/2 / 100) via integer division
+            cgst = sgst = (amount * rate_percent) // 200
+            taxable = amount
+            gross = taxable + cgst + sgst
+        elif mode == "inclusive":
+            # floor(amount * rate/2 / (100 + rate)) via integer division
+            cgst = sgst = (amount * rate_percent) // (2 * (100 + rate_percent))
+            taxable = amount - cgst - sgst
+            gross = amount
+        else:
+            raise ValueError(f"Unknown tax mode: {mode!r}")
+
+        return {
+            "taxable_value": taxable,
+            "cgst": cgst,
+            "sgst": sgst,
+            "total_tax": cgst + sgst,
+            "gross": gross,
+        }
+
+    @classmethod
+    def round_down_to_rupee(cls, amount_paise: int) -> tuple[int, int]:
+        """Floor amount to the whole rupee (GST-mode payable rounding).
+
+        Returns (rounded_paise, adjustment) where adjustment <= 0 — the salon
+        always absorbs the paise; the customer is never charged extra.
+        """
+        if amount_paise < 0:
+            raise ValueError("Amount cannot be negative")
+
+        rounded = (amount_paise // 100) * 100
+        return (rounded, rounded - amount_paise)
+
     @classmethod
     def round_to_rupee(cls, amount_paise: int) -> tuple[int, int]:
         """
