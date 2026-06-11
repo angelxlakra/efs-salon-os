@@ -529,25 +529,54 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
   // await (network fetch) is no longer tied to the click gesture and gets
   // silently blocked by popup blockers — the iframe approach avoids that and
   // triggers the print dialog directly. Falls back to a new tab if blocked.
-  const printPdfBlob = (data: BlobPart) => {
-    const url = window.URL.createObjectURL(new Blob([data], { type: 'application/pdf' }));
-    const iframe = document.createElement('iframe');
-    iframe.style.position = 'fixed';
-    iframe.style.width = '0';
-    iframe.style.height = '0';
-    iframe.style.border = '0';
-    iframe.style.right = '0';
-    iframe.style.bottom = '0';
-    iframe.src = url;
-    iframe.onload = () => {
-      try {
-        iframe.contentWindow?.focus();
-        iframe.contentWindow?.print();
-      } catch {
-        window.open(url, '_blank');
-      }
-    };
-    document.body.appendChild(iframe);
+  //
+  // Returns a promise that resolves once printing finishes (or is dismissed),
+  // so callers printing multiple bills (service + product) can sequence them:
+  // two print() calls fired at once leave the browser showing only the first
+  // dialog, dropping the second bill. We wait via onafterprint with a timeout
+  // safety net.
+  const printPdfBlob = (data: BlobPart): Promise<void> => {
+    return new Promise((resolve) => {
+      const url = window.URL.createObjectURL(new Blob([data], { type: 'application/pdf' }));
+      const iframe = document.createElement('iframe');
+      iframe.style.position = 'fixed';
+      iframe.style.width = '0';
+      iframe.style.height = '0';
+      iframe.style.border = '0';
+      iframe.style.right = '0';
+      iframe.style.bottom = '0';
+      iframe.src = url;
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        // Remove the iframe and release the blob once printing is done.
+        setTimeout(() => {
+          iframe.remove();
+          window.URL.revokeObjectURL(url);
+        }, 1000);
+        resolve();
+      };
+      iframe.onload = () => {
+        const win = iframe.contentWindow;
+        if (!win) {
+          window.open(url, '_blank');
+          finish();
+          return;
+        }
+        win.onafterprint = finish;
+        try {
+          win.focus();
+          win.print();
+        } catch {
+          window.open(url, '_blank');
+          finish();
+        }
+        // Safety net if onafterprint never fires (some PDF viewers/browsers).
+        setTimeout(finish, 60000);
+      };
+      document.body.appendChild(iframe);
+    });
   };
 
   const handlePrintReceipt = async (receiptBillId?: string) => {
@@ -557,7 +586,7 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
       const response = await apiClient.get(`/pos/bills/${targetBillId}/receipt`, {
         responseType: 'blob',
       });
-      printPdfBlob(response.data);
+      await printPdfBlob(response.data);
     } catch (error) {
       console.error('Failed to download receipt', error);
       toast.error('Failed to download receipt');
