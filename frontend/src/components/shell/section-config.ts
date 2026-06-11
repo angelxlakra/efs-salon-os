@@ -92,3 +92,28 @@ export const MOBILE_TABS: ShellNavItem[] = [
   { label: "POS",          href: "/dashboard/pos",          icon: ShoppingCart },
   // "More" tab is rendered specially in BottomTabNav — opens MoreSheet, not a route.
 ];
+
+/** All nav hrefs across every section (for active-route resolution). */
+export const ALL_NAV_HREFS: string[] = SHELL_SECTIONS.flatMap((s) =>
+  s.items.map((i) => i.href),
+);
+
+/**
+ * Resolve which single nav href is "active" for a pathname.
+ *
+ * Uses the LONGEST matching prefix so nested routes don't light up their
+ * parent too — e.g. /dashboard/packages/sold activates "Sold Packages"
+ * (/dashboard/packages/sold), not also "Packages" (/dashboard/packages).
+ * Returns null when nothing matches.
+ */
+export function resolveActiveHref(
+  pathname: string,
+  hrefs: string[] = ALL_NAV_HREFS,
+): string | null {
+  if (pathname === "/dashboard") return "/dashboard";
+  const matches = hrefs.filter(
+    (h) => h !== "/dashboard" && (pathname === h || pathname.startsWith(h + "/")),
+  );
+  if (matches.length === 0) return null;
+  return matches.reduce((best, h) => (h.length > best.length ? h : best));
+}

@@ -3,16 +3,12 @@
 import * as React from "react";
 import { usePathname } from "next/navigation";
 import { NavItem } from "@/components/ui/nav-item";
-import { SHELL_SECTIONS } from "@/components/shell/section-config";
+import { SHELL_SECTIONS, resolveActiveHref } from "@/components/shell/section-config";
 import { cn } from "@/lib/utils";
-
-function isActive(itemHref: string, pathname: string): boolean {
-  if (itemHref === "/dashboard") return pathname === "/dashboard";
-  return pathname === itemHref || pathname.startsWith(itemHref + "/");
-}
 
 export function SidebarRail({ className }: { className?: string }) {
   const pathname = usePathname() ?? "/";
+  const activeHref = resolveActiveHref(pathname);
   return (
     <aside
       className={cn(
@@ -32,7 +28,7 @@ export function SidebarRail({ className }: { className?: string }) {
               label={item.label}
               href={item.href}
               icon={<Icon />}
-              active={isActive(item.href, pathname)}
+              active={item.href === activeHref}
               variant="rail"
             />
           );

@@ -3,20 +3,17 @@
 import * as React from "react";
 import { usePathname } from "next/navigation";
 import { NavItem } from "@/components/ui/nav-item";
-import { SHELL_SECTIONS } from "@/components/shell/section-config";
+import { SHELL_SECTIONS, resolveActiveHref } from "@/components/shell/section-config";
 import { cn } from "@/lib/utils";
 
 /**
  * Labelled 192px sidebar. Reads structure from `section-config.ts`.
- * Active route detection: exact match for /dashboard, prefix match for sub-routes.
+ * Active route: the single longest-matching href (see resolveActiveHref), so a
+ * nested route doesn't also highlight its parent.
  */
-function isActive(itemHref: string, pathname: string): boolean {
-  if (itemHref === "/dashboard") return pathname === "/dashboard";
-  return pathname === itemHref || pathname.startsWith(itemHref + "/");
-}
-
 export function SidebarV2({ className }: { className?: string }) {
   const pathname = usePathname() ?? "/";
+  const activeHref = resolveActiveHref(pathname);
   return (
     <aside
       className={cn(
@@ -33,6 +30,9 @@ export function SidebarV2({ className }: { className?: string }) {
         '--border-subtle':       'rgba(240,237,232,0.14)',
         '--surface-row-hover':   'rgba(255,255,255,0.10)',
         '--accent-bg-soft':      'rgba(232,201,122,0.22)',
+        // text-accent resolves through --accent-default (navy by default), so
+        // override that — otherwise the active label renders navy-on-navy.
+        '--accent-default':      '#e8c97a',
         '--accent':              '#e8c97a',
       } as React.CSSProperties}
     >
@@ -51,7 +51,7 @@ export function SidebarV2({ className }: { className?: string }) {
                   label={item.label}
                   href={item.href}
                   icon={<Icon />}
-                  active={isActive(item.href, pathname)}
+                  active={item.href === activeHref}
                 />
               );
             })}

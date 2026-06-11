@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, Filter, Download, Eye, Printer, RotateCcw, XCircle, Loader2, FileText, FileSpreadsheet, AlertTriangle } from 'lucide-react';
+import { Search, Filter, Download, Eye, Printer, RotateCcw, XCircle, Loader2, FileText, FileSpreadsheet, AlertTriangle, MoreVertical } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -131,15 +131,17 @@ export default function BillsPage() {
   };
 
   const getStatusChip = (status: string): React.ReactNode => {
+    // Solid soft tints with dark text — readable on the light bills page
+    // (the previous dark-theme tints washed out against the cream background).
     const map: Record<string, { bg: string; text: string; label: string }> = {
-      posted:   { bg: 'bg-green-950/40',  text: 'text-green-400',  label: 'Paid' },
-      draft:    { bg: 'bg-amber-950/40',  text: 'text-amber-400',  label: 'Draft' },
-      void:     { bg: 'bg-zinc-900/60',   text: 'text-text-muted', label: 'Voided' },
-      refunded: { bg: 'bg-red-950/40',    text: 'text-red-400',    label: 'Refunded' },
+      posted:   { bg: 'bg-green-100', text: 'text-green-800', label: 'Paid' },
+      draft:    { bg: 'bg-amber-100', text: 'text-amber-800', label: 'Draft' },
+      void:     { bg: 'bg-zinc-200',  text: 'text-zinc-700',  label: 'Voided' },
+      refunded: { bg: 'bg-red-100',   text: 'text-red-800',   label: 'Refunded' },
     };
-    const cfg = map[status] ?? { bg: 'bg-zinc-900/60', text: 'text-text-muted', label: status };
+    const cfg = map[status] ?? { bg: 'bg-zinc-200', text: 'text-zinc-700', label: status };
     return (
-      <span className={`text-xs px-2 py-0.5 rounded-full ${cfg.bg} ${cfg.text}`}>
+      <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full ${cfg.bg} ${cfg.text}`}>
         {cfg.label}
       </span>
     );
@@ -409,16 +411,27 @@ export default function BillsPage() {
                       Pending: {formatPrice(bill.rounded_total - bill.total_paid - (bill.write_off_amount ?? 0))}
                     </div>
                   )}
-                  {/* Row 3: status badge + View button */}
+                  {/* Row 3: status badge + quick actions */}
                   <div className="flex items-center justify-between gap-2">
                     {getStatusChip(bill.status)}
-                    <button
-                      type="button"
-                      className="text-xs text-text-secondary hover:text-text-primary transition-colors"
-                      onClick={() => handleViewBill(bill.id)}
-                    >
-                      View
-                    </button>
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        className="text-xs font-medium text-text-secondary hover:text-text-primary transition-colors inline-flex items-center gap-1"
+                        onClick={() => handleReprintReceipt(bill.id)}
+                      >
+                        <Printer className="h-3.5 w-3.5" />
+                        Reprint
+                      </button>
+                      <button
+                        type="button"
+                        className="text-xs font-medium text-text-secondary hover:text-text-primary transition-colors inline-flex items-center gap-1"
+                        onClick={() => handleViewBill(bill.id)}
+                      >
+                        <Eye className="h-3.5 w-3.5" />
+                        View
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))
@@ -481,39 +494,52 @@ export default function BillsPage() {
                       <td className="px-4 py-3 text-center">
                         {getStatusChip(bill.status)}
                       </td>
-                      <td className="px-4 py-3 text-center">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                              Actions
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleViewBill(bill.id)}>
-                              <Eye className="h-4 w-4 mr-2" />
-                              View Details
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleReprintReceipt(bill.id)}>
-                              <Printer className="h-4 w-4 mr-2" />
-                              Reprint Receipt
-                            </DropdownMenuItem>
-                            {(bill.status === 'draft' || (bill.status === 'posted' && isOwner)) && (
-                              <DropdownMenuItem
-                                onClick={() => handleVoidBill(bill.id)}
-                                className="text-destructive"
-                              >
-                                <XCircle className="h-4 w-4 mr-2" />
-                                Void Bill
-                              </DropdownMenuItem>
-                            )}
-                            {bill.status === 'posted' && (
-                              <DropdownMenuItem onClick={() => handleRefund(bill.id)}>
-                                <RotateCcw className="h-4 w-4 mr-2" />
-                                Process Refund
-                              </DropdownMenuItem>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                      <td className="px-4 py-3">
+                        {(() => {
+                          const canVoid = bill.status === 'draft' || (bill.status === 'posted' && isOwner);
+                          const canRefund = bill.status === 'posted';
+                          const hasMore = canVoid || canRefund;
+                          return (
+                            <div className="flex items-center justify-end gap-1">
+                              {/* Common actions surfaced directly */}
+                              <Button variant="ghost" size="sm" onClick={() => handleViewBill(bill.id)}>
+                                <Eye className="h-4 w-4 mr-1.5" />
+                                View
+                              </Button>
+                              <Button variant="ghost" size="sm" onClick={() => handleReprintReceipt(bill.id)}>
+                                <Printer className="h-4 w-4 mr-1.5" />
+                                Reprint
+                              </Button>
+                              {/* Less-common / destructive actions behind a 3-dot menu */}
+                              {hasMore && (
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon" aria-label="More actions">
+                                      <MoreVertical className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    {canVoid && (
+                                      <DropdownMenuItem
+                                        onClick={() => handleVoidBill(bill.id)}
+                                        className="text-destructive"
+                                      >
+                                        <XCircle className="h-4 w-4 mr-2" />
+                                        Void Bill
+                                      </DropdownMenuItem>
+                                    )}
+                                    {canRefund && (
+                                      <DropdownMenuItem onClick={() => handleRefund(bill.id)}>
+                                        <RotateCcw className="h-4 w-4 mr-2" />
+                                        Process Refund
+                                      </DropdownMenuItem>
+                                    )}
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </td>
                     </tr>
                   ))
