@@ -185,6 +185,198 @@ class BillingService:
             )
         return InvoiceNumberGenerator.generate(self.db)
 
+    def create_bill_group(self, items: List[dict], created_by_id: str, **kwargs) -> List[Bill]:
+        """Create a checkout, splitting mixed carts into service + product bills.
+
+        GST mode with both service-side and product lines → two DRAFT bills
+        sharing a bill_group_id (services tax at 5% exclusive, products at 18%
+        MRP-inclusive, each with its own invoice series at posting). Single-
+        class carts and legacy mode → one bill, exactly like create_bill.
+
+        Returns:
+            List of 1 or 2 DRAFT bills.
+        """
+        bill = self.create_bill(items=items, created_by_id=created_by_id, **kwargs)
+        sibling = self._split_bill_if_mixed(bill)
+        if sibling is None:
+            return [bill]
+        self.db.commit()
+        self.db.refresh(bill)
+        self.db.refresh(sibling)
+        return [bill, sibling]
+
+    def _split_bill_if_mixed(self, bill: Bill) -> Optional[Bill]:
+        """Move product lines off a mixed DRAFT bill onto a sibling product bill.
+
+        The original bill keeps the service-side lines (services + package
+        lines) and becomes the SERVICE bill; both share bill_group_id. The
+        bill-level discount is allocated proportionally across ALL lines first,
+        then each side keeps its share, so the customer's total discount is
+        preserved exactly. Returns the new product bill, or None if no split
+        is needed (single-class cart or GST mode off).
+        """
+        if not self._gst_mode_active() or bill.status != BillStatus.DRAFT:
+            return None
+
+        items = list(bill.items)
+        product_items = [i for i in items if i.sku_id]
+        if not product_items or len(product_items) == len(items):
+            return None
+
+        discounts = allocate_discount(
+            [i.line_total for i in items], bill.discount_amount or 0
+        )
+        prd_discount = sum(d for d, i in zip(discounts, items) if i.sku_id)
+        svc_discount = (bill.discount_amount or 0) - prd_discount
+
+        group_id = bill.id
+        bill.bill_group_id = group_id
+
+        product_bill = Bill(
+            id=str(ULID()),
+            invoice_number=None,
+            customer_id=bill.customer_id,
+            customer_name=bill.customer_name,
+            customer_phone=bill.customer_phone,
+            subtotal=sum(i.line_total for i in product_items),
+            discount_amount=prd_discount,
+            discount_reason=bill.discount_reason if prd_discount else None,
+            discount_approved_by=bill.discount_approved_by if prd_discount else None,
+            tax_amount=0,
+            cgst_amount=0,
+            sgst_amount=0,
+            total_amount=0,
+            rounded_total=0,
+            rounding_adjustment=0,
+            tip_amount=0,  # tips belong to staff → stay on the service bill
+            status=BillStatus.DRAFT,
+            created_by=bill.created_by,
+            bill_class=BillClass.PRODUCT,
+            bill_group_id=group_id,
+        )
+        self.db.add(product_bill)
+        self.db.flush()
+
+        for item in product_items:
+            item.bill_id = product_bill.id
+        self.db.flush()
+        # bill.items was loaded before the move; reload so the recompute
+        # below only sees the service-side lines
+        self.db.expire(bill, ["items"])
+
+        bill.subtotal = sum(i.line_total for i in items if not i.sku_id)
+        bill.discount_amount = svc_discount
+        self._recalculate_bill_tax(bill)
+        self._recalculate_bill_tax(product_bill)
+        self.db.flush()
+        return product_bill
+
+    def pay_bill_group(
+        self,
+        bill_group_id: str,
+        payments: List[dict],  # [{"payment_method", "amount" (rupees), ...}]
+        confirmed_by_id: str,
+    ) -> List[Payment]:
+        """Settle every DRAFT bill in a checkout group with one customer tender.
+
+        The tendered total must equal the group total exactly (totals are
+        already floored to whole rupees, so the customer pays a round figure).
+        Each tender is split across the bills service-bill-first; every bill
+        gets its own Payment rows tied together by payment_group_id. All bills
+        post atomically — invoice numbers, stock reduction, package sales and
+        customer stats happen in ONE transaction.
+
+        Raises:
+            ValueError: group not found / not draft / tender != group total.
+        """
+        bills = (
+            self.db.query(Bill)
+            .filter(
+                Bill.bill_group_id == bill_group_id,
+                Bill.status == BillStatus.DRAFT,
+            )
+            .all()
+        )
+        if not bills:
+            raise ValueError(f"No draft bills found for group {bill_group_id}")
+
+        group_total = sum(b.rounded_total for b in bills)
+        tendered = sum(p["amount"] for p in payments) * 100
+        if tendered < group_total:
+            raise ValueError(
+                f"Group checkout requires full payment. "
+                f"Due: Rs {group_total/100:.2f}, tendered: Rs {tendered/100:.2f}"
+            )
+        if tendered > group_total:
+            raise ValueError(
+                f"Tendered amount exceeds group total. "
+                f"Due: Rs {group_total/100:.2f}, tendered: Rs {tendered/100:.2f}"
+            )
+
+        # Service bill first: tips/pending conventions live there, and the
+        # allocation must be deterministic for reconciliation.
+        bills_sorted = sorted(
+            bills, key=lambda b: 0 if b.bill_class == BillClass.SERVICE else 1
+        )
+        remaining = {b.id: b.rounded_total for b in bills_sorted}
+        payment_group_id = str(ULID())
+        now = datetime.now(IST)
+        created: List[Payment] = []
+
+        bill_index = 0
+        for tender in payments:
+            amount_paise = tender["amount"] * 100
+            while amount_paise > 0 and bill_index < len(bills_sorted):
+                target = bills_sorted[bill_index]
+                take = min(amount_paise, remaining[target.id])
+                if take > 0:
+                    payment = Payment(
+                        id=str(ULID()),
+                        bill_id=target.id,
+                        payment_group_id=payment_group_id,
+                        payment_method=tender["payment_method"],
+                        amount=take,
+                        confirmed_at=now,
+                        confirmed_by=confirmed_by_id,
+                        reference_number=tender.get("reference_number"),
+                        notes=tender.get("notes"),
+                    )
+                    self.db.add(payment)
+                    created.append(payment)
+                    remaining[target.id] -= take
+                    amount_paise -= take
+                if remaining[target.id] == 0:
+                    bill_index += 1
+
+        # Post every bill in the group (one transaction — all or nothing)
+        inventory_service = InventoryService(self.db)
+        for bill in bills_sorted:
+            if not bill.invoice_number:
+                bill.invoice_number = self._generate_invoice_number(bill)
+            bill.status = BillStatus.POSTED
+            bill.posted_at = now
+
+            for item in bill.items:
+                if item.sku_id:
+                    inventory_service.reduce_stock_for_sale(
+                        sku_id=item.sku_id,
+                        quantity=item.quantity,
+                        bill_id=bill.id,
+                        user_id=confirmed_by_id,
+                    )
+
+            self._create_package_sales_for_bill(bill, confirmed_by_id)
+
+            if bill.customer_id:
+                self._update_customer_stats(
+                    bill.customer_id, bill.rounded_total, increment=True
+                )
+
+        self.db.commit()
+        for payment in created:
+            self.db.refresh(payment)
+        return created
+
     def create_bill(
         self,
         items: List[dict],  # [{"service_id": str, ...} OR {"sku_id": str, ...}]

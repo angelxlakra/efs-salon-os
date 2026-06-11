@@ -219,6 +219,131 @@ class TestGstModeProductBill:
         assert item.taxable_value == 100000
 
 
+class TestBillGroupSplit:
+    """Phase 5: mixed cart → service bill + product bill, one payment."""
+
+    def _mixed_group(self, db_session, gst_service, sellable_sku, gst_user, **kw):
+        svc = BillingService(db_session)
+        return svc, svc.create_bill_group(
+            items=[
+                {"service_id": gst_service.id, "quantity": 1},
+                {"sku_id": sellable_sku.id, "quantity": 1},
+            ],
+            created_by_id=gst_user.id,
+            customer_name="GST Customer",
+            **kw,
+        )
+
+    def test_mixed_cart_splits_into_two_bills(
+        self, db_session, gst_on, gst_service, sellable_sku, gst_user
+    ):
+        _, bills = self._mixed_group(db_session, gst_service, sellable_sku, gst_user)
+        assert len(bills) == 2
+        service_bill = next(b for b in bills if b.bill_class == BillClass.SERVICE)
+        product_bill = next(b for b in bills if b.bill_class == BillClass.PRODUCT)
+
+        assert service_bill.bill_group_id == product_bill.bill_group_id
+        assert service_bill.bill_group_id is not None
+
+        # service side: 50000 + 5% = 52500
+        assert service_bill.subtotal == 50000
+        assert service_bill.cgst_amount == service_bill.sgst_amount == 1250
+        assert service_bill.total_amount == 52500
+        # product side: MRP 118000, tax extracted
+        assert product_bill.subtotal == 118000
+        assert product_bill.cgst_amount == product_bill.sgst_amount == 9000
+        assert product_bill.total_amount == 118000
+
+        # lines landed on the right bills
+        assert all(not i.sku_id for i in service_bill.items)
+        assert all(i.sku_id for i in product_bill.items)
+
+    def test_discount_splits_proportionally(
+        self, db_session, gst_on, gst_service, sellable_sku, gst_user
+    ):
+        # 16800 over lines 50000:118000 → floor-proportional 5000 / 11800
+        _, bills = self._mixed_group(
+            db_session, gst_service, sellable_sku, gst_user,
+            discount_amount=16800,
+        )
+        service_bill = next(b for b in bills if b.bill_class == BillClass.SERVICE)
+        product_bill = next(b for b in bills if b.bill_class == BillClass.PRODUCT)
+        assert service_bill.discount_amount + product_bill.discount_amount == 16800
+        assert service_bill.discount_amount == 5000
+        assert product_bill.discount_amount == 11800
+
+    def test_single_side_cart_stays_one_bill(
+        self, db_session, gst_on, gst_service, gst_user
+    ):
+        svc = BillingService(db_session)
+        bills = svc.create_bill_group(
+            items=[{"service_id": gst_service.id, "quantity": 1}],
+            created_by_id=gst_user.id,
+            customer_name="GST Customer",
+        )
+        assert len(bills) == 1
+        assert bills[0].bill_class == BillClass.SERVICE
+
+    def test_pay_bill_group_posts_both_with_split_payment(
+        self, db_session, gst_on, gst_service, sellable_sku, gst_user
+    ):
+        svc, bills = self._mixed_group(db_session, gst_service, sellable_sku, gst_user)
+        group_id = bills[0].bill_group_id
+        group_total = sum(b.rounded_total for b in bills)  # 52500 + 118000
+
+        payments = svc.pay_bill_group(
+            bill_group_id=group_id,
+            payments=[{"payment_method": PaymentMethod.UPI,
+                       "amount": group_total // 100}],
+            confirmed_by_id=gst_user.id,
+        )
+
+        for b in bills:
+            db_session.refresh(b)
+        service_bill = next(b for b in bills if b.bill_class == BillClass.SERVICE)
+        product_bill = next(b for b in bills if b.bill_class == BillClass.PRODUCT)
+
+        assert service_bill.status == BillStatus.POSTED
+        assert product_bill.status == BillStatus.POSTED
+        assert service_bill.invoice_number.startswith("SRV-")
+        assert product_bill.invoice_number.startswith("PRD-")
+
+        # one tender split into one payment per bill, linked by group id
+        assert len(payments) == 2
+        assert len({p.payment_group_id for p in payments}) == 1
+        assert payments[0].payment_group_id is not None
+        assert sum(p.amount for p in payments) == group_total
+        by_bill = {p.bill_id: p.amount for p in payments}
+        assert by_bill[service_bill.id] == service_bill.rounded_total
+        assert by_bill[product_bill.id] == product_bill.rounded_total
+
+    def test_pay_bill_group_rejects_underpayment(
+        self, db_session, gst_on, gst_service, sellable_sku, gst_user
+    ):
+        svc, bills = self._mixed_group(db_session, gst_service, sellable_sku, gst_user)
+        with pytest.raises(ValueError, match="full payment"):
+            svc.pay_bill_group(
+                bill_group_id=bills[0].bill_group_id,
+                payments=[{"payment_method": PaymentMethod.CASH, "amount": 100}],
+                confirmed_by_id=gst_user.id,
+            )
+
+    def test_pay_bill_group_reduces_product_stock(
+        self, db_session, gst_on, gst_service, sellable_sku, gst_user
+    ):
+        svc, bills = self._mixed_group(db_session, gst_service, sellable_sku, gst_user)
+        stock_before = sellable_sku.current_stock
+        group_total = sum(b.rounded_total for b in bills)
+        svc.pay_bill_group(
+            bill_group_id=bills[0].bill_group_id,
+            payments=[{"payment_method": PaymentMethod.CASH,
+                       "amount": group_total // 100}],
+            confirmed_by_id=gst_user.id,
+        )
+        db_session.refresh(sellable_sku)
+        assert sellable_sku.current_stock == stock_before - 1
+
+
 @pytest.fixture
 def gst_off(db_session):
     """Force GST mode off (a prior test's commit may have left it on)."""
@@ -253,8 +378,9 @@ class TestLegacyModeUnchanged:
 
 class TestInvoiceSeries:
     def test_generator_accepts_prefix(self, db_session):
-        n = InvoiceNumberGenerator.generate(db_session, prefix="SRV", lock_id=987124)
-        assert n.startswith("SRV-")
+        # dedicated prefix: other tests in this file commit SRV invoices
+        n = InvoiceNumberGenerator.generate(db_session, prefix="TSX", lock_id=987226)
+        assert n.startswith("TSX-")
         assert n.endswith("-0001")
 
     def test_series_are_independent(self, db_session):
