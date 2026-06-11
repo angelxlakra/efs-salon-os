@@ -20,7 +20,7 @@
       4. Update customer statistics
 """
 
-from datetime import datetime
+from datetime import datetime, date
 from typing import List, Optional
 
 from sqlalchemy import func
@@ -72,14 +72,28 @@ class BillingService:
     SERVICE_GST_RATE = 5    # exclusive: added on top of discounted base
     PRODUCT_GST_RATE = 18   # inclusive: extracted from discounted MRP
 
+    @staticmethod
+    def _effective_date(settings) -> Optional[date]:
+        """GST effective date as a date.
+
+        Settings can come from the Redis cache, where to_dict() serialized the
+        date to an ISO string and SalonSettings(**cached) rebuilt it as a str.
+        Normalize so date comparisons never raise.
+        """
+        eff = settings.gst_effective_from
+        if isinstance(eff, str):
+            return date.fromisoformat(eff) if eff else None
+        return eff
+
     def _gst_mode_active(self) -> bool:
         """True when the salon is GST-registered and past the effective date."""
         from app.services.settings_service import SettingsService
 
         settings = SettingsService.get_or_create_settings(self.db)
-        if not settings.gst_registered or not settings.gst_effective_from:
+        eff = self._effective_date(settings)
+        if not settings.gst_registered or not eff:
             return False
-        return datetime.now(IST).date() >= settings.gst_effective_from
+        return datetime.now(IST).date() >= eff
 
     def _gst_mode_for_bill(self, bill: Bill) -> bool:
         """Whether a specific bill uses the GST scheme.
@@ -95,13 +109,14 @@ class BillingService:
         from app.services.settings_service import SettingsService
 
         settings = SettingsService.get_or_create_settings(self.db)
-        if not settings.gst_registered or not settings.gst_effective_from:
+        eff = self._effective_date(settings)
+        if not settings.gst_registered or not eff:
             return False
         bill_date = (
             bill.created_at.astimezone(IST).date()
             if bill.created_at else datetime.now(IST).date()
         )
-        return bill_date >= settings.gst_effective_from
+        return bill_date >= eff
 
     @staticmethod
     def _line_tax_params(item: BillItem) -> tuple[int, str]:

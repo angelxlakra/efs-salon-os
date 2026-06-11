@@ -376,6 +376,31 @@ class TestBillGroupSplit:
         assert sellable_sku.current_stock == stock_before - 1
 
 
+class TestEffectiveDateNormalization:
+    """Regression: settings loaded from the Redis cache carry gst_effective_from
+    as an ISO string (to_dict serialized it), which crashed the date comparison
+    in _gst_mode_active with TypeError — every GST bill creation 500'd."""
+
+    def _settings(self, value):
+        class _S:
+            gst_registered = True
+            gst_effective_from = value
+        return _S()
+
+    def test_string_date_normalized(self):
+        assert BillingService._effective_date(
+            self._settings("2026-06-12")
+        ) == date(2026, 6, 12)
+
+    def test_real_date_passthrough(self):
+        d = date(2026, 6, 12)
+        assert BillingService._effective_date(self._settings(d)) == d
+
+    def test_none_and_empty(self):
+        assert BillingService._effective_date(self._settings(None)) is None
+        assert BillingService._effective_date(self._settings("")) is None
+
+
 class TestLegacyBillsNotRetroTaxed:
     """Regression (review C1): editing a pre-registration legacy bill after
     GST is enabled must NOT re-tax it or reclassify its invoice series."""
