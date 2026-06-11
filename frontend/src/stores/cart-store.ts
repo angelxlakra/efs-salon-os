@@ -59,6 +59,127 @@ export interface CartState {
   getUnbookedItems: () => CartItem[];
 }
 
+// ---------------------------------------------------------------------------
+// GST split-billing preview math (must match backend tax_calculator EXACTLY:
+// integer arithmetic with floor; payable per bill floors to whole rupee).
+// Used only when settings.gst_registered is true; legacy totals untouched.
+// ---------------------------------------------------------------------------
+
+export interface GstSectionTotals {
+  items: CartItem[];
+  subtotal: number; // gross (before any discount), paise
+  discount: number; // item discounts + allocated share of bill discount, paise
+  cgst: number; // paise
+  sgst: number; // paise
+  total: number; // customer pays for this bill, floored to whole rupee, paise
+}
+
+export interface GstCartBreakdown {
+  serviceSection: GstSectionTotals;
+  productSection: GstSectionTotals;
+  grandTotal: number; // sum of per-bill totals, paise
+}
+
+const floorToRupee = (paise: number) => Math.floor(paise / 100) * 100;
+
+/**
+ * Compute the GST-mode cart preview: services at 5% exclusive (added on top),
+ * products at 18% inclusive (extracted from MRP). The bill-level discount is
+ * allocated proportionally across ALL lines (floor per line, remainder one
+ * paise at a time to largest lines first, ties by position).
+ */
+export function computeGstBreakdown(
+  items: CartItem[],
+  globalDiscount: number
+): GstCartBreakdown {
+  const lines = items.map((item) => {
+    const gross = item.unitPrice * item.quantity;
+    const itemDiscount = item.discount * item.quantity;
+    return {
+      item,
+      gross,
+      itemDiscount,
+      base: gross - itemDiscount, // line total before bill-level discount
+      alloc: 0, // allocated share of bill-level discount
+    };
+  });
+
+  // Proportional allocation of the bill-level discount across ALL lines
+  const totalBase = lines.reduce((sum, l) => sum + l.base, 0);
+  if (globalDiscount > 0 && totalBase > 0) {
+    let allocated = 0;
+    for (const line of lines) {
+      line.alloc = Math.floor((line.base * globalDiscount) / totalBase);
+      allocated += line.alloc;
+    }
+    // Remainder: one paise at a time to largest lines first (ties by position)
+    let remainder = globalDiscount - allocated;
+    const order = lines
+      .map((_, i) => i)
+      .sort((a, b) => lines[b].base - lines[a].base || a - b);
+    for (let i = 0; remainder > 0 && order.length > 0; i++) {
+      lines[order[i % order.length]].alloc += 1;
+      remainder -= 1;
+    }
+  }
+
+  const makeSection = (): Omit<GstSectionTotals, 'total'> & { pays: number } => ({
+    items: [],
+    subtotal: 0,
+    discount: 0,
+    cgst: 0,
+    sgst: 0,
+    pays: 0,
+  });
+  const service = makeSection();
+  const product = makeSection();
+
+  for (const line of lines) {
+    const amountAfterDiscount = line.base - line.alloc;
+    const section = line.item.isProduct ? product : service;
+    section.items.push(line.item);
+    section.subtotal += line.gross;
+    section.discount += line.itemDiscount + line.alloc;
+
+    if (line.item.isProduct) {
+      // 18% inclusive in MRP: extract tax from the discounted price
+      const half = Math.floor((amountAfterDiscount * 18) / 236);
+      section.cgst += half;
+      section.sgst += half;
+      section.pays += amountAfterDiscount; // customer pays the (discounted) MRP
+    } else {
+      // 5% exclusive: added on top of the discounted base
+      const half = Math.floor((amountAfterDiscount * 5) / 200);
+      section.cgst += half;
+      section.sgst += half;
+      section.pays += amountAfterDiscount + half + half;
+    }
+  }
+
+  const serviceSection: GstSectionTotals = {
+    items: service.items,
+    subtotal: service.subtotal,
+    discount: service.discount,
+    cgst: service.cgst,
+    sgst: service.sgst,
+    total: service.items.length > 0 ? floorToRupee(service.pays) : 0,
+  };
+  const productSection: GstSectionTotals = {
+    items: product.items,
+    subtotal: product.subtotal,
+    discount: product.discount,
+    cgst: product.cgst,
+    sgst: product.sgst,
+    total: product.items.length > 0 ? floorToRupee(product.pays) : 0,
+  };
+
+  return {
+    serviceSection,
+    productSection,
+    grandTotal: serviceSection.total + productSection.total,
+  };
+}
+
 export const useCartStore = create<CartState>((set, get) => ({
   items: [],
   customerId: null,

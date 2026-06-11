@@ -14,6 +14,12 @@ interface SalonSettings {
   contact_website: string | null;
   gstin: string | null;
   pan: string | null;
+  gst_registered: boolean;
+  gst_effective_from: string | null;
+  invoice_prefix_service: string;
+  invoice_prefix_product: string;
+  default_service_sac_code: string | null;
+  default_product_hsn_code: string | null;
   receipt_header_text: string | null;
   receipt_footer_text: string | null;
   receipt_show_gstin: boolean;
@@ -30,6 +36,7 @@ interface SettingsStore {
   settings: SalonSettings | null;
   isLoading: boolean;
   hasGST: () => boolean;
+  isGstMode: () => boolean;
   fetchSettings: () => Promise<void>;
 }
 
@@ -40,6 +47,11 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   hasGST: () => {
     const settings = get().settings;
     return !!(settings?.gstin && settings.gstin.trim().length > 0);
+  },
+
+  // GST split-billing mode (date check enforced server-side)
+  isGstMode: () => {
+    return !!get().settings?.gst_registered;
   },
 
   fetchSettings: async () => {
