@@ -234,13 +234,12 @@ class ReceiptService:
 
         # ==================== INVOICE INFO ====================
 
+        # Always a clean customer-facing title — no internal "draft" wording.
+        # A pre-payment bill is still titled TAX INVOICE; it simply has no
+        # invoice number until the sale is posted (the number row is omitted
+        # below until then).
         if is_gst_bill:
-            if bill.status.value != "posted":
-                invoice_label = "DRAFT BILL"
-            elif is_credit_note:
-                invoice_label = "CREDIT NOTE"
-            else:
-                invoice_label = "TAX INVOICE"
+            invoice_label = "CREDIT NOTE" if is_credit_note else "TAX INVOICE"
             # Document title — centered and prominent (Rule 46)
             doc_title_style = ParagraphStyle(
                 'DocTitle',
@@ -253,8 +252,7 @@ class ReceiptService:
             elements.append(Paragraph(invoice_label, doc_title_style))
             elements.append(Spacer(1, 1 * mm))
         else:
-            invoice_label = "INVOICE" if bill.status.value == "posted" else "DRAFT BILL"
-        invoice_number = bill.invoice_number or "DRAFT"
+            invoice_label = "INVOICE"
 
         # Convert to IST for display (handle both timezone-aware and naive datetimes)
         if bill.created_at.tzinfo is None:
@@ -266,12 +264,15 @@ class ReceiptService:
 
         invoice_date = bill_time_ist.strftime("%d/%m/%Y %I:%M %p")
 
-        # Create clean invoice info table
+        # Create clean invoice info table. The invoice-number row is shown only
+        # once a number has been assigned (at posting) — a pre-payment bill
+        # carries no number rather than an internal "#DRAFT" placeholder.
         invoice_data = []
-        invoice_data.append([
-            Paragraph("Invoice No:" if is_gst_bill else invoice_label, invoice_label_style),
-            Paragraph(f"<b>#{invoice_number}</b>", ParagraphStyle('InvNum', parent=styles['Normal'], fontSize=9, alignment=TA_RIGHT))
-        ])
+        if bill.invoice_number:
+            invoice_data.append([
+                Paragraph("Invoice No:" if is_gst_bill else invoice_label, invoice_label_style),
+                Paragraph(f"<b>#{bill.invoice_number}</b>", ParagraphStyle('InvNum', parent=styles['Normal'], fontSize=9, alignment=TA_RIGHT))
+            ])
         if is_gst_bill and is_credit_note and bill.original_bill and bill.original_bill.invoice_number:
             invoice_data.append([
                 Paragraph("Against Invoice:", ParagraphStyle('Label', parent=styles['Normal'], fontSize=8)),

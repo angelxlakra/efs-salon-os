@@ -174,9 +174,12 @@ def test_draft_bill_prints_without_payment(db_session, gst_settings, test_user, 
     assert "Haircut" in text
     assert "CGST @ 2.5%" in text
     assert "TOTAL" in text
-    # ...but no payment section and not yet a final tax invoice
-    assert "DRAFT BILL" in text
-    assert "TAX INVOICE" not in text
+    # Professional, customer-facing: titled TAX INVOICE with no internal
+    # "draft" wording and no placeholder invoice number...
+    assert "TAX INVOICE" in text
+    assert "DRAFT" not in text
+    assert "Invoice No" not in text  # no number until the sale is posted
+    # ...and no payment details until paid
     assert "Payment Method" not in text
     assert "PENDING" not in text
 

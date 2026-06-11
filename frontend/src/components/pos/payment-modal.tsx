@@ -504,6 +504,31 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
     }
   };
 
+  // Print a PDF blob via a hidden iframe. window.open() called after an
+  // await (network fetch) is no longer tied to the click gesture and gets
+  // silently blocked by popup blockers — the iframe approach avoids that and
+  // triggers the print dialog directly. Falls back to a new tab if blocked.
+  const printPdfBlob = (data: BlobPart) => {
+    const url = window.URL.createObjectURL(new Blob([data], { type: 'application/pdf' }));
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.src = url;
+    iframe.onload = () => {
+      try {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+      } catch {
+        window.open(url, '_blank');
+      }
+    };
+    document.body.appendChild(iframe);
+  };
+
   const handlePrintReceipt = async (receiptBillId?: string) => {
     const targetBillId = receiptBillId || billId;
     if (!targetBillId) return;
@@ -511,8 +536,7 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
       const response = await apiClient.get(`/pos/bills/${targetBillId}/receipt`, {
         responseType: 'blob',
       });
-      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
-      window.open(url, '_blank');
+      printPdfBlob(response.data);
     } catch (error) {
       console.error('Failed to download receipt', error);
       toast.error('Failed to download receipt');
