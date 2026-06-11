@@ -120,8 +120,12 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
   // is applied while the modal is open beside the cart). Otherwise payment
   // would settle the stale bills instead of the amount now shown. Cleared bills
   // are recreated to match the current cart on the next print/pay action.
+  //
+  // Only while still composing the payment (status 'idle'): after payment the
+  // cart is cleared, which would otherwise wipe the bill IDs needed to print
+  // the receipt from the success view.
   useEffect(() => {
-    if (!isOpen || serverGrandTotal === null || payments.length > 0) return;
+    if (!isOpen || status !== 'idle' || serverGrandTotal === null || payments.length > 0) return;
     if (liveTotal !== serverGrandTotal) {
       setBillId(null);
       setGroupId(null);
