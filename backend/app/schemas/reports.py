@@ -263,6 +263,15 @@ class TaxReportEntry(BaseModel):
         return self.total_tax / 100.0
 
 
+class TaxRateBreakdown(BaseModel):
+    """Per-rate slab totals for GSTR filing (computed from bill line items)."""
+    tax_rate: int = Field(..., description="GST rate in whole percent (5/18)")
+    taxable_value: int = Field(..., description="Taxable value (paise)")
+    cgst_amount: int = Field(..., description="CGST collected (paise)")
+    sgst_amount: int = Field(..., description="SGST collected (paise)")
+    total_tax: int = Field(..., description="CGST + SGST (paise)")
+
+
 class TaxReportResponse(BaseModel):
     """GST tax report for compliance."""
     period_start: date
@@ -281,6 +290,10 @@ class TaxReportResponse(BaseModel):
 
     # Detailed breakdown
     entries: List[TaxReportEntry] = Field(default_factory=list)
+
+    # Per-rate slab breakdown (5% services / 18% products); empty before
+    # GST registration mode is enabled
+    rate_breakdown: List[TaxRateBreakdown] = Field(default_factory=list)
 
     # Generation metadata
     generated_at: datetime

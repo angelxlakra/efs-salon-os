@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, or_
 
 from app.models.accounting import DaySummary, CashDrawer
-from app.models.billing import Bill, BillItem, BillStatus, Payment, PaymentMethod
+from app.models.billing import Bill, BillClass, BillItem, BillStatus, Payment, PaymentMethod
 from app.models.expense import Expense, ExpenseStatus
 from app.models.appointment import Appointment, WalkIn, AppointmentStatus
 from app.models.service import Service
@@ -840,12 +840,55 @@ class AccountingService:
         total_tax = total_cgst + total_sgst
         total_gross_amount = total_taxable_amount + total_tax
 
+        # Per-rate slab breakdown (GSTR filing needs taxable value + CGST +
+        # SGST per rate). Computed from per-line tax columns of POSTED
+        # GST-classed bills; legacy zero-tax bills and refunded originals are
+        # excluded (a fully refunded sale nets to zero, and credit notes carry
+        # no line items).
+        ist_start = datetime.combine(start_date, time.min).replace(tzinfo=IST)
+        ist_end = datetime.combine(end_date, time.max).replace(tzinfo=IST)
+        rate_rows = (
+            self.db.query(
+                BillItem.tax_rate,
+                func.sum(BillItem.taxable_value).label("taxable_value"),
+                func.sum(BillItem.cgst_amount).label("cgst_amount"),
+                func.sum(BillItem.sgst_amount).label("sgst_amount"),
+            )
+            .join(Bill, Bill.id == BillItem.bill_id)
+            .filter(
+                Bill.status == BillStatus.POSTED,
+                Bill.bill_class.in_([BillClass.SERVICE, BillClass.PRODUCT]),
+                Bill.posted_at >= ist_start,
+                Bill.posted_at <= ist_end,
+                BillItem.tax_rate > 0,
+            )
+            .group_by(BillItem.tax_rate)
+            .order_by(BillItem.tax_rate)
+            .all()
+        )
+        rate_breakdown = [
+            {
+                "tax_rate": row.tax_rate,
+                "taxable_value": int(row.taxable_value or 0),
+                "cgst_amount": int(row.cgst_amount or 0),
+                "sgst_amount": int(row.sgst_amount or 0),
+                "total_tax": int((row.cgst_amount or 0) + (row.sgst_amount or 0)),
+            }
+            for row in rate_rows
+        ]
+
+        # Business identity from DB settings (operator-managed), falling back
+        # to env config for installs that never saved settings.
+        from app.services.settings_service import SettingsService
+        salon = SettingsService.get_or_create_settings(self.db)
+
         return {
+            "rate_breakdown": rate_breakdown,
             "period_start": start_date,
             "period_end": end_date,
-            "gstin": settings.gstin,
-            "salon_name": settings.salon_name,
-            "salon_address": settings.salon_address,
+            "gstin": salon.gstin or settings.gstin,
+            "salon_name": salon.salon_name or settings.salon_name,
+            "salon_address": salon.salon_address or settings.salon_address,
             "total_bills": total_bills,
             "total_taxable_amount": total_taxable_amount,
             "total_cgst": total_cgst,
