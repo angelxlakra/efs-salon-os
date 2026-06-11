@@ -4,6 +4,12 @@
 
 Models for bills, line items, and payments.
 
+> **GST split billing**: when the salon is GST-registered, `Bill.bill_class`
+> (`service`/`product`/`mixed_legacy`) + `bill_group_id` split a mixed cart into
+> two bills, `BillItem` carries per-line tax (`tax_rate`, `tax_mode`,
+> `taxable_value`, `cgst_amount`, `sgst_amount`), and `Payment.payment_group_id`
+> links the split tender. See [GST Split Billing](../features/11-gst-billing.md).
+
 ---
 
 ## PaymentMethod

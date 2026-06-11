@@ -457,6 +457,22 @@ EOF
 
 ---
 
+## 🧾 Enabling GST (when the salon registers)
+
+When the client obtains GST registration, activate dual-rate split billing
+(see [GST Split Billing](../features/11-gst-billing.md) for the full scheme):
+
+1. Update and run migrations: `docker compose exec api alembic upgrade head`.
+   This adds the GST columns and **zeroes the tax fields on existing bills**
+   (totals unchanged — no GST was collected before registration).
+2. In **Settings**: enter the **GSTIN**, turn on **GST registered**, and set
+   **GST effective from** to the registration date.
+3. Verify: a service-only sale prints an `SRV-` TAX INVOICE with 5% added on
+   top; a product-only sale prints a `PRD-` invoice with 18% shown as included
+   in MRP; a mixed cart produces both bills with one combined payment.
+
+---
+
 ## 🔄 PART 4: Post-Installation
 
 ### Day 1 After Installation
