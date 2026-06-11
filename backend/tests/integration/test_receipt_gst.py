@@ -146,6 +146,41 @@ def test_credit_note_label(db_session, gst_settings, test_user):
     assert "SRV-26-0002" in text  # references the original invoice
 
 
+def test_draft_bill_prints_without_payment(db_session, gst_settings, test_user, service_factory):
+    """Print-before-payment: a DRAFT bill renders with items + tax but NO
+    payment details, and is not yet a numbered TAX INVOICE."""
+    svc = service_factory()
+    bill = Bill(
+        customer_name="GST Cust", subtotal=50000, discount_amount=0,
+        tax_amount=2500, cgst_amount=1250, sgst_amount=1250,
+        total_amount=52500, rounded_total=52500, rounding_adjustment=0,
+        status=BillStatus.DRAFT, bill_type=BillType.NORMAL,
+        bill_class=BillClass.SERVICE, created_by=test_user.id,
+        invoice_number=None,
+    )
+    db_session.add(bill)
+    db_session.flush()
+    db_session.add(BillItem(
+        bill_id=bill.id, service_id=svc.id, item_name="Haircut",
+        base_price=50000, quantity=1, line_total=50000,
+        item_type=BillItemType.SERVICE, tax_rate=5, tax_mode=TaxMode.EXCLUSIVE,
+        taxable_value=50000, cgst_amount=1250, sgst_amount=1250,
+    ))
+    db_session.flush()
+    db_session.refresh(bill)
+
+    text = _pdf_text(bill, db_session)
+    # Bill content is present (items + tax)
+    assert "Haircut" in text
+    assert "CGST @ 2.5%" in text
+    assert "TOTAL" in text
+    # ...but no payment section and not yet a final tax invoice
+    assert "DRAFT BILL" in text
+    assert "TAX INVOICE" not in text
+    assert "Payment Method" not in text
+    assert "PENDING" not in text
+
+
 def test_legacy_bill_unchanged(db_session, gst_settings, test_user):
     bill = Bill(
         customer_name="Old Cust", subtotal=50000, discount_amount=0,

@@ -212,27 +212,29 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
   // Create bill(s) if not already created. In GST mode uses the group endpoint
   // (mixed carts return TWO bills settled by ONE payment); otherwise legacy.
   // Returns the single bill id (null when a 2-bill group was created) and group id.
-  const ensureBillsCreated = async (): Promise<{ billId: string | null; groupId: string | null; grandTotal: number }> => {
+  const ensureBillsCreated = async (): Promise<{ billId: string | null; groupId: string | null; grandTotal: number; billIds: string[] }> => {
     if (billId || groupId) {
-      return { billId, groupId, grandTotal: serverGrandTotal ?? total };
+      const existingIds = groupId ? groupBills.map(b => b.id) : (billId ? [billId] : []);
+      return { billId, groupId, grandTotal: serverGrandTotal ?? total, billIds: existingIds };
     }
 
     if (gstMode) {
       const { data } = await apiClient.post<BillGroupResponse>('/pos/bills/group', buildBillPayload());
       setGroupBills(data.bills);
       setServerGrandTotal(data.grand_total);
+      const billIds = data.bills.map(b => b.id);
       if (data.bill_group_id && data.bills.length > 1) {
         setGroupId(data.bill_group_id);
-        return { billId: null, groupId: data.bill_group_id, grandTotal: data.grand_total };
+        return { billId: null, groupId: data.bill_group_id, grandTotal: data.grand_total, billIds };
       }
       const singleId = data.bills[0].id;
       setBillId(singleId);
-      return { billId: singleId, groupId: null, grandTotal: data.grand_total };
+      return { billId: singleId, groupId: null, grandTotal: data.grand_total, billIds };
     }
 
     const { data: billData } = await apiClient.post('/pos/bills', buildBillPayload());
     setBillId(billData.id);
-    return { billId: billData.id, groupId: null, grandTotal: total };
+    return { billId: billData.id, groupId: null, grandTotal: total, billIds: [billData.id] };
   };
 
   const handlePayment = async () => {
@@ -475,6 +477,32 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
   };
 
   const [isSendingWhatsApp, setIsSendingWhatsApp] = useState(false);
+  const [isPrintingDraft, setIsPrintingDraft] = useState(false);
+
+  // Print the bill BEFORE payment, for customers who want to see it first.
+  // Creates the draft bill(s) (idempotent — reused when they actually pay) and
+  // prints each. The receipt hides payment details until the bill is posted.
+  const handlePrintDraft = async () => {
+    if (incompleteServices.length > 0) {
+      toast.error('Please complete all services before printing the bill');
+      return;
+    }
+    try {
+      setIsPrintingDraft(true);
+      const created = await ensureBillsCreated();
+      if (created.billIds.length === 0) {
+        toast.error('Could not prepare the bill to print');
+        return;
+      }
+      for (const id of created.billIds) {
+        await handlePrintReceipt(id);
+      }
+    } catch (error: any) {
+      toast.error(error.response?.data?.detail || 'Failed to print bill');
+    } finally {
+      setIsPrintingDraft(false);
+    }
+  };
 
   const handlePrintReceipt = async (receiptBillId?: string) => {
     const targetBillId = receiptBillId || billId;
@@ -973,6 +1001,29 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
                 </Button>
               )}
             </div>
+
+            {/* Print bill before payment — for customers who want to see the
+                bill first. Payment details are omitted until the bill is paid. */}
+            {total > 0 && (
+              <Button
+                onClick={handlePrintDraft}
+                disabled={status === 'processing' || isPrintingDraft || incompleteServices.length > 0}
+                variant="outline"
+                className="w-full"
+              >
+                {isPrintingDraft ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Preparing bill...
+                  </>
+                ) : (
+                  <>
+                    <Printer className="h-4 w-4 mr-2" />
+                    Print Bill (before payment)
+                  </>
+                )}
+              </Button>
+            )}
 
             {/* Complete Bill with Pending Balance button (when partial payment made) */}
             {remainingPaise > 0 && payments.length > 0 && (
