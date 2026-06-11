@@ -636,7 +636,7 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
                     </div>
                     <p className="text-xs text-text-secondary">
                       {formatPrice(item.unitPrice)} each
-                      {!item.isProduct && item.duration && ` • ${item.duration} min`}
+                      {!item.isProduct && !!item.duration && ` • ${item.duration} min`}
                     </p>
                   </div>
                   <Button
