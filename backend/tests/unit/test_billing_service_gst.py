@@ -1,0 +1,305 @@
+"""Tests for GST-mode billing in BillingService (Phase 4 of GST split billing).
+
+When the salon is GST-registered (settings.gst_registered=True and bill date
+>= gst_effective_from):
+  - service lines: 5% EXCLUSIVE tax added on top of the discounted base
+  - product lines: 18% INCLUSIVE tax extracted from the discounted MRP
+  - per-line tax columns populated, bill totals are sums of lines
+  - payable floors to the whole rupee
+  - single-class bills get bill_class SERVICE/PRODUCT and SRV/PRD invoices
+
+When GST mode is off, the legacy inclusive-18% bill-level math is unchanged.
+"""
+
+from datetime import date, timedelta
+
+import pytest
+
+from app.models.billing import BillClass, BillStatus, PaymentMethod, TaxMode
+from app.services.billing_service import BillingService
+from app.services.invoice_generator import InvoiceNumberGenerator
+from app.utils import generate_ulid
+
+
+@pytest.fixture
+def gst_on(db_session):
+    """Enable GST mode effective yesterday.
+
+    Writes the settings row directly (no SettingsService.update_settings):
+    that method commits, which would break per-test rollback isolation.
+    """
+    from app.models.settings import SalonSettings
+
+    s = db_session.query(SalonSettings).first()
+    if not s:
+        s = SalonSettings(salon_name="Test Salon", salon_address="Test Addr")
+        db_session.add(s)
+    s.gst_registered = True
+    s.gstin = "29ABCDE1234F1Z5"
+    s.gst_effective_from = date.today() - timedelta(days=1)
+    db_session.flush()
+    return s
+
+
+# BillingService.create_bill commits mid-test, so shared conftest fixtures
+# with fixed unique names (test_role/test_service_category) collide on the
+# next test in this file. These local fixtures use ULID-unique names instead.
+
+
+@pytest.fixture
+def gst_user(db_session):
+    from app.models.user import Role, RoleEnum, User
+
+    uid = generate_ulid()
+    # Role names are a fixed enum and unique — reuse if a commit leaked one
+    role = db_session.query(Role).filter(Role.name == RoleEnum.OWNER).first()
+    if not role:
+        role = Role(name=RoleEnum.OWNER, description="t", permissions={"*": ["*"]})
+        db_session.add(role)
+        db_session.flush()
+    user = User(
+        role_id=role.id,
+        username=f"gst_user_{uid}",
+        password_hash="x",
+        full_name="GST Test User",
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.flush()
+    return user
+
+
+@pytest.fixture
+def gst_service(db_session):
+    """Service: menu price ₹500 (50000 paise)."""
+    from app.models.service import Service, ServiceCategory
+
+    uid = generate_ulid()
+    cat = ServiceCategory(name=f"GST Cat {uid}", display_order=1)
+    db_session.add(cat)
+    db_session.flush()
+    svc = Service(
+        category_id=cat.id,
+        name=f"GST Haircut {uid}",
+        base_price=50000,
+        duration_minutes=30,
+        is_active=True,
+    )
+    db_session.add(svc)
+    db_session.flush()
+    return svc
+
+
+@pytest.fixture
+def sellable_sku(db_session):
+    """Retail product: MRP ₹1,180 (GST-inclusive), in stock."""
+    from app.models.inventory import SKU, InventoryCategory
+
+    uid = generate_ulid()
+    cat = InventoryCategory(id=generate_ulid(), name=f"Retail GST {uid}")
+    db_session.add(cat)
+    db_session.flush()
+    sku = SKU(
+        id=generate_ulid(),
+        sku_code=f"GST{uid[:10]}",
+        name=f"Shampoo {uid}",
+        uom="bottle",
+        category_id=cat.id,
+        is_active=True,
+        is_sellable=True,
+        retail_price=118000,
+        current_stock=10,
+    )
+    db_session.add(sku)
+    db_session.flush()
+    return sku
+
+
+class TestGstModeServiceBill:
+    def test_service_bill_adds_5_percent_on_top(
+        self, db_session, gst_on, gst_service, gst_user
+    ):
+        svc = BillingService(db_session)
+        bill = svc.create_bill(
+            items=[{"service_id": gst_service.id, "quantity": 1}],
+            created_by_id=gst_user.id,
+            customer_name="GST Customer",
+        )
+
+        # test_service.base_price = 50000 (₹500)
+        assert bill.subtotal == 50000
+        assert bill.cgst_amount == 1250  # 2.5%
+        assert bill.sgst_amount == 1250
+        assert bill.tax_amount == 2500
+        assert bill.total_amount == 52500  # customer pays base + 5%
+        assert bill.rounded_total == 52500
+        assert bill.bill_class == BillClass.SERVICE
+
+        item = bill.items[0]
+        assert item.tax_rate == 5
+        assert item.tax_mode == TaxMode.EXCLUSIVE
+        assert item.taxable_value == 50000
+        assert item.cgst_amount == item.sgst_amount == 1250
+
+    def test_discount_reduces_base_before_tax(
+        self, db_session, gst_on, gst_service, gst_user
+    ):
+        svc = BillingService(db_session)
+        bill = svc.create_bill(
+            items=[{"service_id": gst_service.id, "quantity": 1}],
+            created_by_id=gst_user.id,
+            customer_name="GST Customer",
+            discount_amount=10000,
+        )
+
+        # base 50000 - 10000 = 40000 → 2.5% halves = 1000 each
+        assert bill.cgst_amount == 1000
+        assert bill.sgst_amount == 1000
+        assert bill.total_amount == 42000
+        assert bill.items[0].taxable_value == 40000
+
+    def test_payable_floors_to_rupee(
+        self, db_session, gst_on, gst_service, gst_user
+    ):
+        svc = BillingService(db_session)
+        bill = svc.create_bill(
+            items=[{"service_id": gst_service.id, "quantity": 1}],
+            created_by_id=gst_user.id,
+            customer_name="GST Customer",
+            discount_amount=3,
+        )
+
+        # base 49997 → cgst = sgst = floor(49997*0.025) = 1249
+        # total 49997 + 2498 = 52495 (₹524.95) → floors to ₹524
+        assert bill.cgst_amount == 1249
+        assert bill.total_amount == 52495
+        assert bill.rounded_total == 52400
+        assert bill.rounding_adjustment == -95
+
+    def test_apply_discount_recomputes_gst(
+        self, db_session, gst_on, gst_service, gst_user
+    ):
+        svc = BillingService(db_session)
+        bill = svc.create_bill(
+            items=[{"service_id": gst_service.id, "quantity": 1}],
+            created_by_id=gst_user.id,
+            customer_name="GST Customer",
+        )
+        bill = svc.apply_discount(
+            bill_id=bill.id,
+            discount_amount=10000,
+            discount_reason="loyalty",
+            applied_by_id=gst_user.id,
+        )
+        assert bill.cgst_amount == 1000
+        assert bill.total_amount == 42000
+
+
+class TestGstModeProductBill:
+    def test_product_bill_extracts_18_percent_from_mrp(
+        self, db_session, gst_on, sellable_sku, gst_user
+    ):
+        svc = BillingService(db_session)
+        bill = svc.create_bill(
+            items=[{"sku_id": sellable_sku.id, "quantity": 1}],
+            created_by_id=gst_user.id,
+            customer_name="GST Customer",
+        )
+
+        # MRP 118000 → taxable 100000 + 9000 + 9000; customer pays MRP
+        assert bill.subtotal == 118000
+        assert bill.cgst_amount == 9000
+        assert bill.sgst_amount == 9000
+        assert bill.total_amount == 118000
+        assert bill.bill_class == BillClass.PRODUCT
+
+        item = bill.items[0]
+        assert item.tax_rate == 18
+        assert item.tax_mode == TaxMode.INCLUSIVE
+        assert item.taxable_value == 100000
+
+
+@pytest.fixture
+def gst_off(db_session):
+    """Force GST mode off (a prior test's commit may have left it on)."""
+    from app.models.settings import SalonSettings
+
+    s = db_session.query(SalonSettings).first()
+    if s:
+        s.gst_registered = False
+        s.gst_effective_from = None
+        db_session.flush()
+    return s
+
+
+class TestLegacyModeUnchanged:
+    def test_legacy_extraction_when_gst_off(
+        self, db_session, gst_off, gst_service, gst_user
+    ):
+        svc = BillingService(db_session)
+        bill = svc.create_bill(
+            items=[{"service_id": gst_service.id, "quantity": 1}],
+            created_by_id=gst_user.id,
+            customer_name="Legacy Customer",
+        )
+
+        # Old behavior: 18% extracted from inclusive 50000, total unchanged
+        expected_tax = round((50000 * 18) / 118)
+        assert abs(bill.tax_amount - expected_tax) <= 1
+        assert bill.total_amount == 50000
+        assert bill.bill_class == BillClass.MIXED_LEGACY
+        assert bill.items[0].tax_mode == TaxMode.NONE
+
+
+class TestInvoiceSeries:
+    def test_generator_accepts_prefix(self, db_session):
+        n = InvoiceNumberGenerator.generate(db_session, prefix="SRV", lock_id=987124)
+        assert n.startswith("SRV-")
+        assert n.endswith("-0001")
+
+    def test_series_are_independent(self, db_session):
+        a1 = InvoiceNumberGenerator.generate(db_session, prefix="TSA", lock_id=987224)
+        assert a1.endswith("-0001")
+        b1 = InvoiceNumberGenerator.generate(db_session, prefix="TSB", lock_id=987225)
+        assert b1.endswith("-0001")
+
+    def test_default_stays_sal(self, db_session):
+        n = InvoiceNumberGenerator.generate(db_session)
+        assert n.startswith("SAL-")
+
+    def test_gst_service_bill_gets_srv_invoice(
+        self, db_session, gst_on, gst_service, gst_user
+    ):
+        svc = BillingService(db_session)
+        bill = svc.create_bill(
+            items=[{"service_id": gst_service.id, "quantity": 1}],
+            created_by_id=gst_user.id,
+            customer_name="GST Customer",
+        )
+        svc.add_payment(
+            bill_id=bill.id,
+            payment_method=PaymentMethod.CASH,
+            amount=bill.rounded_total // 100,  # add_payment takes rupees
+            confirmed_by_id=gst_user.id,
+        )
+        db_session.refresh(bill)
+        assert bill.status == BillStatus.POSTED
+        assert bill.invoice_number.startswith("SRV-")
+
+    def test_gst_product_bill_gets_prd_invoice(
+        self, db_session, gst_on, sellable_sku, gst_user
+    ):
+        svc = BillingService(db_session)
+        bill = svc.create_bill(
+            items=[{"sku_id": sellable_sku.id, "quantity": 1}],
+            created_by_id=gst_user.id,
+            customer_name="GST Customer",
+        )
+        svc.add_payment(
+            bill_id=bill.id,
+            payment_method=PaymentMethod.CASH,
+            amount=bill.rounded_total // 100,  # add_payment takes rupees
+            confirmed_by_id=gst_user.id,
+        )
+        db_session.refresh(bill)
+        assert bill.invoice_number.startswith("PRD-")

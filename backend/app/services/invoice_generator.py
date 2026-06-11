@@ -35,8 +35,13 @@ class InvoiceNumberGenerator:
     ADVISORY_LOCK_ID = 987123
     INVOICE_PREFIX = "SAL"
 
+    # GST split billing: each invoice series gets its own advisory lock so
+    # concurrent SRV/PRD/SAL generation never serializes across series.
+    SERVICE_LOCK_ID = 987124
+    PRODUCT_LOCK_ID = 987125
+
     @classmethod
-    def generate(cls, db: Session) -> str:
+    def generate(cls, db: Session, prefix: str | None = None, lock_id: int | None = None) -> str:
         """Generate next invoice number atomically.
 
             Acquires a PostgreSQL transaction-scoped advisory lock, queries the
@@ -65,6 +70,9 @@ class InvoiceNumberGenerator:
                 - Multiple calls in the same transaction will see the same lock
         """
 
+        prefix = prefix or cls.INVOICE_PREFIX
+        lock_id = lock_id if lock_id is not None else cls.ADVISORY_LOCK_ID
+
         now = datetime.now()
         if now.month >= 4:
             fiscal_year = now.strftime("%y")
@@ -75,9 +83,9 @@ class InvoiceNumberGenerator:
         # Use transaction-scoped advisory lock (automatically released on commit/rollback)
         # This ensures the lock is held until the transaction completes, preventing
         # race conditions where multiple threads generate the same invoice number
-        db.execute(text("SELECT pg_advisory_xact_lock(:lock_id)"), {"lock_id": cls.ADVISORY_LOCK_ID})
+        db.execute(text("SELECT pg_advisory_xact_lock(:lock_id)"), {"lock_id": lock_id})
 
-        pattern = f"{cls.INVOICE_PREFIX}-{fiscal_year}-%"
+        pattern = f"{prefix}-{fiscal_year}-%"
 
         result = db.execute(
             text("""
@@ -92,7 +100,7 @@ class InvoiceNumberGenerator:
         max_num = result.max_num if result else 0
 
         next_num = max_num + 1
-        invoice_number = f"{cls.INVOICE_PREFIX}-{fiscal_year}-{next_num:04d}"
+        invoice_number = f"{prefix}-{fiscal_year}-{next_num:04d}"
 
         return invoice_number
 

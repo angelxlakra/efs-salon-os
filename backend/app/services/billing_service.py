@@ -27,7 +27,10 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 from ulid import ULID
 
-from app.models.billing import Bill, BillItem, BillItemType, BillStatus, Payment, PaymentMethod, BillItemStaffContribution
+from app.models.billing import (
+    Bill, BillClass, BillItem, BillItemType, BillStatus, Payment,
+    PaymentMethod, BillItemStaffContribution, TaxMode,
+)
 from app.models.customer import Customer
 from app.models.pending_payment import PendingPaymentCollection
 from app.utils import IST
@@ -36,6 +39,7 @@ from app.models.inventory import SKU
 from app.models.appointment import WalkIn
 from app.services.invoice_generator import InvoiceNumberGenerator
 from app.services.tax_calculator import TaxCalculator
+from app.services.discount_allocator import allocate_discount
 from app.services.inventory_service import InventoryService
 from app.services.contribution_calculator import ContributionCalculator, ContributionCalculationError
 
@@ -58,7 +62,129 @@ class BillingService:
         """
 
         self.db = db
-    
+
+    # ------------------------------------------------------------------
+    # GST mode (split billing scheme, see docs/superpowers/plans/
+    # 2026-06-11-gst-split-billing.md)
+    # ------------------------------------------------------------------
+
+    # Whole-percent GST rates per line kind (owner-confirmed)
+    SERVICE_GST_RATE = 5    # exclusive: added on top of discounted base
+    PRODUCT_GST_RATE = 18   # inclusive: extracted from discounted MRP
+
+    def _gst_mode_active(self) -> bool:
+        """True when the salon is GST-registered and past the effective date."""
+        from app.services.settings_service import SettingsService
+
+        settings = SettingsService.get_or_create_settings(self.db)
+        if not settings.gst_registered or not settings.gst_effective_from:
+            return False
+        return datetime.now(IST).date() >= settings.gst_effective_from
+
+    @staticmethod
+    def _line_tax_params(item: BillItem) -> tuple[int, str]:
+        """(rate_percent, tax_mode) for a bill line in GST mode.
+
+        Classified by FK first (historic rows predate item_type=PRODUCT being
+        set on retail lines), then by item_type. Package sale/redemption lines
+        carry no GST (owner decision: redemptions have zero realized value;
+        package sales keep current treatment until revisited).
+        """
+        if item.item_type in (
+            BillItemType.PACKAGE_SALE_LINE, BillItemType.PACKAGE_REDEMPTION
+        ):
+            return 0, TaxMode.NONE.value
+        if item.sku_id:
+            return BillingService.PRODUCT_GST_RATE, TaxMode.INCLUSIVE.value
+        if item.service_id:
+            return BillingService.SERVICE_GST_RATE, TaxMode.EXCLUSIVE.value
+        return 0, TaxMode.NONE.value
+
+    def _recalculate_bill_tax(self, bill: Bill) -> None:
+        """Recompute per-line tax and bill totals from bill.items.
+
+        GST mode: discount is allocated proportionally across lines first,
+        then each line is taxed by its own rate/mode (floor rounding) and the
+        bill totals are sums of lines; payable floors to the whole rupee.
+
+        Legacy mode: original bill-level 18%-inclusive extraction with
+        ROUND_HALF_UP, so pre-registration bills stay reproducible.
+
+        Caller must have flushed items and set bill.subtotal/discount_amount.
+        """
+        items = list(bill.items)
+        discount = bill.discount_amount or 0
+
+        if not self._gst_mode_active():
+            amount_after_discount = bill.subtotal - discount
+            breakdown = TaxCalculator.calculate_tax_breakdown(amount_after_discount)
+            bill.tax_amount = breakdown["total_tax"]
+            bill.cgst_amount = breakdown["cgst"]
+            bill.sgst_amount = breakdown["sgst"]
+            bill.total_amount = amount_after_discount  # prices tax-inclusive
+            bill.rounded_total, bill.rounding_adjustment = (
+                TaxCalculator.round_to_rupee(amount_after_discount)
+            )
+            return
+
+        line_discounts = allocate_discount([i.line_total for i in items], discount)
+
+        cgst = sgst = total = 0
+        for item, line_discount in zip(items, line_discounts):
+            rate, mode = self._line_tax_params(item)
+            tax = TaxCalculator.calculate_line_tax(
+                item.line_total - line_discount, rate, mode
+            )
+            item.tax_rate = rate
+            item.tax_mode = mode
+            item.taxable_value = tax["taxable_value"]
+            item.cgst_amount = tax["cgst"]
+            item.sgst_amount = tax["sgst"]
+            cgst += tax["cgst"]
+            sgst += tax["sgst"]
+            total += tax["gross"]
+
+        bill.cgst_amount = cgst
+        bill.sgst_amount = sgst
+        bill.tax_amount = cgst + sgst
+        bill.total_amount = total
+        bill.rounded_total, bill.rounding_adjustment = (
+            TaxCalculator.round_down_to_rupee(total)
+        )
+
+        # Single-class carts get their GST rate-class (drives SRV/PRD invoice
+        # series). Mixed carts split into two bills at checkout (Phase 5);
+        # until then they remain MIXED_LEGACY. Product lines are identified
+        # by sku_id; everything else (services, package lines) is the
+        # service-side of a checkout.
+        has_product = any(i.sku_id for i in items)
+        has_service_side = any(not i.sku_id for i in items)
+        if items and has_product and not has_service_side:
+            bill.bill_class = BillClass.PRODUCT
+        elif items and has_service_side and not has_product:
+            bill.bill_class = BillClass.SERVICE
+
+    def _generate_invoice_number(self, bill: Bill) -> str:
+        """Pick the invoice series for a bill (SRV/PRD in GST mode, else SAL)."""
+        from app.services.settings_service import SettingsService
+
+        if self._gst_mode_active() and bill.bill_class in (
+            BillClass.SERVICE, BillClass.PRODUCT
+        ):
+            settings = SettingsService.get_or_create_settings(self.db)
+            if bill.bill_class == BillClass.SERVICE:
+                return InvoiceNumberGenerator.generate(
+                    self.db,
+                    prefix=settings.invoice_prefix_service,
+                    lock_id=InvoiceNumberGenerator.SERVICE_LOCK_ID,
+                )
+            return InvoiceNumberGenerator.generate(
+                self.db,
+                prefix=settings.invoice_prefix_product,
+                lock_id=InvoiceNumberGenerator.PRODUCT_LOCK_ID,
+            )
+        return InvoiceNumberGenerator.generate(self.db)
+
     def create_bill(
         self,
         items: List[dict],  # [{"service_id": str, ...} OR {"sku_id": str, ...}]
@@ -164,6 +290,7 @@ class BillingService:
                     "quantity": quantity,
                     "line_total": line_total,
                     "cogs_amount": cogs_amount,
+                    "item_type": BillItemType.SERVICE,
                     "staff_id": item.get("staff_id"),
                     "appointment_id": item.get("appointment_id"),
                     "walkin_id": item.get("walkin_id"),
@@ -198,6 +325,7 @@ class BillingService:
                     "quantity": quantity,
                     "line_total": line_total,
                     "cogs_amount": cogs_amount,
+                    "item_type": BillItemType.PRODUCT,
                     "staff_id": None,
                     "appointment_id": None,
                     "walkin_id": None,
@@ -209,11 +337,8 @@ class BillingService:
         if discount_paise > subtotal:
             raise ValueError("Discount cannot exceed subtotal")
 
-        amount_after_discount = subtotal - discount_paise
-        tax_breakdown = TaxCalculator.calculate_tax_breakdown(amount_after_discount)
-        total_amount = amount_after_discount # Tax already inclusive
-        rounded_total, rounding_adjustment = TaxCalculator.round_to_rupee(total_amount)
-
+        # Totals are placeholders here; _recalculate_bill_tax() computes the
+        # real figures once items are flushed (per-line tax needs the items).
         bill = Bill(
             id=str(ULID()),
             invoice_number=None,
@@ -223,12 +348,12 @@ class BillingService:
             subtotal=subtotal,
             discount_amount=discount_paise,
             discount_reason=discount_reason,
-            tax_amount=tax_breakdown["total_tax"],
-            cgst_amount=tax_breakdown["cgst"],
-            sgst_amount=tax_breakdown["sgst"],
-            total_amount=total_amount,
-            rounded_total=rounded_total,
-            rounding_adjustment=rounding_adjustment,
+            tax_amount=0,
+            cgst_amount=0,
+            sgst_amount=0,
+            total_amount=subtotal - discount_paise,
+            rounded_total=subtotal - discount_paise,
+            rounding_adjustment=0,
             tip_amount=tip_amount,
             tip_staff_id=tip_staff_id,
             status=BillStatus.DRAFT,
@@ -258,6 +383,9 @@ class BillingService:
                     line_total_paise=bill_item.line_total,
                     contributions_data=staff_contributions_data
                 )
+
+        # Compute taxes now that all items exist (per-line in GST mode)
+        self._recalculate_bill_tax(bill)
 
         # Link walk-ins to bill if session_id provided
         if session_id:
@@ -334,19 +462,9 @@ class BillingService:
         self.db.add(bill_item)
         self.db.flush()  # Get bill_item.id
 
-        # Recalculate bill totals
-        new_subtotal = bill.subtotal + line_total
-        amount_after_discount = new_subtotal - (bill.discount_amount or 0)
-        tax_breakdown = TaxCalculator.calculate_tax_breakdown(amount_after_discount)
-        rounded_total, rounding_adjustment = TaxCalculator.round_to_rupee(amount_after_discount)
-
-        bill.subtotal = new_subtotal
-        bill.tax_amount = tax_breakdown["total_tax"]
-        bill.cgst_amount = tax_breakdown["cgst"]
-        bill.sgst_amount = tax_breakdown["sgst"]
-        bill.total_amount = amount_after_discount
-        bill.rounded_total = rounded_total
-        bill.rounding_adjustment = rounding_adjustment
+        # Recalculate bill totals (per-line GST when active)
+        bill.subtotal = bill.subtotal + line_total
+        self._recalculate_bill_tax(bill)
         self.db.flush()
 
         # Package eligibility check
@@ -570,7 +688,7 @@ class BillingService:
             # Preserve existing invoice number if bill was previously posted and
             # reverted to draft via payment deletion — don't generate a duplicate.
             if not bill.invoice_number:
-                bill.invoice_number = InvoiceNumberGenerator.generate(self.db)
+                bill.invoice_number = self._generate_invoice_number(bill)
             bill.status = BillStatus.POSTED
             bill.posted_at = datetime.now(IST)
 
@@ -644,7 +762,10 @@ class BillingService:
         
         refund_bill = Bill(
             id=str(ULID()),
-            invoice_number=InvoiceNumberGenerator.generate(self.db),
+            invoice_number=None,  # assigned below: credit note uses the
+                                  # original bill's series (SRV/PRD/SAL)
+            bill_class=original_bill.bill_class,
+            bill_group_id=original_bill.bill_group_id,
             customer_id=original_bill.customer_id,
             customer_name=original_bill.customer_name,
             customer_phone=original_bill.customer_phone,
@@ -665,6 +786,7 @@ class BillingService:
             created_by=refunded_by_id
         )
 
+        refund_bill.invoice_number = self._generate_invoice_number(refund_bill)
         self.db.add(refund_bill)
 
         original_bill.status = BillStatus.REFUNDED
@@ -727,8 +849,7 @@ class BillingService:
             )
 
         # Generate invoice number
-        invoice_number = InvoiceNumberGenerator.generate(self.db)
-        bill.invoice_number = invoice_number
+        bill.invoice_number = self._generate_invoice_number(bill)
         bill.status = BillStatus.POSTED
         bill.posted_at = datetime.now(IST)
 
@@ -880,20 +1001,11 @@ class BillingService:
             raise ValueError("Discount cannot exceed subtotal")
 
         # Recalculate all totals from scratch using the new discount
-        amount_after_discount = bill.subtotal - discount_amount
-        tax_breakdown = TaxCalculator.calculate_tax_breakdown(amount_after_discount)
-        total_amount = amount_after_discount  # prices are tax-inclusive
-        rounded_total, rounding_adjustment = TaxCalculator.round_to_rupee(total_amount)
-
+        # (per-line GST when active; legacy inclusive extraction otherwise)
         bill.discount_amount = discount_amount
         bill.discount_reason = discount_reason
         bill.discount_approved_by = applied_by_id
-        bill.tax_amount = tax_breakdown["total_tax"]
-        bill.cgst_amount = tax_breakdown["cgst"]
-        bill.sgst_amount = tax_breakdown["sgst"]
-        bill.total_amount = total_amount
-        bill.rounded_total = rounded_total
-        bill.rounding_adjustment = rounding_adjustment
+        self._recalculate_bill_tax(bill)
         bill.updated_at = datetime.now(IST)
 
         # Auto-post if partial payments now fully cover the revised total
@@ -901,16 +1013,16 @@ class BillingService:
             Payment.bill_id == bill_id
         ).all()
         total_paid = sum(p.amount for p in existing_payments)
-        if existing_payments and total_paid >= rounded_total:
+        if existing_payments and total_paid >= bill.rounded_total:
             bill.status = BillStatus.POSTED
             bill.posted_at = datetime.now(IST)
             # Preserve existing invoice number (bill may have been posted before
             # and reverted to draft via payment deletion — don't generate a duplicate)
             if not bill.invoice_number:
-                bill.invoice_number = InvoiceNumberGenerator.generate(self.db)
+                bill.invoice_number = self._generate_invoice_number(bill)
             if bill.customer_id:
                 self._update_customer_stats(
-                    bill.customer_id, rounded_total, increment=True
+                    bill.customer_id, bill.rounded_total, increment=True
                 )
 
         self.db.commit()
@@ -1135,8 +1247,7 @@ class BillingService:
                 # If was draft and now fully paid, post it
                 if bill.status == BillStatus.DRAFT:
                     # Generate invoice number
-                    invoice_number = InvoiceNumberGenerator.generate(self.db)
-                    bill.invoice_number = invoice_number
+                    bill.invoice_number = self._generate_invoice_number(bill)
                     bill.status = BillStatus.POSTED
                     bill.posted_at = datetime.now(IST)
 
