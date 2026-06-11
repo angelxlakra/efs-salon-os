@@ -51,6 +51,10 @@ class Service(Base, ULIDMixin, TimestampMixin, SoftDeleteMixin):
     is_active = Column(Boolean, nullable=False, default=True, index=True)
     display_order = Column(Integer, nullable=False, default=0)
 
+    # GST invoice compliance (Rule 46): SAC code printed per line.
+    # NULL falls back to salon_settings.default_service_sac_code (999721).
+    sac_code = Column(String(8), nullable=True)
+
     # Relationships
     category = relationship("ServiceCategory", back_populates="services")
     addons = relationship("ServiceAddon", back_populates="service")

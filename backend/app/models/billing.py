@@ -13,6 +13,30 @@ class BillType(str, enum.Enum):
     CREDIT_NOTE = "credit_note"
 
 
+class BillClass(str, enum.Enum):
+    """GST rate-class of a bill (split billing scheme, post GST registration).
+
+    SERVICE: only service lines, 5% exclusive GST, SRV invoice series.
+    PRODUCT: only retail product lines, 18% MRP-inclusive GST, PRD series.
+    MIXED_LEGACY: pre-registration bills (any mix, zero tax recorded).
+    """
+    SERVICE = "service"
+    PRODUCT = "product"
+    MIXED_LEGACY = "mixed_legacy"
+
+
+class TaxMode(str, enum.Enum):
+    """How GST applies to a bill line.
+
+    EXCLUSIVE: tax added on top of the discounted base (services, 5%).
+    INCLUSIVE: tax extracted from the discounted MRP (products, 18%).
+    NONE: no tax (legacy lines, package redemptions, exempt).
+    """
+    EXCLUSIVE = "exclusive"
+    INCLUSIVE = "inclusive"
+    NONE = "none"
+
+
 class BillItemType(str, enum.Enum):
     """BillItem kind: existing service/product or new package item types."""
     SERVICE = "service"
@@ -112,6 +136,16 @@ class Bill(Base, ULIDMixin, TimestampMixin):
         index=True,
     )
 
+    # GST split billing: rate-class of this bill and link to its checkout sibling.
+    # A mixed cart posts as TWO bills (service + product) sharing one bill_group_id.
+    bill_class = Column(
+        Enum(BillClass, name="billclass",
+             values_callable=lambda obj: [e.value for e in obj]),
+        nullable=False, default=BillClass.MIXED_LEGACY, server_default="mixed_legacy",
+        index=True,
+    )
+    bill_group_id = Column(String(26), nullable=True, index=True)
+
     __table_args__ = (
         CheckConstraint(
             "(bill_type = 'credit_note' AND original_bill_id IS NOT NULL) "
@@ -183,6 +217,19 @@ class BillItem(Base, ULIDMixin, TimestampMixin):
 
     # COGS tracking (actual cost, not estimate)
     cogs_amount = Column(Integer, nullable=True)  # paise
+
+    # Per-line GST (split billing scheme). Amounts floored to the paise.
+    # tax_mode EXCLUSIVE: line gross = taxable_value + cgst + sgst
+    # tax_mode INCLUSIVE: taxable_value + cgst + sgst == discounted line total
+    tax_rate = Column(Integer, nullable=False, default=0, server_default="0")  # whole percent
+    tax_mode = Column(
+        Enum(TaxMode, name="taxmode",
+             values_callable=lambda obj: [e.value for e in obj]),
+        nullable=False, default=TaxMode.NONE, server_default="none",
+    )
+    taxable_value = Column(Integer, nullable=False, default=0, server_default="0")
+    cgst_amount = Column(Integer, nullable=False, default=0, server_default="0")
+    sgst_amount = Column(Integer, nullable=False, default=0, server_default="0")
 
     # Notes
     notes = Column(Text)
@@ -290,6 +337,10 @@ class Payment(Base, ULIDMixin, TimestampMixin):
     __tablename__ = "payments"
 
     bill_id = Column(String(26), ForeignKey("bills.id"), nullable=False, index=True)
+
+    # GST split billing: one customer tender split across the two bills of a
+    # checkout group shares a payment_group_id (NULL for single-bill payments).
+    payment_group_id = Column(String(26), nullable=True, index=True)
 
     payment_method = Column(Enum(PaymentMethod), nullable=False)
     amount = Column(Integer, nullable=False)  # paise

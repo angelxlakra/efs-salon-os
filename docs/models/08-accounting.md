@@ -4,6 +4,10 @@
 
 Models for cash management, daily summaries, and export tracking.
 
+> **GST reporting**: the tax report (`GET /api/reports/tax`) exposes a
+> per-rate `rate_breakdown` (taxable value + CGST + SGST per 5%/18% slab) from
+> posted GST-classed bills. See [GST Split Billing](../features/11-gst-billing.md).
+
 ---
 
 ## CashDrawer

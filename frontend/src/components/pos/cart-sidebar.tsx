@@ -17,8 +17,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { useCartStore } from '@/stores/cart-store';
-import { useState, useImperativeHandle, RefObject, useEffect } from 'react';
+import { useCartStore, computeGstBreakdown } from '@/stores/cart-store';
+import { Fragment, useState, useImperativeHandle, RefObject, useEffect } from 'react';
 import { useAuthStore } from '@/stores/auth-store';
 import { useSettingsStore } from '@/stores/settings-store';
 import { CustomerSearch } from './customer-search';
@@ -70,7 +70,7 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
 
   const router = useRouter();
   const { user } = useAuthStore();
-  const { hasGST, fetchSettings, settings } = useSettingsStore();
+  const { hasGST, isGstMode, fetchSettings, settings } = useSettingsStore();
   const [discountInput, setDiscountInput] = useState('');
   const [isCustomerSearchOpen, setIsCustomerSearchOpen] = useState(false);
   const [isCreatingOrders, setIsCreatingOrders] = useState(false);
@@ -491,7 +491,11 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
   const subtotal = getSubtotal();
   const taxAmount = getTaxAmount();
   const discountAmount = getDiscountAmount();
-  const total = getTotal();
+
+  // GST split-billing mode: services 5% exclusive, products 18% inclusive
+  const gstMode = isGstMode();
+  const gstBreakdown = gstMode ? computeGstBreakdown(items, discount) : null;
+  const total = gstBreakdown ? gstBreakdown.grandTotal : getTotal();
 
   // Check if all service items have staff assigned (products don't need staff)
   const serviceItems = items.filter((item) => !item.isProduct);
@@ -590,9 +594,22 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
           />
         ) : (
           <div className="space-y-3">
-            {[...items].sort((a, b) => Number(a.isBooked) - Number(b.isBooked)).map((item) => (
+            {(gstMode
+              ? [...items].sort(
+                  (a, b) =>
+                    Number(a.isProduct) - Number(b.isProduct) ||
+                    Number(a.isBooked) - Number(b.isBooked)
+                )
+              : [...items].sort((a, b) => Number(a.isBooked) - Number(b.isBooked))
+            ).map((item, idx, sortedItems) => (
+              <Fragment key={item.id}>
+              {/* GST mode: section headers (services first, then retail products) */}
+              {gstMode && (idx === 0 || sortedItems[idx - 1].isProduct !== item.isProduct) && (
+                <p className="text-xs font-semibold uppercase tracking-wide text-text-muted pt-1">
+                  {item.isProduct ? 'Retail Products' : 'Services'}
+                </p>
+              )}
               <div
-                key={item.id}
                 className={`rounded-lg p-3 space-y-2 ${
                   item.isBooked
                     ? 'bg-success-bg-soft border-2 border-success-border'
@@ -735,6 +752,7 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
                   </span>
                 </div>
               </div>
+              </Fragment>
             ))}
           </div>
         )}
@@ -782,36 +800,92 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
           </div>
 
           {/* Price Breakdown */}
-          <div className="space-y-1.5 text-sm">
-            <div className="flex justify-between text-text-secondary">
-              <span>Subtotal</span>
-              <span>{formatPrice(subtotal)}</span>
-            </div>
-            {discountAmount > 0 && (
-              <div className="flex justify-between text-warning-fg">
-                <span>
-                  Discount
-                  {subtotal > 0 && (
-                    <span className="ml-1 text-xs">
-                      ({((discountAmount / subtotal) * 100).toFixed(1)}%)
-                    </span>
+          {gstMode && gstBreakdown ? (
+            <div className="space-y-1.5 text-sm">
+              {/* Services: 5% GST added on top */}
+              {gstBreakdown.serviceSection.items.length > 0 && (
+                <>
+                  <div className="flex justify-between font-medium text-text-primary">
+                    <span>Services</span>
+                    <span>{formatPrice(gstBreakdown.serviceSection.subtotal)}</span>
+                  </div>
+                  {gstBreakdown.serviceSection.discount > 0 && (
+                    <div className="flex justify-between text-warning-fg">
+                      <span>Discount</span>
+                      <span>-{formatPrice(gstBreakdown.serviceSection.discount)}</span>
+                    </div>
                   )}
-                </span>
-                <span>-{formatPrice(discountAmount)}</span>
+                  <div className="flex justify-between text-text-secondary">
+                    <span>CGST (2.5%)</span>
+                    <span>{formatPrice(gstBreakdown.serviceSection.cgst)}</span>
+                  </div>
+                  <div className="flex justify-between text-text-secondary">
+                    <span>SGST (2.5%)</span>
+                    <span>{formatPrice(gstBreakdown.serviceSection.sgst)}</span>
+                  </div>
+                </>
+              )}
+              {/* Retail products: 18% GST included in MRP */}
+              {gstBreakdown.productSection.items.length > 0 && (
+                <>
+                  <div className="flex justify-between font-medium text-text-primary">
+                    <span>Retail Products</span>
+                    <span>{formatPrice(gstBreakdown.productSection.subtotal)}</span>
+                  </div>
+                  {gstBreakdown.productSection.discount > 0 && (
+                    <div className="flex justify-between text-warning-fg">
+                      <span>Discount</span>
+                      <span>-{formatPrice(gstBreakdown.productSection.discount)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-text-secondary">
+                    <span>CGST (9%) (incl. in MRP)</span>
+                    <span>{formatPrice(gstBreakdown.productSection.cgst)}</span>
+                  </div>
+                  <div className="flex justify-between text-text-secondary">
+                    <span>SGST (9%) (incl. in MRP)</span>
+                    <span>{formatPrice(gstBreakdown.productSection.sgst)}</span>
+                  </div>
+                </>
+              )}
+              <Separator />
+              <div className="flex justify-between text-lg font-bold text-text-primary">
+                <span>Grand Total</span>
+                <span>{formatPrice(total)}</span>
               </div>
-            )}
-            {hasGST() && (
-              <div className="flex justify-between text-text-secondary">
-                <span>GST (included)</span>
-                <span>{formatPrice(taxAmount)}</span>
-              </div>
-            )}
-            <Separator />
-            <div className="flex justify-between text-lg font-bold text-text-primary">
-              <span>Total</span>
-              <span>{formatPrice(total)}</span>
             </div>
-          </div>
+          ) : (
+            <div className="space-y-1.5 text-sm">
+              <div className="flex justify-between text-text-secondary">
+                <span>Subtotal</span>
+                <span>{formatPrice(subtotal)}</span>
+              </div>
+              {discountAmount > 0 && (
+                <div className="flex justify-between text-warning-fg">
+                  <span>
+                    Discount
+                    {subtotal > 0 && (
+                      <span className="ml-1 text-xs">
+                        ({((discountAmount / subtotal) * 100).toFixed(1)}%)
+                      </span>
+                    )}
+                  </span>
+                  <span>-{formatPrice(discountAmount)}</span>
+                </div>
+              )}
+              {hasGST() && (
+                <div className="flex justify-between text-text-secondary">
+                  <span>GST (included)</span>
+                  <span>{formatPrice(taxAmount)}</span>
+                </div>
+              )}
+              <Separator />
+              <div className="flex justify-between text-lg font-bold text-text-primary">
+                <span>Total</span>
+                <span>{formatPrice(total)}</span>
+              </div>
+            </div>
+          )}
 
           {/* Action Buttons */}
           <div className="space-y-2">

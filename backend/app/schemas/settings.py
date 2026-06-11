@@ -1,8 +1,8 @@
 """Pydantic schemas for salon settings."""
 
 from typing import Optional
-from datetime import datetime
-from pydantic import BaseModel, Field, field_validator
+from datetime import date, datetime
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class SalonSettingsBase(BaseModel):
@@ -20,6 +20,13 @@ class SalonSettingsBase(BaseModel):
 
     gstin: Optional[str] = Field(None, max_length=15)
     pan: Optional[str] = Field(None, max_length=10)
+
+    gst_registered: bool = False
+    gst_effective_from: Optional[date] = None
+    invoice_prefix_service: str = Field("SRV", min_length=1, max_length=10)
+    invoice_prefix_product: str = Field("PRD", min_length=1, max_length=10)
+    default_service_sac_code: str = Field("999721", min_length=4, max_length=8)
+    default_product_hsn_code: str = Field("3305", min_length=4, max_length=8)
 
     receipt_header_text: Optional[str] = None
     receipt_footer_text: Optional[str] = None
@@ -61,6 +68,15 @@ class SalonSettingsBase(BaseModel):
             raise ValueError('Color must be 7 characters (#RRGGBB)')
         return v
 
+    @model_validator(mode='after')
+    def validate_gst_mode(self):
+        """GST registration requires a GSTIN; invoice series must be distinguishable."""
+        if self.gst_registered and not (self.gstin and self.gstin.strip()):
+            raise ValueError('GSTIN is required when GST registration is enabled')
+        if self.invoice_prefix_service == self.invoice_prefix_product:
+            raise ValueError('Service and product invoice prefixes must differ')
+        return self
+
 
 class SalonSettingsUpdate(BaseModel):
     """Schema for updating salon settings (all fields optional)."""
@@ -77,6 +93,13 @@ class SalonSettingsUpdate(BaseModel):
 
     gstin: Optional[str] = Field(None, max_length=15)
     pan: Optional[str] = Field(None, max_length=10)
+
+    gst_registered: Optional[bool] = None
+    gst_effective_from: Optional[date] = None
+    invoice_prefix_service: Optional[str] = Field(None, min_length=1, max_length=10)
+    invoice_prefix_product: Optional[str] = Field(None, min_length=1, max_length=10)
+    default_service_sac_code: Optional[str] = Field(None, min_length=4, max_length=8)
+    default_product_hsn_code: Optional[str] = Field(None, min_length=4, max_length=8)
 
     receipt_header_text: Optional[str] = None
     receipt_footer_text: Optional[str] = None

@@ -13,6 +13,12 @@ export interface SalonSettings {
   contact_website?: string;
   gstin?: string;
   pan?: string;
+  gst_registered: boolean;
+  gst_effective_from?: string | null;
+  invoice_prefix_service: string;
+  invoice_prefix_product: string;
+  default_service_sac_code?: string | null;
+  default_product_hsn_code?: string | null;
   receipt_header_text?: string;
   receipt_footer_text?: string;
   receipt_show_gstin: boolean;

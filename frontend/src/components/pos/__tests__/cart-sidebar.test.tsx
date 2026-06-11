@@ -41,7 +41,7 @@ vi.mock('@/stores/auth-store', () => ({
 }));
 
 vi.mock('@/stores/settings-store', () => ({
-  useSettingsStore: () => ({ hasGST: () => false, fetchSettings: vi.fn(), settings: {} }),
+  useSettingsStore: () => ({ hasGST: () => false, isGstMode: () => false, fetchSettings: vi.fn(), settings: {} }),
 }));
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }));

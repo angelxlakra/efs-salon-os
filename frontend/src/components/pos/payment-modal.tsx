@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { useCartStore } from '@/stores/cart-store';
+import { useCartStore, computeGstBreakdown } from '@/stores/cart-store';
 import { CustomerSearch } from '@/components/pos/customer-search';
 import { apiClient } from '@/lib/api-client';
 import { toast } from 'sonner';
@@ -30,9 +30,25 @@ interface PaymentModalProps {
 type PaymentMethod = 'cash' | 'card' | 'upi';
 type PaymentStatus = 'idle' | 'processing' | 'success' | 'error';
 
+// Bill returned by POST /pos/bills/group (GST split-billing)
+interface GroupBill {
+  id: string;
+  bill_class: 'service' | 'product' | 'mixed_legacy';
+  invoice_number: string | null;
+  total_amount: number; // paise
+  cgst_amount: number; // paise
+  sgst_amount: number; // paise
+}
+
+interface BillGroupResponse {
+  bill_group_id: string | null;
+  bills: GroupBill[];
+  grand_total: number; // paise
+}
+
 export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
   const router = useRouter();
-  const { settings } = useSettingsStore();
+  const { settings, isGstMode } = useSettingsStore();
   const {
     items,
     customerName,
@@ -51,6 +67,10 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
   const [cardReference, setCardReference] = useState('');
   const [status, setStatus] = useState<PaymentStatus>('idle');
   const [billId, setBillId] = useState<string | null>(null);
+  // GST split-billing group state (set when /pos/bills/group returns 2 bills)
+  const [groupId, setGroupId] = useState<string | null>(null);
+  const [groupBills, setGroupBills] = useState<GroupBill[]>([]);
+  const [serverGrandTotal, setServerGrandTotal] = useState<number | null>(null);
   const [successData, setSuccessData] = useState<{ total: number; paid: number; change: number; phone?: string } | null>(null);
   const [incompleteServices, setIncompleteServices] = useState<string[]>([]);
   const [isCheckingServices, setIsCheckingServices] = useState(false);
@@ -63,7 +83,11 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
   // Track payments and remaining amount
   const [payments, setPayments] = useState<{ id: string; method: string; amount: number; reference?: string }[]>([]);
   const [isDeletingPayment, setIsDeletingPayment] = useState<string | null>(null);
-  const total = getTotal(); // Total bill amount in paise
+  // GST split-billing mode: preview math mirrors the server exactly
+  const gstMode = isGstMode();
+  const gstBreakdown = gstMode ? computeGstBreakdown(items, discount) : null;
+  // Total bill amount in paise (server grand total wins once bills are created)
+  const total = serverGrandTotal ?? (gstBreakdown ? gstBreakdown.grandTotal : getTotal());
   const totalPaid = payments.reduce((sum, p) => sum + (p.amount * 100), 0);
   const remainingPaise = Math.max(0, total - totalPaid);
   
@@ -73,7 +97,9 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
   // Set initial amount to pay when modal opens
   useEffect(() => {
     if (isOpen && payments.length === 0) {
-      const totalPaise = getTotal();
+      const totalPaise = gstMode
+        ? computeGstBreakdown(items, discount).grandTotal
+        : getTotal();
       setAmountToPay((totalPaise / 100).toString());
     }
   }, [isOpen]);
@@ -137,6 +163,80 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
     })}`;
   };
 
+  // Build the bill creation payload (shared by /pos/bills and /pos/bills/group)
+  const buildBillPayload = () => {
+    const billPayload: any = {
+      items: items.map(item => {
+        // For services
+        if (!item.isProduct) {
+          const serviceItem: any = {
+            service_id: item.serviceId,
+            quantity: item.quantity,
+            unit_price: item.unitPrice,
+            discount: item.discount,
+          };
+
+          // Multi-staff service with contributions
+          if (item.isMultiStaff && item.staffContributions && item.staffContributions.length > 0) {
+            serviceItem.staff_contributions = item.staffContributions;
+          } else {
+            // Single-staff service
+            serviceItem.staff_id = item.staffId;
+          }
+
+          return serviceItem;
+        }
+        // For products
+        return {
+          sku_id: item.skuId,
+          quantity: item.quantity,
+          unit_price: item.unitPrice,
+          discount: item.discount,
+        };
+      }),
+      customer_name: customerName || 'Walk-in Customer',
+      discount_amount: discount,
+      session_id: sessionId,
+    };
+
+    // Only include customer_phone and customer_id if they exist
+    if (customerPhone) {
+      billPayload.customer_phone = customerPhone;
+    }
+    if (customerId) {
+      billPayload.customer_id = customerId;
+    }
+    return billPayload;
+  };
+
+  // Create bill(s) if not already created. In GST mode uses the group endpoint
+  // (mixed carts return TWO bills settled by ONE payment); otherwise legacy.
+  // Returns the single bill id (null when a 2-bill group was created) and group id.
+  const ensureBillsCreated = async (): Promise<{ billId: string | null; groupId: string | null; grandTotal: number; billIds: string[] }> => {
+    if (billId || groupId) {
+      const existingIds = groupId ? groupBills.map(b => b.id) : (billId ? [billId] : []);
+      return { billId, groupId, grandTotal: serverGrandTotal ?? total, billIds: existingIds };
+    }
+
+    if (gstMode) {
+      const { data } = await apiClient.post<BillGroupResponse>('/pos/bills/group', buildBillPayload());
+      setGroupBills(data.bills);
+      setServerGrandTotal(data.grand_total);
+      const billIds = data.bills.map(b => b.id);
+      if (data.bill_group_id && data.bills.length > 1) {
+        setGroupId(data.bill_group_id);
+        return { billId: null, groupId: data.bill_group_id, grandTotal: data.grand_total, billIds };
+      }
+      const singleId = data.bills[0].id;
+      setBillId(singleId);
+      return { billId: singleId, groupId: null, grandTotal: data.grand_total, billIds };
+    }
+
+    const { data: billData } = await apiClient.post('/pos/bills', buildBillPayload());
+    setBillId(billData.id);
+    return { billId: billData.id, groupId: null, grandTotal: total, billIds: [billData.id] };
+  };
+
   const handlePayment = async () => {
     // Check for incomplete services
     if (incompleteServices.length > 0) {
@@ -160,55 +260,53 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
 
     try {
       setStatus('processing');
-      let currentBillId = billId;
 
-      // 1. Create bill if it doesn't exist
+      // 1. Create bill(s) if they don't exist (GST mode may return a 2-bill group)
+      const created = await ensureBillsCreated();
+      const currentBillId = created.billId;
+
+      // GST split group: ONE tender settles both bills, must equal grand total
+      if (created.groupId) {
+        const grandRupees = created.grandTotal / 100;
+        let tender = amount;
+        if (paymentMethod === 'cash' && tender > grandRupees) {
+          tender = grandRupees; // cash overpayment returned as change
+        }
+        if (tender !== grandRupees || !Number.isInteger(tender)) {
+          toast.error(`Split GST bills must be paid in full: ₹${grandRupees}`);
+          setStatus('idle');
+          return;
+        }
+
+        await apiClient.post(`/pos/bills/group/${created.groupId}/payments`, {
+          payments: [
+            {
+              method: paymentMethod,
+              amount: tender, // whole rupees
+              reference_number:
+                paymentMethod === 'upi' ? upiReference || undefined :
+                paymentMethod === 'card' ? cardReference || undefined :
+                undefined,
+            },
+          ],
+        });
+
+        setSuccessData({
+          total: created.grandTotal,
+          paid: created.grandTotal,
+          change: paymentMethod === 'cash' ? Math.max(0, amount - grandRupees) : 0,
+          phone: customerPhone || undefined,
+        });
+        setStatus('success');
+        toast.success('Payment completed successfully!');
+        setTimeout(() => {
+          clearCart();
+        }, 2000);
+        return;
+      }
+
       if (!currentBillId) {
-        const billPayload: any = {
-          items: items.map(item => {
-            // For services
-            if (!item.isProduct) {
-              const serviceItem: any = {
-                service_id: item.serviceId,
-                quantity: item.quantity,
-                unit_price: item.unitPrice,
-                discount: item.discount,
-              };
-
-              // Multi-staff service with contributions
-              if (item.isMultiStaff && item.staffContributions && item.staffContributions.length > 0) {
-                serviceItem.staff_contributions = item.staffContributions;
-              } else {
-                // Single-staff service
-                serviceItem.staff_id = item.staffId;
-              }
-
-              return serviceItem;
-            }
-            // For products
-            return {
-              sku_id: item.skuId,
-              quantity: item.quantity,
-              unit_price: item.unitPrice,
-              discount: item.discount,
-            };
-          }),
-          customer_name: customerName || 'Walk-in Customer',
-          discount_amount: discount,
-          session_id: sessionId,
-        };
-
-        // Only include customer_phone and customer_id if they exist
-        if (customerPhone) {
-          billPayload.customer_phone = customerPhone;
-        }
-        if (customerId) {
-          billPayload.customer_id = customerId;
-        }
-
-        const { data: billData } = await apiClient.post('/pos/bills', billPayload);
-        currentBillId = billData.id;
-        setBillId(currentBillId);
+        throw new Error('Bill creation failed');
       }
 
       // 2. Process payment
@@ -284,55 +382,17 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
 
     try {
       setStatus('processing');
-      let currentBillId = billId;
 
-      // 1. Create bill if it doesn't exist
-      if (!currentBillId) {
-        const billPayload: any = {
-          items: items.map(item => {
-            // For services
-            if (!item.isProduct) {
-              const serviceItem: any = {
-                service_id: item.serviceId,
-                quantity: item.quantity,
-                unit_price: item.unitPrice,
-                discount: item.discount,
-              };
+      // 1. Create bill(s) if they don't exist
+      const created = await ensureBillsCreated();
+      const currentBillId = created.billId;
 
-              // Multi-staff service with contributions
-              if (item.isMultiStaff && item.staffContributions && item.staffContributions.length > 0) {
-                serviceItem.staff_contributions = item.staffContributions;
-              } else {
-                // Single-staff service
-                serviceItem.staff_id = item.staffId;
-              }
-
-              return serviceItem;
-            }
-            // For products
-            return {
-              sku_id: item.skuId,
-              quantity: item.quantity,
-              unit_price: item.unitPrice,
-              discount: item.discount,
-            };
-          }),
-          customer_name: customerName || 'Walk-in Customer',
-          discount_amount: discount,
-          session_id: sessionId,
-        };
-
-        // Only include customer_phone and customer_id if they exist
-        if (customerPhone) {
-          billPayload.customer_phone = customerPhone;
-        }
-        if (customerId) {
-          billPayload.customer_id = customerId;
-        }
-
-        const { data: billData } = await apiClient.post('/pos/bills', billPayload);
-        currentBillId = billData.id;
-        setBillId(currentBillId);
+      // Pending-balance completion is per-bill; a split GST group (2 bills)
+      // must be settled with a full payment instead.
+      if (created.groupId || !currentBillId) {
+        toast.error('Mixed GST carts must be paid in full — pending balance is not supported');
+        setStatus('idle');
+        return;
       }
 
       // 2. Complete the bill with pending balance
@@ -417,11 +477,38 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
   };
 
   const [isSendingWhatsApp, setIsSendingWhatsApp] = useState(false);
+  const [isPrintingDraft, setIsPrintingDraft] = useState(false);
 
-  const handlePrintReceipt = async () => {
-    if (!billId) return;
+  // Print the bill BEFORE payment, for customers who want to see it first.
+  // Creates the draft bill(s) (idempotent — reused when they actually pay) and
+  // prints each. The receipt hides payment details until the bill is posted.
+  const handlePrintDraft = async () => {
+    if (incompleteServices.length > 0) {
+      toast.error('Please complete all services before printing the bill');
+      return;
+    }
     try {
-      const response = await apiClient.get(`/pos/bills/${billId}/receipt`, {
+      setIsPrintingDraft(true);
+      const created = await ensureBillsCreated();
+      if (created.billIds.length === 0) {
+        toast.error('Could not prepare the bill to print');
+        return;
+      }
+      for (const id of created.billIds) {
+        await handlePrintReceipt(id);
+      }
+    } catch (error: any) {
+      toast.error(error.response?.data?.detail || 'Failed to print bill');
+    } finally {
+      setIsPrintingDraft(false);
+    }
+  };
+
+  const handlePrintReceipt = async (receiptBillId?: string) => {
+    const targetBillId = receiptBillId || billId;
+    if (!targetBillId) return;
+    try {
+      const response = await apiClient.get(`/pos/bills/${targetBillId}/receipt`, {
         responseType: 'blob',
       });
       const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
@@ -456,6 +543,9 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
     setUpiReference('');
     setCardReference('');
     setBillId(null);
+    setGroupId(null);
+    setGroupBills([]);
+    setServerGrandTotal(null);
     setPayments([]);
     setIsDeletingPayment(null);
     setStatus('idle');
@@ -505,12 +595,51 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
                 Change: <span className="font-semibold">₹{(successData?.change ?? changeAmount).toFixed(2)}</span>
               </p>
             )}
+            {/* GST split group: show both bills with their taxes */}
+            {groupId && groupBills.length > 1 && (
+              <div className="w-full bg-surface-page rounded-lg p-3 mb-4 space-y-2 text-sm">
+                {groupBills.map((bill) => (
+                  <div key={bill.id} className="flex justify-between items-center">
+                    <div>
+                      <p className="font-medium text-text-primary">
+                        {bill.bill_class === 'service' ? 'Service Bill' : 'Product Bill'}
+                        {bill.invoice_number ? ` · ${bill.invoice_number}` : ''}
+                      </p>
+                      <p className="text-xs text-text-secondary">
+                        CGST {formatPrice(bill.cgst_amount)} + SGST {formatPrice(bill.sgst_amount)}
+                      </p>
+                    </div>
+                    <span className="font-semibold text-text-primary">
+                      {formatPrice(bill.total_amount)}
+                    </span>
+                  </div>
+                ))}
+                <div className="flex justify-between pt-2 border-t border-border-default font-bold text-text-primary">
+                  <span>Grand Total</span>
+                  <span>{formatPrice(serverGrandTotal ?? total)}</span>
+                </div>
+              </div>
+            )}
             <div className="w-full space-y-2">
-              <Button onClick={handlePrintReceipt} variant="outline" className="w-full">
-                <Printer className="h-4 w-4 mr-2" />
-                Print Receipt
-              </Button>
-              {successData?.phone && (
+              {groupId && groupBills.length > 1 ? (
+                groupBills.map((bill) => (
+                  <Button
+                    key={bill.id}
+                    onClick={() => handlePrintReceipt(bill.id)}
+                    variant="outline"
+                    className="w-full"
+                  >
+                    <Printer className="h-4 w-4 mr-2" />
+                    Print {bill.bill_class === 'service' ? 'Service' : 'Product'} Receipt
+                  </Button>
+                ))
+              ) : (
+                <Button onClick={() => handlePrintReceipt()} variant="outline" className="w-full">
+                  <Printer className="h-4 w-4 mr-2" />
+                  Print Receipt
+                </Button>
+              )}
+              {!groupId && successData?.phone && (
                 <Button
                   onClick={handleSendWhatsApp}
                   variant="outline"
@@ -631,6 +760,33 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
 
             {/* Amount Information */}
             <div className="bg-surface-page rounded-lg p-3">
+              {/* GST mode: per-class bill breakdown (mixed cart = two bills, one payment) */}
+              {gstMode && gstBreakdown && (
+                <div className="space-y-1 mb-2 pb-2 border-b border-border-default text-sm">
+                  {gstBreakdown.serviceSection.items.length > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-text-muted">
+                        Service Bill
+                        <span className="ml-1 text-xs">
+                          (CGST {formatPrice(gstBreakdown.serviceSection.cgst)} + SGST {formatPrice(gstBreakdown.serviceSection.sgst)})
+                        </span>
+                      </span>
+                      <span className="text-text-primary">{formatPrice(gstBreakdown.serviceSection.total)}</span>
+                    </div>
+                  )}
+                  {gstBreakdown.productSection.items.length > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-text-muted">
+                        Product Bill
+                        <span className="ml-1 text-xs">
+                          (CGST {formatPrice(gstBreakdown.productSection.cgst)} + SGST {formatPrice(gstBreakdown.productSection.sgst)} incl.)
+                        </span>
+                      </span>
+                      <span className="text-text-primary">{formatPrice(gstBreakdown.productSection.total)}</span>
+                    </div>
+                  )}
+                </div>
+              )}
               <div className="flex justify-between items-end mb-2">
                  <span className="text-sm text-text-secondary">Total Amount</span>
                  <span className="text-lg font-bold text-text-primary">{formatPrice(total)}</span>
@@ -845,6 +1001,29 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
                 </Button>
               )}
             </div>
+
+            {/* Print bill before payment — for customers who want to see the
+                bill first. Payment details are omitted until the bill is paid. */}
+            {total > 0 && (
+              <Button
+                onClick={handlePrintDraft}
+                disabled={status === 'processing' || isPrintingDraft || incompleteServices.length > 0}
+                variant="outline"
+                className="w-full"
+              >
+                {isPrintingDraft ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Preparing bill...
+                  </>
+                ) : (
+                  <>
+                    <Printer className="h-4 w-4 mr-2" />
+                    Print Bill (before payment)
+                  </>
+                )}
+              </Button>
+            )}
 
             {/* Complete Bill with Pending Balance button (when partial payment made) */}
             {remainingPaise > 0 && payments.length > 0 && (

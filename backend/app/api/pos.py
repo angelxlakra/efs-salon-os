@@ -28,6 +28,10 @@ from app.services.export_service import ExportService
 from app.schemas.billing import (
     BillCreate,
     BillResponse,
+    BillGroupResponse,
+    BillGroupPaymentCreate,
+    BillGroupPaymentResponse,
+    PaymentResponse,
     PaymentCreate,
     PaymentUpdate,
     PaymentResponseWithBill,
@@ -159,6 +163,149 @@ def create_bill(
 
         return BillResponse.model_validate(bill)
 
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
+
+@router.post(
+    "/bills/group",
+    response_model=BillGroupResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a checkout group (GST split billing)"
+)
+def create_bill_group(
+    bill_data: BillCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key")
+):
+    """Create a checkout, splitting a mixed cart into service + product bills.
+
+    In GST mode a cart with both services and retail products produces TWO
+    draft bills sharing a bill_group_id — services taxed 5% exclusive,
+    products 18% MRP-inclusive — settled together via
+    POST /bills/group/{group_id}/payments. Single-class carts return one bill.
+
+    **Permissions**: billing.create
+    """
+    if not PermissionChecker.has_permission(current_user.role.name, "billing", "create"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions to create bills"
+        )
+
+    if idempotency_key:
+        idempotency_service = IdempotencyService()
+        existing_bill_id = idempotency_service.check_key(idempotency_key)
+        if existing_bill_id:
+            existing = db.query(Bill).filter(Bill.id == existing_bill_id).first()
+            if existing:
+                bills = [existing]
+                if existing.bill_group_id:
+                    bills = db.query(Bill).filter(
+                        Bill.bill_group_id == existing.bill_group_id
+                    ).all()
+                return BillGroupResponse(
+                    bill_group_id=existing.bill_group_id,
+                    bills=[BillResponse.model_validate(b) for b in bills],
+                    grand_total=sum(b.rounded_total for b in bills),
+                )
+
+    billing_service = BillingService(db)
+    try:
+        items_dict = [item.model_dump() for item in bill_data.items]
+        bills = billing_service.create_bill_group(
+            items=items_dict,
+            created_by_id=current_user.id,
+            customer_id=bill_data.customer_id,
+            customer_name=bill_data.customer_name,
+            customer_phone=bill_data.customer_phone,
+            discount_amount=bill_data.discount_amount,
+            discount_reason=bill_data.discount_reason,
+            session_id=bill_data.session_id,
+        )
+
+        if idempotency_key:
+            idempotency_service.store_key(idempotency_key, bills[0].id)
+
+        return BillGroupResponse(
+            bill_group_id=bills[0].bill_group_id,
+            bills=[BillResponse.model_validate(b) for b in bills],
+            grand_total=sum(b.rounded_total for b in bills),
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
+
+@router.post(
+    "/bills/group/{bill_group_id}/payments",
+    response_model=BillGroupPaymentResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Settle a checkout group with one customer tender"
+)
+def pay_bill_group(
+    bill_group_id: str,
+    payment_data: BillGroupPaymentCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Settle every draft bill in a checkout group atomically.
+
+    The tendered total must equal the group total exactly (totals are floored
+    to whole rupees in GST mode). Each tender is split across the bills
+    service-bill-first; both bills post in one transaction with their own
+    SRV/PRD invoice numbers.
+
+    **Permissions**: billing.create
+    """
+    if not PermissionChecker.has_permission(current_user.role.name, "billing", "create"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions to record payments"
+        )
+
+    # Group totals are whole rupees; reject fractional/oversized tenders and
+    # never let float money reach the service layer.
+    MAX_TENDER_RUPEES = 10_000_000  # ₹1 crore guard against overflow/typos
+    for p in payment_data.payments:
+        if round(p.amount, 2) != round(p.amount):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Group payments must be whole-rupee amounts"
+            )
+        if p.amount > MAX_TENDER_RUPEES:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Payment amount exceeds the allowed maximum"
+            )
+
+    billing_service = BillingService(db)
+    try:
+        payments = billing_service.pay_bill_group(
+            bill_group_id=bill_group_id,
+            payments=[
+                {
+                    "payment_method": p.method,
+                    "amount": round(p.amount),
+                    "reference_number": p.reference_number,
+                    "notes": p.notes,
+                }
+                for p in payment_data.payments
+            ],
+            confirmed_by_id=current_user.id,
+        )
+        bills = db.query(Bill).filter(Bill.bill_group_id == bill_group_id).all()
+        return BillGroupPaymentResponse(
+            payment_group_id=payments[0].payment_group_id if payments else None,
+            payments=[PaymentResponse.model_validate(p) for p in payments],
+            bills=[BillResponse.model_validate(b) for b in bills],
+        )
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

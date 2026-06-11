@@ -51,6 +51,7 @@ Documentation for specific feature implementations.
 | 08 | [Pending Payment Tracking](./features/08-pending-payment-tracking.md) | Payment collection audit trail, bill resolution, and payment methods |
 | 09 | [Centralized Backups](./features/09-centralized-backups.md) | Nightly pg_dump to B2, daily metrics JSON push, multi-branch support |
 | 10 | [Bundles & Session Packages](./features/10-packages.md) | Multi-service bundles: create, sell, redeem, refund, and extend |
+| 11 | [GST Split Billing](./features/11-gst-billing.md) | Dual-rate GST: 5% services / 18% products, split bills, SRV/PRD invoices, Rule 46 tax invoices |
 
 ---
 

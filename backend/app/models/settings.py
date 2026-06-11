@@ -1,6 +1,6 @@
 """Salon settings model for configurable salon information."""
 
-from sqlalchemy import Column, DateTime, String, Text, Boolean, Integer
+from sqlalchemy import Column, Date, DateTime, String, Text, Boolean, Integer
 from app.database import Base
 from app.models.base import TimestampMixin, ULIDMixin
 
@@ -32,6 +32,17 @@ class SalonSettings(Base, ULIDMixin, TimestampMixin):
     # Tax Information
     gstin = Column(String(15), nullable=True)  # GST Identification Number
     pan = Column(String(10), nullable=True)     # PAN Card Number
+
+    # GST registration mode (dual-rate billing scheme)
+    # Explicit toggle: GSTIN presence alone never flips billing behavior.
+    # Bills dated before gst_effective_from keep the legacy inclusive-18% math.
+    gst_registered = Column(Boolean, nullable=False, default=False, server_default="false")
+    gst_effective_from = Column(Date, nullable=True)
+    invoice_prefix_service = Column(String(10), nullable=False, default="SRV", server_default="SRV")
+    invoice_prefix_product = Column(String(10), nullable=False, default="PRD", server_default="PRD")
+    # Rule 46 line-item codes; per-item overrides live on Service/SKU
+    default_service_sac_code = Column(String(8), nullable=False, default="999721", server_default="999721")
+    default_product_hsn_code = Column(String(8), nullable=False, default="3305", server_default="3305")
 
     # Receipt Customization
     receipt_header_text = Column(Text, nullable=True)  # Custom header message
@@ -73,6 +84,12 @@ class SalonSettings(Base, ULIDMixin, TimestampMixin):
             "contact_website": self.contact_website,
             "gstin": self.gstin,
             "pan": self.pan,
+            "gst_registered": self.gst_registered,
+            "gst_effective_from": self.gst_effective_from.isoformat() if self.gst_effective_from else None,
+            "invoice_prefix_service": self.invoice_prefix_service,
+            "invoice_prefix_product": self.invoice_prefix_product,
+            "default_service_sac_code": self.default_service_sac_code,
+            "default_product_hsn_code": self.default_product_hsn_code,
             "receipt_header_text": self.receipt_header_text,
             "receipt_footer_text": self.receipt_footer_text,
             "receipt_show_gstin": self.receipt_show_gstin,

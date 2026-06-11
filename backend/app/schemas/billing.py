@@ -114,6 +114,13 @@ class BillItemResponse(BaseModel):
     notes: Optional[str] = None
     staff_contributions: List[BillItemStaffContributionResponse] = []  # Multi-staff tracking
 
+    # Per-line GST (split billing scheme; zeros on legacy bills)
+    tax_rate: int = 0
+    tax_mode: str = "none"
+    taxable_value: int = 0  # paise
+    cgst_amount: int = 0  # paise
+    sgst_amount: int = 0  # paise
+
     class Config:
         from_attributes = True
 
@@ -258,6 +265,10 @@ class BillResponse(BaseModel):
     id: str
     invoice_number: Optional[str] = None
     status: BillStatus
+
+    # GST split billing
+    bill_class: str = "mixed_legacy"
+    bill_group_id: Optional[str] = None
 
     # Customer info
     customer_id: Optional[str] = None
@@ -547,3 +558,29 @@ class AddBillItemResponse(BaseModel):
     bill_item: BillItemResponse
     auto_applied_package_sale_id: Optional[str] = None
     eligible_packages: List[str] = []
+
+
+class BillGroupResponse(BaseModel):
+    """A checkout group: 1 bill (single-class cart) or 2 (mixed cart split).
+
+    grand_total is what the customer actually pays — the sum of the bills'
+    rounded totals (each already floored to the whole rupee in GST mode).
+    """
+
+    bill_group_id: Optional[str] = None
+    bills: List[BillResponse]
+    grand_total: int  # paise
+
+
+class BillGroupPaymentCreate(BaseModel):
+    """One customer tender (possibly multiple methods) settling a bill group."""
+
+    payments: List[PaymentCreate] = Field(..., min_length=1)
+
+
+class BillGroupPaymentResponse(BaseModel):
+    """Result of settling a bill group: per-bill payments + posted bills."""
+
+    payment_group_id: Optional[str] = None
+    payments: List[PaymentResponse]
+    bills: List[BillResponse]

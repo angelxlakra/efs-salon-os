@@ -52,4 +52,7 @@ select = ["E", "F", "I"]
 ignore = ["E501"]
 
 [dependency-groups]
-dev = []
+dev = [
+    "freezegun>=1.5.5",
+    "pypdf>=6.13.2",
+]
