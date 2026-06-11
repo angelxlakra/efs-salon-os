@@ -344,6 +344,66 @@ class TestBillGroupSplit:
         assert sellable_sku.current_stock == stock_before - 1
 
 
+class TestSplitBillRefunds:
+    """Phase 6: each half of a split checkout is refundable independently,
+    with the credit note drawn from that bill's own invoice series."""
+
+    def _paid_group(self, db_session, gst_service, sellable_sku, gst_user):
+        svc = BillingService(db_session)
+        bills = svc.create_bill_group(
+            items=[
+                {"service_id": gst_service.id, "quantity": 1},
+                {"sku_id": sellable_sku.id, "quantity": 1},
+            ],
+            created_by_id=gst_user.id,
+            customer_name="GST Customer",
+        )
+        svc.pay_bill_group(
+            bill_group_id=bills[0].bill_group_id,
+            payments=[{"payment_method": PaymentMethod.CASH,
+                       "amount": sum(b.rounded_total for b in bills) // 100}],
+            confirmed_by_id=gst_user.id,
+        )
+        for b in bills:
+            db_session.refresh(b)
+        return svc, bills
+
+    def test_refund_product_half_only(
+        self, db_session, gst_on, gst_service, sellable_sku, gst_user
+    ):
+        svc, bills = self._paid_group(db_session, gst_service, sellable_sku, gst_user)
+        service_bill = next(b for b in bills if b.bill_class == BillClass.SERVICE)
+        product_bill = next(b for b in bills if b.bill_class == BillClass.PRODUCT)
+
+        credit = svc.refund_bill(
+            bill_id=product_bill.id, reason="returned item",
+            refunded_by_id=gst_user.id,
+        )
+
+        assert credit.invoice_number.startswith("PRD-")
+        assert credit.bill_class == BillClass.PRODUCT
+        assert credit.bill_group_id == product_bill.bill_group_id
+        assert credit.total_amount == -product_bill.total_amount
+        assert credit.cgst_amount == -product_bill.cgst_amount
+
+        db_session.refresh(service_bill)
+        db_session.refresh(product_bill)
+        assert product_bill.status == BillStatus.REFUNDED
+        assert service_bill.status == BillStatus.POSTED  # untouched
+
+    def test_refund_service_half_uses_srv_series(
+        self, db_session, gst_on, gst_service, sellable_sku, gst_user
+    ):
+        svc, bills = self._paid_group(db_session, gst_service, sellable_sku, gst_user)
+        service_bill = next(b for b in bills if b.bill_class == BillClass.SERVICE)
+        credit = svc.refund_bill(
+            bill_id=service_bill.id, reason="complaint",
+            refunded_by_id=gst_user.id,
+        )
+        assert credit.invoice_number.startswith("SRV-")
+        assert credit.sgst_amount == -service_bill.sgst_amount
+
+
 @pytest.fixture
 def gst_off(db_session):
     """Force GST mode off (a prior test's commit may have left it on)."""

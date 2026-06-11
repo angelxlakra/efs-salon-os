@@ -28,8 +28,8 @@ from sqlalchemy.orm import Session
 from ulid import ULID
 
 from app.models.billing import (
-    Bill, BillClass, BillItem, BillItemType, BillStatus, Payment,
-    PaymentMethod, BillItemStaffContribution, TaxMode,
+    Bill, BillClass, BillItem, BillItemType, BillStatus, BillType,
+    Payment, PaymentMethod, BillItemStaffContribution, TaxMode,
 )
 from app.models.customer import Customer
 from app.models.pending_payment import PendingPaymentCollection
@@ -956,6 +956,8 @@ class BillingService:
             id=str(ULID()),
             invoice_number=None,  # assigned below: credit note uses the
                                   # original bill's series (SRV/PRD/SAL)
+            bill_type=BillType.CREDIT_NOTE,  # required by
+                                  # ck_bill_credit_note_has_original
             bill_class=original_bill.bill_class,
             bill_group_id=original_bill.bill_group_id,
             customer_id=original_bill.customer_id,
