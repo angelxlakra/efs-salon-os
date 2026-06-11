@@ -19,7 +19,13 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from sqlalchemy.orm import Session
 
-from app.models.billing import Bill, BillItemType, PaymentMethod as PaymentMethodEnum
+from app.models.billing import (
+    Bill,
+    BillClass,
+    BillItemType,
+    BillType,
+    PaymentMethod as PaymentMethodEnum,
+)
 from app.models.settings import SalonSettings
 from app.utils import IST
 
@@ -70,6 +76,11 @@ class ReceiptService:
             return f"{rupees:.2f}"
 
     @staticmethod
+    def _format_rate(rate_percent: float) -> str:
+        """Format a tax rate percentage, trimming trailing zeros (2.5% / 9%)."""
+        return f"{rate_percent:g}%"
+
+    @staticmethod
     def _split_payments(
         payments: list,
     ) -> tuple[list, int]:
@@ -115,6 +126,11 @@ class ReceiptService:
 
         elements = []
         styles = getSampleStyleSheet()
+
+        # GST split-billing bills (service/product class) get a Rule 46 compliant
+        # tax-invoice layout; mixed_legacy bills keep the original layout exactly.
+        is_gst_bill = bill.bill_class in (BillClass.SERVICE, BillClass.PRODUCT)
+        is_credit_note = bill.bill_type == BillType.CREDIT_NOTE
 
         # ==================== STYLES ====================
 
@@ -195,8 +211,16 @@ class ReceiptService:
         else:
             elements.append(Paragraph("Ph: +91 98765 43210", info_style))
 
-        # GSTIN (if enabled)
-        if settings and settings.receipt_show_gstin and settings.gstin:
+        # GSTIN — mandatory and prominent on tax invoices; opt-in on legacy bills
+        if is_gst_bill and settings and settings.gstin:
+            gstin_style = ParagraphStyle(
+                'Gstin',
+                parent=info_style,
+                fontSize=9,
+                fontName=UNICODE_FONT_BOLD,
+            )
+            elements.append(Paragraph(f"GSTIN: {settings.gstin}", gstin_style))
+        elif settings and settings.receipt_show_gstin and settings.gstin:
             elements.append(Paragraph(f"GSTIN: {settings.gstin}", info_style))
 
         # Custom header message
@@ -210,7 +234,26 @@ class ReceiptService:
 
         # ==================== INVOICE INFO ====================
 
-        invoice_label = "INVOICE" if bill.status.value == "posted" else "DRAFT BILL"
+        if is_gst_bill:
+            if bill.status.value != "posted":
+                invoice_label = "DRAFT BILL"
+            elif is_credit_note:
+                invoice_label = "CREDIT NOTE"
+            else:
+                invoice_label = "TAX INVOICE"
+            # Document title — centered and prominent (Rule 46)
+            doc_title_style = ParagraphStyle(
+                'DocTitle',
+                parent=styles['Normal'],
+                alignment=TA_CENTER,
+                fontSize=11,
+                fontName=UNICODE_FONT_BOLD,
+                spaceAfter=2,
+            )
+            elements.append(Paragraph(invoice_label, doc_title_style))
+            elements.append(Spacer(1, 1 * mm))
+        else:
+            invoice_label = "INVOICE" if bill.status.value == "posted" else "DRAFT BILL"
         invoice_number = bill.invoice_number or "DRAFT"
 
         # Convert to IST for display (handle both timezone-aware and naive datetimes)
@@ -226,9 +269,14 @@ class ReceiptService:
         # Create clean invoice info table
         invoice_data = []
         invoice_data.append([
-            Paragraph(invoice_label, invoice_label_style),
+            Paragraph("Invoice No:" if is_gst_bill else invoice_label, invoice_label_style),
             Paragraph(f"<b>#{invoice_number}</b>", ParagraphStyle('InvNum', parent=styles['Normal'], fontSize=9, alignment=TA_RIGHT))
         ])
+        if is_gst_bill and is_credit_note and bill.original_bill and bill.original_bill.invoice_number:
+            invoice_data.append([
+                Paragraph("Against Invoice:", ParagraphStyle('Label', parent=styles['Normal'], fontSize=8)),
+                Paragraph(f"#{bill.original_bill.invoice_number}", ParagraphStyle('Value', parent=styles['Normal'], fontSize=8, alignment=TA_RIGHT))
+            ])
         invoice_data.append([
             Paragraph("Date:", ParagraphStyle('Label', parent=styles['Normal'], fontSize=8)),
             Paragraph(invoice_date, ParagraphStyle('Value', parent=styles['Normal'], fontSize=8, alignment=TA_RIGHT))
@@ -344,8 +392,28 @@ class ReceiptService:
                 Paragraph(f"- {ReceiptService.format_currency(bill.discount_amount)}", ParagraphStyle('TV', parent=styles['Normal'], fontSize=8, alignment=TA_RIGHT, textColor=colors.black))
             ])
 
-        # Tax breakdown (only show if receipt_show_gstin is enabled)
-        if settings and settings.receipt_show_gstin:
+        # Tax breakdown — CGST and SGST shown as separate lines (Rule 46).
+        if is_gst_bill:
+            # Per-rate from the stored amounts; rate per half is 2.5% (service,
+            # exclusive) or 9% (product, inclusive in MRP). Taxable value works
+            # for both classes and credit notes: total minus tax.
+            taxable_value = bill.total_amount - bill.tax_amount
+            half_rate = 2.5 if bill.bill_class == BillClass.SERVICE else 9
+            incl_note = " incl." if bill.bill_class == BillClass.PRODUCT else ""
+            totals_data.append([
+                Paragraph("Taxable Value:", ParagraphStyle('TL', parent=styles['Normal'], fontSize=8, alignment=TA_RIGHT)),
+                Paragraph(ReceiptService.format_currency(taxable_value), ParagraphStyle('TV', parent=styles['Normal'], fontSize=8, alignment=TA_RIGHT))
+            ])
+            totals_data.append([
+                Paragraph(f"CGST @ {ReceiptService._format_rate(half_rate)}{incl_note}:", ParagraphStyle('TL', parent=styles['Normal'], fontSize=8, alignment=TA_RIGHT)),
+                Paragraph(ReceiptService.format_currency(bill.cgst_amount), ParagraphStyle('TV', parent=styles['Normal'], fontSize=8, alignment=TA_RIGHT))
+            ])
+            totals_data.append([
+                Paragraph(f"SGST @ {ReceiptService._format_rate(half_rate)}{incl_note}:", ParagraphStyle('TL', parent=styles['Normal'], fontSize=8, alignment=TA_RIGHT)),
+                Paragraph(ReceiptService.format_currency(bill.sgst_amount), ParagraphStyle('TV', parent=styles['Normal'], fontSize=8, alignment=TA_RIGHT))
+            ])
+        elif settings and settings.receipt_show_gstin:
+            # Legacy inclusive-18% bills: keep the original CGST/SGST display.
             cgst = bill.tax_amount / 2
             sgst = bill.tax_amount / 2
             totals_data.append([
@@ -360,7 +428,7 @@ class ReceiptService:
         # Round off
         round_off = bill.rounded_total - bill.total_amount
         if abs(round_off) >= 1:
-            sign = "+" if round_off > 0 else ""
+            sign = "+" if round_off > 0 else "-"
             totals_data.append([
                 Paragraph("Round Off:", ParagraphStyle('TL', parent=styles['Normal'], fontSize=7, alignment=TA_RIGHT, textColor=colors.black)),
                 Paragraph(f"{sign} {ReceiptService.format_currency(abs(round_off))}", ParagraphStyle('TV', parent=styles['Normal'], fontSize=7, alignment=TA_RIGHT, textColor=colors.black))
@@ -505,6 +573,37 @@ class ReceiptService:
                 textColor=colors.black
             )
             elements.append(Paragraph(settings.invoice_terms, terms_style))
+
+        # ==================== TAX-INVOICE DECLARATIONS (Rule 46) ====================
+
+        if is_gst_bill:
+            elements.append(Spacer(1, 3 * mm))
+            declaration_style = ParagraphStyle(
+                'Declaration',
+                parent=styles['Normal'],
+                fontSize=7,
+                fontName=UNICODE_FONT,
+                alignment=TA_LEFT,
+                leading=9,
+                textColor=colors.black,
+            )
+            elements.append(Paragraph(
+                "Whether tax is payable under reverse charge: No",
+                declaration_style,
+            ))
+
+            # Authorised signatory — leave vertical space for a signature
+            elements.append(Spacer(1, 8 * mm))
+            signatory_style = ParagraphStyle(
+                'Signatory',
+                parent=styles['Normal'],
+                fontSize=8,
+                fontName=UNICODE_FONT,
+                alignment=TA_RIGHT,
+                leading=9,
+                textColor=colors.black,
+            )
+            elements.append(Paragraph("Authorised Signatory", signatory_style))
 
         # Build PDF
         doc.build(elements)
