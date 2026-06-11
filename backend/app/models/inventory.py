@@ -113,6 +113,10 @@ class SKU(Base, ULIDMixin, TimestampMixin):
     retail_price = Column(Integer, nullable=True)  # paise (tax-inclusive)
     retail_markup_percent = Column(Numeric(5, 2), nullable=True)
 
+    # GST invoice compliance (Rule 46): HSN code printed per line.
+    # NULL falls back to salon_settings.default_product_hsn_code (3305).
+    hsn_code = Column(String(8), nullable=True)
+
     # Relationships
     category = relationship("InventoryCategory", back_populates="skus")
     supplier = relationship("Supplier", back_populates="skus")
