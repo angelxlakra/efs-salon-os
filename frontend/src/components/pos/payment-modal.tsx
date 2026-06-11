@@ -507,96 +507,63 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
   const [isSendingWhatsApp, setIsSendingWhatsApp] = useState(false);
   const [isPrintingDraft, setIsPrintingDraft] = useState(false);
 
+  // Fetch a receipt PDF and show it in the given window for printing.
+  // A mixed GST cart is ONE PDF with two pages (service bill, product bill) —
+  // a thermal printer prints them in sequence on the continuous roll, so a
+  // single print job covers both. `win` is opened synchronously by the caller
+  // during the click so popup blockers (which fire after an await) don't block
+  // it. Falls back to a new tab if the synchronous open was blocked.
+  const showReceipt = async (
+    win: Window | null,
+    ids: { groupId: string | null; billId: string | null },
+  ) => {
+    const path = ids.groupId
+      ? `/pos/bills/group/${ids.groupId}/receipt`
+      : `/pos/bills/${ids.billId}/receipt`;
+    const response = await apiClient.get(path, { responseType: 'blob' });
+    const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+    if (win && !win.closed) {
+      win.location.href = url;
+    } else {
+      window.open(url, '_blank');
+    }
+  };
+
   // Print the bill BEFORE payment, for customers who want to see it first.
-  // Creates the draft bill(s) (idempotent — reused when they actually pay) and
-  // prints each. The receipt hides payment details until the bill is posted.
+  // Creates the draft bill(s) (idempotent — reused at payment) and opens the
+  // combined receipt. The receipt hides payment details until the bill is paid.
   const handlePrintDraft = async () => {
     if (incompleteServices.length > 0) {
       toast.error('Please complete all services before printing the bill');
       return;
     }
+    const win = window.open('', '_blank'); // open synchronously (popup-safe)
     try {
       setIsPrintingDraft(true);
       const created = await ensureBillsCreated();
-      if (created.billIds.length === 0) {
+      if (!created.groupId && !created.billId) {
+        win?.close();
         toast.error('Could not prepare the bill to print');
         return;
       }
-      for (const id of created.billIds) {
-        await handlePrintReceipt(id);
-      }
+      await showReceipt(win, { groupId: created.groupId, billId: created.billId });
     } catch (error: any) {
+      win?.close();
       toast.error(error.response?.data?.detail || 'Failed to print bill');
     } finally {
       setIsPrintingDraft(false);
     }
   };
 
-  // Print a PDF blob via a hidden iframe. window.open() called after an
-  // await (network fetch) is no longer tied to the click gesture and gets
-  // silently blocked by popup blockers — the iframe approach avoids that and
-  // triggers the print dialog directly. Falls back to a new tab if blocked.
-  //
-  // Returns a promise that resolves once printing finishes (or is dismissed),
-  // so callers printing multiple bills (service + product) can sequence them:
-  // two print() calls fired at once leave the browser showing only the first
-  // dialog, dropping the second bill. We wait via onafterprint with a timeout
-  // safety net.
-  const printPdfBlob = (data: BlobPart): Promise<void> => {
-    return new Promise((resolve) => {
-      const url = window.URL.createObjectURL(new Blob([data], { type: 'application/pdf' }));
-      const iframe = document.createElement('iframe');
-      iframe.style.position = 'fixed';
-      iframe.style.width = '0';
-      iframe.style.height = '0';
-      iframe.style.border = '0';
-      iframe.style.right = '0';
-      iframe.style.bottom = '0';
-      iframe.src = url;
-      let settled = false;
-      const finish = () => {
-        if (settled) return;
-        settled = true;
-        // Remove the iframe and release the blob once printing is done.
-        setTimeout(() => {
-          iframe.remove();
-          window.URL.revokeObjectURL(url);
-        }, 1000);
-        resolve();
-      };
-      iframe.onload = () => {
-        const win = iframe.contentWindow;
-        if (!win) {
-          window.open(url, '_blank');
-          finish();
-          return;
-        }
-        win.onafterprint = finish;
-        try {
-          win.focus();
-          win.print();
-        } catch {
-          window.open(url, '_blank');
-          finish();
-        }
-        // Safety net if onafterprint never fires (some PDF viewers/browsers).
-        setTimeout(finish, 60000);
-      };
-      document.body.appendChild(iframe);
-    });
-  };
-
-  const handlePrintReceipt = async (receiptBillId?: string) => {
-    const targetBillId = receiptBillId || billId;
-    if (!targetBillId) return;
+  // Print the receipt after payment (success view). Group → combined PDF.
+  const handlePrintReceipt = async () => {
+    const win = window.open('', '_blank'); // open synchronously (popup-safe)
     try {
-      const response = await apiClient.get(`/pos/bills/${targetBillId}/receipt`, {
-        responseType: 'blob',
-      });
-      await printPdfBlob(response.data);
+      await showReceipt(win, { groupId, billId });
     } catch (error) {
-      console.error('Failed to download receipt', error);
-      toast.error('Failed to download receipt');
+      win?.close();
+      console.error('Failed to open receipt', error);
+      toast.error('Failed to open receipt');
     }
   };
 
@@ -702,24 +669,12 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
               </div>
             )}
             <div className="w-full space-y-2">
-              {groupId && groupBills.length > 1 ? (
-                groupBills.map((bill) => (
-                  <Button
-                    key={bill.id}
-                    onClick={() => handlePrintReceipt(bill.id)}
-                    variant="outline"
-                    className="w-full"
-                  >
-                    <Printer className="h-4 w-4 mr-2" />
-                    Print {bill.bill_class === 'service' ? 'Service' : 'Product'} Receipt
-                  </Button>
-                ))
-              ) : (
-                <Button onClick={() => handlePrintReceipt()} variant="outline" className="w-full">
-                  <Printer className="h-4 w-4 mr-2" />
-                  Print Receipt
-                </Button>
-              )}
+              {/* One print job — for a mixed cart this is a 2-page PDF
+                  (service bill, then product bill). */}
+              <Button onClick={() => handlePrintReceipt()} variant="outline" className="w-full">
+                <Printer className="h-4 w-4 mr-2" />
+                {groupId && groupBills.length > 1 ? 'Print Receipts' : 'Print Receipt'}
+              </Button>
               {!groupId && successData?.phone && (
                 <Button
                   onClick={handleSendWhatsApp}

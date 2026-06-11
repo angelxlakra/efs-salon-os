@@ -109,6 +109,7 @@ class ReceiptService:
         """
         buffer = BytesIO()
 
+
         # Load salon settings if db session provided
         settings = None
         if db:
@@ -610,3 +611,27 @@ class ReceiptService:
         doc.build(elements)
         buffer.seek(0)
         return buffer
+
+    @staticmethod
+    def generate_group_receipt_pdf(bills: list, db: Optional[Session] = None) -> BytesIO:
+        """Combine several bills into one multi-page PDF (one bill per page).
+
+        For a GST split checkout the service bill and product bill print as
+        separate pages of a single document — an 80mm thermal printer prints
+        each page in turn on the continuous roll (feed/cut between pages), so
+        the customer gets two distinct receipts from one print job. Reuses the
+        single-bill renderer and concatenates the pages.
+        """
+        from pypdf import PdfReader, PdfWriter
+
+        writer = PdfWriter()
+        for bill in bills:
+            single = ReceiptService.generate_receipt_pdf(bill, db)
+            reader = PdfReader(single)
+            for page in reader.pages:
+                writer.add_page(page)
+
+        out = BytesIO()
+        writer.write(out)
+        out.seek(0)
+        return out

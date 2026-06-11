@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.database import get_db
 from app.models.user import User
-from app.models.billing import Bill, BillStatus, Payment
+from app.models.billing import Bill, BillClass, BillStatus, Payment
 from app.models.pending_payment import PendingPaymentCollection
 from app.services.billing_service import BillingService
 from app.services.idempotency_service import IdempotencyService
@@ -653,6 +653,55 @@ def get_bill_receipt(
         media_type="application/pdf",
         headers={
             "Content-Disposition": f'inline; filename="receipt_{bill.invoice_number or "draft"}.pdf"'
+        }
+    )
+
+
+@router.get(
+    "/bills/group/{bill_group_id}/receipt",
+    summary="Get a combined multi-page receipt PDF for a bill group"
+)
+def get_group_receipt(
+    bill_group_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Generate one PDF with the group's bills as separate pages.
+
+    The service bill and product bill of a split checkout print as page 1 and
+    page 2 of a single document — one print job, both receipts.
+
+    **Permissions**: Receptionist or Owner
+    """
+    if not PermissionChecker.has_permission(current_user.role.name, "billing", "read"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions to view receipts"
+        )
+
+    # Ignore credit notes for the receipt; service bill prints before product.
+    bills = (
+        db.query(Bill)
+        .filter(
+            Bill.bill_group_id == bill_group_id,
+            Bill.bill_class.in_([BillClass.SERVICE, BillClass.PRODUCT]),
+        )
+        .all()
+    )
+    bills.sort(key=lambda b: 0 if b.bill_class == BillClass.SERVICE else 1)
+    if not bills:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No bills found for group: {bill_group_id}"
+        )
+
+    pdf_buffer = ReceiptService.generate_group_receipt_pdf(bills, db)
+
+    return Response(
+        content=pdf_buffer.getvalue(),
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'inline; filename="receipt_group_{bill_group_id}.pdf"'
         }
     )
 

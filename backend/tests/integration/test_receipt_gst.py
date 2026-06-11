@@ -184,6 +184,58 @@ def test_draft_bill_prints_without_payment(db_session, gst_settings, test_user, 
     assert "PENDING" not in text
 
 
+def test_group_receipt_is_two_pages(db_session, gst_settings, test_user, service_factory, sellable_sku):
+    """A split checkout renders one PDF with two pages: service then product."""
+    from app.services.receipt_service import ReceiptService
+
+    group = "01HGRPRCPT0000000000000001"
+    svc = service_factory()
+    service_bill = Bill(
+        customer_name="GST Cust", subtotal=50000, discount_amount=0,
+        tax_amount=2500, cgst_amount=1250, sgst_amount=1250,
+        total_amount=52500, rounded_total=52500, rounding_adjustment=0,
+        status=BillStatus.POSTED, bill_type=BillType.NORMAL,
+        bill_class=BillClass.SERVICE, created_by=test_user.id,
+        invoice_number="SRV-26-0010", bill_group_id=group,
+    )
+    product_bill = Bill(
+        customer_name="GST Cust", subtotal=88000, discount_amount=0,
+        tax_amount=13422, cgst_amount=6711, sgst_amount=6711,
+        total_amount=88000, rounded_total=88000, rounding_adjustment=0,
+        status=BillStatus.POSTED, bill_type=BillType.NORMAL,
+        bill_class=BillClass.PRODUCT, created_by=test_user.id,
+        invoice_number="PRD-26-0010", bill_group_id=group,
+    )
+    db_session.add_all([service_bill, product_bill])
+    db_session.flush()
+    db_session.add(BillItem(
+        bill_id=service_bill.id, service_id=svc.id, item_name="Haircut",
+        base_price=50000, quantity=1, line_total=50000,
+        item_type=BillItemType.SERVICE, tax_rate=5, tax_mode=TaxMode.EXCLUSIVE,
+        taxable_value=50000, cgst_amount=1250, sgst_amount=1250,
+    ))
+    db_session.add(BillItem(
+        bill_id=product_bill.id, sku_id=sellable_sku.id, item_name="Shampoo",
+        base_price=88000, quantity=1, line_total=88000,
+        item_type=BillItemType.PRODUCT, tax_rate=18, tax_mode=TaxMode.INCLUSIVE,
+        taxable_value=74578, cgst_amount=6711, sgst_amount=6711,
+    ))
+    db_session.flush()
+    db_session.refresh(service_bill)
+    db_session.refresh(product_bill)
+
+    from io import BytesIO
+    from pypdf import PdfReader
+
+    out = ReceiptService.generate_group_receipt_pdf([service_bill, product_bill], db_session)
+    reader = PdfReader(BytesIO(out.getvalue()))
+    assert len(reader.pages) == 2
+    page1 = reader.pages[0].extract_text()
+    page2 = reader.pages[1].extract_text()
+    assert "SRV-26-0010" in page1 and "Haircut" in page1
+    assert "PRD-26-0010" in page2 and "Shampoo" in page2
+
+
 def test_legacy_bill_unchanged(db_session, gst_settings, test_user):
     bill = Bill(
         customer_name="Old Cust", subtotal=50000, discount_amount=0,
