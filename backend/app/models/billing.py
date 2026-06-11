@@ -125,6 +125,9 @@ class Bill(Base, ULIDMixin, TimestampMixin):
         String(26), ForeignKey("bills.id", ondelete="RESTRICT"), nullable=True
     )
 
+    # Free-text annotations (void reason, pending-balance completion notes)
+    notes = Column(Text)
+
     # Audit
     created_by = Column(String(26), ForeignKey("users.id"), nullable=False)
 
