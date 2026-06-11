@@ -258,19 +258,51 @@ class TestBillGroupSplit:
         assert all(not i.sku_id for i in service_bill.items)
         assert all(i.sku_id for i in product_bill.items)
 
-    def test_discount_splits_proportionally(
+    def test_discount_applies_to_service_bill_only(
         self, db_session, gst_on, gst_service, sellable_sku, gst_user
     ):
-        # 16800 over lines 50000:118000 → floor-proportional 5000 / 11800
+        # Discount applies to services only — all of it lands on the service
+        # bill; the product bill is never discounted (sold at MRP).
         _, bills = self._mixed_group(
             db_session, gst_service, sellable_sku, gst_user,
-            discount_amount=16800,
+            discount_amount=10000,
         )
         service_bill = next(b for b in bills if b.bill_class == BillClass.SERVICE)
         product_bill = next(b for b in bills if b.bill_class == BillClass.PRODUCT)
-        assert service_bill.discount_amount + product_bill.discount_amount == 16800
-        assert service_bill.discount_amount == 5000
-        assert product_bill.discount_amount == 11800
+        assert service_bill.discount_amount == 10000
+        assert product_bill.discount_amount == 0
+        # service: (50000 - 10000) + 5% = 42000; product: MRP 118000 untouched
+        assert service_bill.total_amount == 42000
+        assert product_bill.total_amount == 118000
+
+    def test_discount_exceeding_services_subtotal_rejected(
+        self, db_session, gst_on, gst_service, sellable_sku, gst_user
+    ):
+        # Service subtotal is 50000; a 60000 discount must be rejected even
+        # though the combined subtotal (168000) is larger.
+        svc = BillingService(db_session)
+        with pytest.raises(ValueError, match="services subtotal"):
+            svc.create_bill_group(
+                items=[
+                    {"service_id": gst_service.id, "quantity": 1},
+                    {"sku_id": sellable_sku.id, "quantity": 1},
+                ],
+                created_by_id=gst_user.id,
+                customer_name="GST Customer",
+                discount_amount=60000,
+            )
+
+    def test_product_only_cart_rejects_discount(
+        self, db_session, gst_on, sellable_sku, gst_user
+    ):
+        svc = BillingService(db_session)
+        with pytest.raises(ValueError, match="services subtotal"):
+            svc.create_bill(
+                items=[{"sku_id": sellable_sku.id, "quantity": 1}],
+                created_by_id=gst_user.id,
+                customer_name="GST Customer",
+                discount_amount=5000,
+            )
 
     def test_single_side_cart_stays_one_bill(
         self, db_session, gst_on, gst_service, gst_user

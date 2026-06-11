@@ -104,22 +104,31 @@ export function computeGstBreakdown(
     };
   });
 
-  // Proportional allocation of the bill-level discount across ALL lines
-  const totalBase = lines.reduce((sum, l) => sum + l.base, 0);
-  if (globalDiscount > 0 && totalBase > 0) {
+  // Bill-level discount applies to SERVICE lines only — retail products are
+  // sold at MRP and never discounted. Allocate proportionally across the
+  // service lines, capped at each line's base (mirrors the backend allocator).
+  const serviceLines = lines.filter((l) => !l.item.isProduct);
+  const totalServiceBase = serviceLines.reduce((sum, l) => sum + l.base, 0);
+  if (globalDiscount > 0 && totalServiceBase > 0) {
     let allocated = 0;
-    for (const line of lines) {
-      line.alloc = Math.floor((line.base * globalDiscount) / totalBase);
+    for (const line of serviceLines) {
+      line.alloc = Math.floor((line.base * globalDiscount) / totalServiceBase);
       allocated += line.alloc;
     }
-    // Remainder: one paise at a time to largest lines first (ties by position)
+    // Remainder: one paise at a time to largest lines first (ties by position),
+    // skipping lines already at their cap.
     let remainder = globalDiscount - allocated;
-    const order = lines
+    const order = serviceLines
       .map((_, i) => i)
-      .sort((a, b) => lines[b].base - lines[a].base || a - b);
-    for (let i = 0; remainder > 0 && order.length > 0; i++) {
-      lines[order[i % order.length]].alloc += 1;
-      remainder -= 1;
+      .sort((a, b) => serviceLines[b].base - serviceLines[a].base || a - b);
+    let k = 0;
+    while (remainder > 0 && order.some((i) => serviceLines[i].alloc < serviceLines[i].base)) {
+      const line = serviceLines[order[k % order.length]];
+      if (line.alloc < line.base) {
+        line.alloc += 1;
+        remainder -= 1;
+      }
+      k += 1;
     }
   }
 

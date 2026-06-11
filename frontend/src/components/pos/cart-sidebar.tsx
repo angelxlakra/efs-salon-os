@@ -202,28 +202,35 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
     // Convert rupees to paise
     const discountPaise = Math.round(amount * 100);
 
+    // Discounts apply to services only (retail products sold at MRP) — cap at
+    // the services subtotal so the backend doesn't reject the bill.
+    if (discountPaise > discountBase) {
+      toast.error('Discount cannot exceed the services subtotal (products are not discountable)');
+      return;
+    }
+
     setGlobalDiscount(discountPaise);
     setDiscountInput('');
   };
 
   const handlePercentageDiscount = (percentage: number) => {
     // Check if this percentage is currently active
-    const currentPercentage = subtotal > 0 ? Math.round((discount / subtotal) * 100) : 0;
+    const currentPercentage = discountBase > 0 ? Math.round((discount / discountBase) * 100) : 0;
 
     if (currentPercentage === percentage) {
       // If already active, remove discount
       setGlobalDiscount(0);
     } else {
-      // Calculate and apply discount as percentage of subtotal
-      const discountPaise = Math.round((subtotal * percentage) / 100);
+      // Apply discount as a percentage of the services subtotal
+      const discountPaise = Math.round((discountBase * percentage) / 100);
       setGlobalDiscount(discountPaise);
     }
   };
 
   // Check if a percentage discount is currently active
   const isPercentageActive = (percentage: number): boolean => {
-    if (subtotal === 0 || discount === 0) return false;
-    const currentPercentage = Math.round((discount / subtotal) * 100);
+    if (discountBase === 0 || discount === 0) return false;
+    const currentPercentage = Math.round((discount / discountBase) * 100);
     return currentPercentage === percentage;
   };
 
@@ -496,6 +503,12 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
   const gstMode = isGstMode();
   const gstBreakdown = gstMode ? computeGstBreakdown(items, discount) : null;
   const total = gstBreakdown ? gstBreakdown.grandTotal : getTotal();
+
+  // Discounts apply to services only in GST mode (retail products sold at MRP),
+  // so percentage buttons and the discount cap use the services subtotal.
+  const discountBase = gstMode
+    ? items.filter((i) => !i.isProduct).reduce((s, i) => s + i.unitPrice * i.quantity, 0)
+    : subtotal;
 
   // Check if all service items have staff assigned (products don't need staff)
   const serviceItems = items.filter((item) => !item.isProduct);

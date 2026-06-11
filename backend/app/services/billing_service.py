@@ -149,7 +149,11 @@ class BillingService:
             )
             return
 
-        line_discounts = allocate_discount([i.line_total for i in items], discount)
+        # Discounts apply to SERVICES only — retail products are never
+        # discounted (sold at MRP). Products contribute 0 to the allocation,
+        # so the whole discount lands on the service lines.
+        discountable = [0 if i.sku_id else i.line_total for i in items]
+        line_discounts = allocate_discount(discountable, discount)
 
         cgst = sgst = total = 0
         for item, line_discount in zip(items, line_discounts):
@@ -251,11 +255,10 @@ class BillingService:
         if not product_items or len(product_items) == len(items):
             return None
 
-        discounts = allocate_discount(
-            [i.line_total for i in items], bill.discount_amount or 0
-        )
-        prd_discount = sum(d for d, i in zip(discounts, items) if i.sku_id)
-        svc_discount = (bill.discount_amount or 0) - prd_discount
+        # Discounts apply to services only, so the entire discount stays on the
+        # service bill; the product bill is never discounted.
+        prd_discount = 0
+        svc_discount = bill.discount_amount or 0
 
         group_id = bill.id
         bill.bill_group_id = group_id
@@ -564,7 +567,18 @@ class BillingService:
             else:
                 raise ValueError("Each item must have either service_id or sku_id")
         discount_paise = discount_amount
-        if discount_paise > subtotal:
+        # In GST mode the discount applies to services only, so it cannot
+        # exceed the services subtotal (retail products are sold at MRP).
+        if self._gst_mode_active():
+            services_subtotal = sum(
+                d["line_total"] for d in bill_items_data if not d.get("sku_id")
+            )
+            if discount_paise > services_subtotal:
+                raise ValueError(
+                    "Discount cannot exceed the services subtotal "
+                    "(retail products are not discountable)"
+                )
+        elif discount_paise > subtotal:
             raise ValueError("Discount cannot exceed subtotal")
 
         # Totals are placeholders here; _recalculate_bill_tax() computes the
@@ -1233,7 +1247,17 @@ class BillingService:
             raise ValueError(f"Bill not found: {bill_id}")
         if bill.status != BillStatus.DRAFT:
             raise ValueError("Can only edit discount on draft bills")
-        if discount_amount > bill.subtotal:
+        # Services-only discount cap in GST mode (products sold at MRP). After a
+        # mixed cart is split, a product bill has no service lines, so any
+        # discount on it is rejected.
+        if self._gst_mode_for_bill(bill):
+            services_subtotal = sum(i.line_total for i in bill.items if not i.sku_id)
+            if discount_amount > services_subtotal:
+                raise ValueError(
+                    "Discount cannot exceed the services subtotal "
+                    "(retail products are not discountable)"
+                )
+        elif discount_amount > bill.subtotal:
             raise ValueError("Discount cannot exceed subtotal")
 
         # Recalculate all totals from scratch using the new discount
