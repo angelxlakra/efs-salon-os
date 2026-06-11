@@ -334,7 +334,10 @@ export const useCartStore = create<CartState>((set, get) => ({
       const itemTotal = item.unitPrice * item.quantity;
       // Tax is already included in price, extract it
       // Formula: tax = (inclusive_price * rate) / (100 + rate)
-      const tax = Math.round((itemTotal * item.taxRate) / (100 + item.taxRate));
+      // Guard against a missing/invalid taxRate (services carry no tax_rate
+      // field) — fall back to the legacy 18% so the display never shows NaN.
+      const rate = Number.isFinite(item.taxRate) ? item.taxRate : 18;
+      const tax = Math.round((itemTotal * rate) / (100 + rate));
       return sum + tax;
     }, 0);
   },

@@ -48,6 +48,8 @@ interface FormDataType {
   contact_website: string;
   gstin: string;
   pan: string;
+  gst_registered: boolean;
+  gst_effective_from: string;
   receipt_header_text: string;
   receipt_footer_text: string;
   receipt_show_gstin: boolean;
@@ -85,6 +87,8 @@ export default function SettingsPage() {
     contact_website: '',
     gstin: '',
     pan: '',
+    gst_registered: false,
+    gst_effective_from: '',
     receipt_header_text: '',
     receipt_footer_text: '',
     receipt_show_gstin: true,
@@ -119,6 +123,8 @@ export default function SettingsPage() {
         contact_website: data.contact_website || '',
         gstin: data.gstin || '',
         pan: data.pan || '',
+        gst_registered: data.gst_registered ?? false,
+        gst_effective_from: data.gst_effective_from || '',
         receipt_header_text: data.receipt_header_text || '',
         receipt_footer_text: data.receipt_footer_text || '',
         receipt_show_gstin: data.receipt_show_gstin ?? true,
@@ -159,6 +165,8 @@ export default function SettingsPage() {
       contact_website: 'Website',
       gstin: 'GSTIN',
       pan: 'PAN',
+      gst_registered: 'GST Registered',
+      gst_effective_from: 'GST Effective From',
       receipt_header_text: 'Receipt Header Text',
       receipt_footer_text: 'Receipt Footer Text',
       receipt_show_gstin: 'Show GSTIN on Receipts',
@@ -235,7 +243,12 @@ export default function SettingsPage() {
     try {
       setIsSaving(true);
       setShowConfirmDialog(false);
-      await apiClient.patch('/settings', formData);
+      // Empty date string isn't a valid date for the backend — send null.
+      const payload = {
+        ...formData,
+        gst_effective_from: formData.gst_effective_from || null,
+      };
+      await apiClient.patch('/settings', payload);
       toast.success('Settings updated successfully');
       setHasChanges(false);
       fetchSettings();
@@ -503,6 +516,39 @@ export default function SettingsPage() {
               </p>
             </div>
           </div>
+
+          {/* GST registration mode — turns on dual-rate split billing
+              (5% services / 18% products) and Rule 46 tax invoices. */}
+          <div className="flex items-center justify-between border-t pt-4">
+            <div className="space-y-0.5">
+              <Label htmlFor="gst_registered">GST Registered</Label>
+              <p className="text-xs text-text-secondary">
+                Charge GST on bills: services 5% (added on top), retail products
+                18% (included in MRP), shown on tax invoices. Requires a GSTIN.
+              </p>
+            </div>
+            <Switch
+              id="gst_registered"
+              checked={formData.gst_registered}
+              onCheckedChange={(checked) => handleChange('gst_registered', checked)}
+            />
+          </div>
+
+          {formData.gst_registered && (
+            <div className="space-y-2">
+              <Label htmlFor="gst_effective_from">GST Effective From</Label>
+              <Input
+                id="gst_effective_from"
+                type="date"
+                value={formData.gst_effective_from}
+                onChange={(e) => handleChange('gst_effective_from', e.target.value)}
+              />
+              <p className="text-xs text-text-secondary">
+                Bills dated on or after this date use GST billing; earlier bills
+                are unchanged. Set this to your GST registration date.
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
