@@ -81,6 +81,28 @@ class BillingService:
             return False
         return datetime.now(IST).date() >= settings.gst_effective_from
 
+    def _gst_mode_for_bill(self, bill: Bill) -> bool:
+        """Whether a specific bill uses the GST scheme.
+
+        Bound to the BILL, not wall-clock: a bill created before the GST
+        effective date stays on legacy inclusive-18% math forever, so editing
+        an old bill (discount/item change) after registration never retro-taxes
+        it. New bills (created on/after the effective date) get the GST scheme.
+        An already-classified service/product bill always stays GST.
+        """
+        if bill.bill_class in (BillClass.SERVICE, BillClass.PRODUCT):
+            return True
+        from app.services.settings_service import SettingsService
+
+        settings = SettingsService.get_or_create_settings(self.db)
+        if not settings.gst_registered or not settings.gst_effective_from:
+            return False
+        bill_date = (
+            bill.created_at.astimezone(IST).date()
+            if bill.created_at else datetime.now(IST).date()
+        )
+        return bill_date >= settings.gst_effective_from
+
     @staticmethod
     def _line_tax_params(item: BillItem) -> tuple[int, str]:
         """(rate_percent, tax_mode) for a bill line in GST mode.
@@ -115,7 +137,7 @@ class BillingService:
         items = list(bill.items)
         discount = bill.discount_amount or 0
 
-        if not self._gst_mode_active():
+        if not self._gst_mode_for_bill(bill):
             amount_after_discount = bill.subtotal - discount
             breakdown = TaxCalculator.calculate_tax_breakdown(amount_after_discount)
             bill.tax_amount = breakdown["total_tax"]
@@ -168,9 +190,7 @@ class BillingService:
         """Pick the invoice series for a bill (SRV/PRD in GST mode, else SAL)."""
         from app.services.settings_service import SettingsService
 
-        if self._gst_mode_active() and bill.bill_class in (
-            BillClass.SERVICE, BillClass.PRODUCT
-        ):
+        if bill.bill_class in (BillClass.SERVICE, BillClass.PRODUCT):
             settings = SettingsService.get_or_create_settings(self.db)
             if bill.bill_class == BillClass.SERVICE:
                 return InvoiceNumberGenerator.generate(
@@ -196,12 +216,20 @@ class BillingService:
         Returns:
             List of 1 or 2 DRAFT bills.
         """
-        bill = self.create_bill(items=items, created_by_id=created_by_id, **kwargs)
-        sibling = self._split_bill_if_mixed(bill)
+        # Single transaction: create_bill defers its commit so a split failure
+        # rolls the whole checkout back (no orphaned, mis-taxed single bill).
+        try:
+            bill = self.create_bill(
+                items=items, created_by_id=created_by_id, commit=False, **kwargs
+            )
+            sibling = self._split_bill_if_mixed(bill)
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
+            raise
+        self.db.refresh(bill)
         if sibling is None:
             return [bill]
-        self.db.commit()
-        self.db.refresh(bill)
         self.db.refresh(sibling)
         return [bill, sibling]
 
@@ -215,7 +243,7 @@ class BillingService:
         preserved exactly. Returns the new product bill, or None if no split
         is needed (single-class cart or GST mode off).
         """
-        if not self._gst_mode_active() or bill.status != BillStatus.DRAFT:
+        if not self._gst_mode_for_bill(bill) or bill.status != BillStatus.DRAFT:
             return None
 
         items = list(bill.items)
@@ -289,12 +317,15 @@ class BillingService:
         Raises:
             ValueError: group not found / not draft / tender != group total.
         """
+        # Lock the group's draft bills FOR UPDATE so two terminals can't both
+        # pass the draft check and double-post / double-reduce stock.
         bills = (
             self.db.query(Bill)
             .filter(
                 Bill.bill_group_id == bill_group_id,
                 Bill.status == BillStatus.DRAFT,
             )
+            .with_for_update()
             .all()
         )
         if not bills:
@@ -348,6 +379,12 @@ class BillingService:
                 if remaining[target.id] == 0:
                     bill_index += 1
 
+        # Defensive: never post a bill that the allocation left short. The
+        # equality guards above should make this impossible, but a POSTED bill
+        # with an unpaid balance is silent money loss, so assert it.
+        if any(r != 0 for r in remaining.values()):
+            raise ValueError("Payment allocation did not fully cover every bill in the group")
+
         # Post every bill in the group (one transaction — all or nothing)
         inventory_service = InventoryService(self.db)
         for bill in bills_sorted:
@@ -389,6 +426,7 @@ class BillingService:
         session_id: Optional[str] = None,  # Link walk-ins to bill
         tip_amount: int = 0,  # in paise
         tip_staff_id: Optional[str] = None,
+        commit: bool = True,  # set False to keep the txn open (group checkout)
     ) -> Bill:
         """Create a new bill in draft status.
 
@@ -588,6 +626,10 @@ class BillingService:
 
             for walkin in walkins:
                 walkin.bill_id = bill.id
+
+        if not commit:
+            self.db.flush()
+            return bill
 
         self.db.commit()
         self.db.refresh(bill)

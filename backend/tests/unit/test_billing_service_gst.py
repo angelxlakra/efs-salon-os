@@ -344,6 +344,62 @@ class TestBillGroupSplit:
         assert sellable_sku.current_stock == stock_before - 1
 
 
+class TestLegacyBillsNotRetroTaxed:
+    """Regression (review C1): editing a pre-registration legacy bill after
+    GST is enabled must NOT re-tax it or reclassify its invoice series."""
+
+    def test_apply_discount_on_legacy_bill_keeps_zero_tax(
+        self, db_session, gst_service, gst_user
+    ):
+        from datetime import datetime, timedelta
+        from app.models.billing import Bill, BillClass, BillStatus, BillItem, BillItemType
+        from app.models.settings import SalonSettings
+        from app.utils import IST
+
+        # A legacy bill created before registration (tax already zeroed by the
+        # backfill), classed mixed_legacy.
+        created = datetime.now(IST) - timedelta(days=30)
+        bill = Bill(
+            id=generate_ulid(), customer_name="Old Cust",
+            subtotal=50000, discount_amount=0, tax_amount=0,
+            cgst_amount=0, sgst_amount=0, total_amount=50000,
+            rounded_total=50000, rounding_adjustment=0,
+            status=BillStatus.DRAFT, bill_class=BillClass.MIXED_LEGACY,
+            created_by=gst_user.id, created_at=created,
+        )
+        db_session.add(bill)
+        db_session.flush()
+        db_session.add(BillItem(
+            id=generate_ulid(), bill_id=bill.id, service_id=gst_service.id,
+            item_name="Haircut", base_price=50000, quantity=1, line_total=50000,
+            item_type=BillItemType.SERVICE,
+        ))
+        db_session.flush()
+
+        # Now GST is registered, effective today.
+        s = db_session.query(SalonSettings).first() or SalonSettings(
+            salon_name="T", salon_address="A")
+        if not s.id:
+            db_session.add(s)
+        s.gst_registered = True
+        s.gstin = "29ABCDE1234F1Z5"
+        s.gst_effective_from = datetime.now(IST).date()
+        db_session.flush()
+
+        svc = BillingService(db_session)
+        bill = svc.apply_discount(
+            bill_id=bill.id, discount_amount=5000,
+            discount_reason="x", applied_by_id=gst_user.id,
+        )
+
+        # Legacy math: 18% extracted from the inclusive 45000 — NOT 0, NOT 5%
+        # exclusive. Crucially the bill stays mixed_legacy (no SRV reclass).
+        assert bill.bill_class == BillClass.MIXED_LEGACY
+        assert bill.total_amount == 45000  # inclusive, tax not added on top
+        expected_tax = round((45000 * 18) / 118)
+        assert abs(bill.tax_amount - expected_tax) <= 1
+
+
 class TestSplitBillRefunds:
     """Phase 6: each half of a split checkout is refundable independently,
     with the credit note drawn from that bill's own invoice series."""

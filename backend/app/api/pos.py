@@ -270,11 +270,19 @@ def pay_bill_group(
             detail="Insufficient permissions to record payments"
         )
 
+    # Group totals are whole rupees; reject fractional/oversized tenders and
+    # never let float money reach the service layer.
+    MAX_TENDER_RUPEES = 10_000_000  # ₹1 crore guard against overflow/typos
     for p in payment_data.payments:
-        if p.amount != int(p.amount):
+        if round(p.amount, 2) != round(p.amount):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Group payments must be whole-rupee amounts"
+            )
+        if p.amount > MAX_TENDER_RUPEES:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Payment amount exceeds the allowed maximum"
             )
 
     billing_service = BillingService(db)
@@ -284,7 +292,7 @@ def pay_bill_group(
             payments=[
                 {
                     "payment_method": p.method,
-                    "amount": int(p.amount),
+                    "amount": round(p.amount),
                     "reference_number": p.reference_number,
                     "notes": p.notes,
                 }
