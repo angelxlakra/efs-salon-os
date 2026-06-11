@@ -99,9 +99,16 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
   // Initialize amountToPay with remaining amount when it changes or when modal opens
   const remainingRupees = remainingPaise / 100;
 
-  // Set initial amount to pay when modal opens
+  // Set initial amount to pay when modal opens, and start each open with a
+  // clean slate: discard any bills created in a previous open (which may
+  // predate a discount/cart change) so the next print/pay creates fresh bills
+  // matching the current cart.
   useEffect(() => {
     if (isOpen && payments.length === 0) {
+      setBillId(null);
+      setGroupId(null);
+      setGroupBills([]);
+      setServerGrandTotal(null);
       const totalPaise = gstMode
         ? computeGstBreakdown(items, discount).grandTotal
         : getTotal();
