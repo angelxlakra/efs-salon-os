@@ -102,6 +102,13 @@ class SettingsService:
             if hasattr(settings, field) and value is not None:
                 setattr(settings, field, value)
 
+        # Partial updates bypass schema-level cross-field validation, so the
+        # combined state must be checked here: GST billing cannot be enabled
+        # without a GSTIN on record.
+        if settings.gst_registered and not (settings.gstin and settings.gstin.strip()):
+            db.rollback()
+            raise ValueError("GSTIN is required when GST registration is enabled")
+
         db.commit()
         db.refresh(settings)
 
