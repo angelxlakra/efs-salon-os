@@ -1,376 +1,305 @@
 #!/bin/bash
 #
-# SalonOS - Build and Push to DockerHub
-# This script builds Docker images and pushes them to DockerHub
+# SalonOS — Build, Push, and Publish
 #
-# Usage: ./scripts/build-and-push.sh [version] [dockerhub-username]
-# Example: ./scripts/build-and-push.sh 1.0.0 myusername
+# Usage:
+#   ./scripts/build-and-push.sh VERSION DOCKERHUB_USERNAME [--publish]
 #
+# --publish  Also create a thin tarball, upload to Backblaze B2, and git-tag.
+#            Requires B2_KEY_ID, B2_APP_KEY, B2_BUCKET_NAME in your shell env
+#            or in a local .env.b2 file.
+#
+# Examples:
+#   ./scripts/build-and-push.sh 1.0.41 angel112
+#   ./scripts/build-and-push.sh 1.0.41 angel112 --publish
 
-set -e  # Exit on error
-set -u  # Exit on undefined variable
+set -euo pipefail
 
-# =============================================================================
-# Configuration
-# =============================================================================
+# ─── Arg parsing ──────────────────────────────────────────────────────────────
 
-VERSION="${1:-latest}"
-DOCKERHUB_USERNAME="${2:-}"
+VERSION=""
+DOCKERHUB_USERNAME=""
+PUBLISH=false
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --publish) PUBLISH=true; shift ;;
+        *)
+            if [ -z "$VERSION" ]; then
+                VERSION="$1"
+            elif [ -z "$DOCKERHUB_USERNAME" ]; then
+                DOCKERHUB_USERNAME="$1"
+            else
+                echo "Unknown argument: $1"; exit 1
+            fi
+            shift ;;
+    esac
+done
 
-# =============================================================================
-# Functions
-# =============================================================================
+# ─── Colors ───────────────────────────────────────────────────────────────────
 
-log_info() {
-    echo -e "${BLUE}[INFO]${NC} $1"
-}
+RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'; NC='\033[0m'
+log_info()    { echo -e "${BLUE}[INFO]${NC} $1"; }
+log_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
+log_warn()    { echo -e "${YELLOW}[WARN]${NC} $1"; }
+log_error()   { echo -e "${RED}[ERROR]${NC} $1"; }
 
-log_success() {
-    echo -e "${GREEN}[SUCCESS]${NC} $1"
-}
+# ─── Validation ───────────────────────────────────────────────────────────────
 
-log_warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1"
-}
+[ -z "$VERSION" ]            && { log_error "VERSION is required";            echo "Usage: $0 VERSION DOCKERHUB_USERNAME [--publish]"; exit 1; }
+[ -z "$DOCKERHUB_USERNAME" ] && { log_error "DOCKERHUB_USERNAME is required"; echo "Usage: $0 VERSION DOCKERHUB_USERNAME [--publish]"; exit 1; }
+[ ! -f "compose.yaml" ]      && { log_error "Must run from project root (compose.yaml not found)"; exit 1; }
+[ ! -d "backend" ] || [ ! -d "frontend" ] && { log_error "backend/ or frontend/ directory not found"; exit 1; }
 
-log_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
-}
+# ─── B2 credentials (needed only for --publish) ───────────────────────────────
 
-print_usage() {
-    echo "Usage: $0 [version] [dockerhub-username]"
-    echo ""
-    echo "Arguments:"
-    echo "  version             Version tag (default: latest)"
-    echo "  dockerhub-username  Your DockerHub username (required)"
-    echo ""
-    echo "Examples:"
-    echo "  $0 1.0.0 myusername"
-    echo "  $0 latest myusername"
-    echo ""
-    echo "Before running:"
-    echo "  1. Login to DockerHub: docker login"
-    echo "  2. Ensure you're on the correct branch: git checkout main"
-    echo ""
-    exit 1
-}
-
-check_requirements() {
-    log_info "Checking requirements..."
-
-    # Check Docker
-    if ! command -v docker &> /dev/null; then
-        log_error "Docker is not installed"
-        exit 1
+if $PUBLISH; then
+    # Try sourcing a local B2 env file if the vars aren't already set
+    if [ -z "${B2_KEY_ID:-}" ] || [ -z "${B2_APP_KEY:-}" ] || [ -z "${B2_BUCKET_NAME:-}" ]; then
+        [ -f ".env.b2" ] && source ".env.b2"
     fi
+    [ -z "${B2_KEY_ID:-}" ]     && { log_error "B2_KEY_ID not set (set in env or .env.b2)"; exit 1; }
+    [ -z "${B2_APP_KEY:-}" ]    && { log_error "B2_APP_KEY not set (set in env or .env.b2)"; exit 1; }
+    [ -z "${B2_BUCKET_NAME:-}" ] && { log_error "B2_BUCKET_NAME not set (set in env or .env.b2)"; exit 1; }
+fi
 
-    # Check if running from project root
-    if [ ! -f "compose.yaml" ]; then
-        log_error "Must run from project root directory"
-        exit 1
-    fi
+PACKAGE_NAME="salon-os-${VERSION}-$(date +%Y%m%d)"
+DIST_DIR="dist"
 
-    # Check if backend and frontend directories exist
-    if [ ! -d "backend" ] || [ ! -d "frontend" ]; then
-        log_error "Backend or frontend directory not found"
-        exit 1
-    fi
+echo ""
+echo "========================================================================"
+echo "  SalonOS Build & Push"
+echo "  Version:  ${VERSION}"
+echo "  User:     ${DOCKERHUB_USERNAME}"
+echo "  Publish:  ${PUBLISH}"
+echo "========================================================================"
+echo ""
 
-    # Check DockerHub username
-    if [ -z "$DOCKERHUB_USERNAME" ]; then
-        log_error "DockerHub username is required"
-        print_usage
-    fi
-
-    log_success "All requirements met"
-}
+# ─── Docker login check ───────────────────────────────────────────────────────
 
 check_docker_login() {
-    log_info "Checking Docker login status..."
-
-    if ! docker info | grep -q "Username"; then
-        log_warning "Not logged into DockerHub"
-        log_info "Please login now..."
+    log_info "Checking Docker login ..."
+    if ! docker info 2>/dev/null | grep -q "Username"; then
+        log_warn "Not logged in — running docker login ..."
         docker login
     else
-        log_success "Already logged into DockerHub"
+        log_success "Already logged in to Docker Hub"
     fi
 }
 
-build_backend() {
-    log_info "Building backend image..."
+# ─── Build & push images ──────────────────────────────────────────────────────
 
-    cd backend
+build_and_push() {
+    log_info "Building backend (linux/amd64) ..."
+    docker build --platform linux/amd64 \
+        -t "${DOCKERHUB_USERNAME}/salon-backend:${VERSION}" \
+        -t "${DOCKERHUB_USERNAME}/salon-backend:latest" \
+        backend/
 
-    # Build the image
-    docker build \
-        -t ${DOCKERHUB_USERNAME}/salon-backend:${VERSION} \
-        -t ${DOCKERHUB_USERNAME}/salon-backend:latest \
-        --platform linux/amd64 \
-        .
+    log_info "Building frontend (linux/amd64) ..."
+    docker build --platform linux/amd64 \
+        -t "${DOCKERHUB_USERNAME}/salon-frontend:${VERSION}" \
+        -t "${DOCKERHUB_USERNAME}/salon-frontend:latest" \
+        frontend/
 
-    cd ..
-
-    log_success "Backend image built: ${DOCKERHUB_USERNAME}/salon-backend:${VERSION}"
+    log_info "Pushing images to Docker Hub ..."
+    docker push "${DOCKERHUB_USERNAME}/salon-backend:${VERSION}"
+    docker push "${DOCKERHUB_USERNAME}/salon-backend:latest"
+    docker push "${DOCKERHUB_USERNAME}/salon-frontend:${VERSION}"
+    docker push "${DOCKERHUB_USERNAME}/salon-frontend:latest"
+    log_success "Images pushed to Docker Hub"
 }
 
-build_frontend() {
-    log_info "Building frontend image..."
+# ─── Create thin package directory ────────────────────────────────────────────
+# No Docker images — those live on Docker Hub. This tarball (~25KB) contains
+# only config, scripts, and alembic migrations that auto-update.sh deploys.
 
-    cd frontend
+create_package() {
+    log_info "Creating deployment package ${PACKAGE_NAME} ..."
 
-    # Build the image
-    docker build \
-        -t ${DOCKERHUB_USERNAME}/salon-frontend:${VERSION} \
-        -t ${DOCKERHUB_USERNAME}/salon-frontend:latest \
-        --platform linux/amd64 \
-        .
+    rm -rf "${DIST_DIR}/${PACKAGE_NAME}"
+    mkdir -p "${DIST_DIR}/${PACKAGE_NAME}/scripts"
+    mkdir -p "${DIST_DIR}/${PACKAGE_NAME}/nginx"
 
-    cd ..
+    # Compose file (docker compose reads compose.yaml by default)
+    cp compose.production.yaml "${DIST_DIR}/${PACKAGE_NAME}/compose.yaml"
 
-    log_success "Frontend image built: ${DOCKERHUB_USERNAME}/salon-frontend:${VERSION}"
-}
+    # Nginx config
+    cp nginx/nginx.conf "${DIST_DIR}/${PACKAGE_NAME}/nginx/"
 
-push_images() {
-    log_info "Pushing images to DockerHub..."
-
-    # Push backend
-    log_info "Pushing backend:${VERSION}..."
-    docker push ${DOCKERHUB_USERNAME}/salon-backend:${VERSION}
-
-    if [ "$VERSION" != "latest" ]; then
-        log_info "Pushing backend:latest..."
-        docker push ${DOCKERHUB_USERNAME}/salon-backend:latest
+    # Alembic migrations (needed by alembic upgrade head inside container)
+    if [ -d "alembic" ]; then
+        cp -r alembic/ "${DIST_DIR}/${PACKAGE_NAME}/alembic/"
     fi
 
-    # Push frontend
-    log_info "Pushing frontend:${VERSION}..."
-    docker push ${DOCKERHUB_USERNAME}/salon-frontend:${VERSION}
+    # All scripts (auto-update.sh, rollback.sh, setup-https.sh, setup-auto-update.sh, etc.)
+    cp scripts/*.sh "${DIST_DIR}/${PACKAGE_NAME}/scripts/"
+    chmod +x "${DIST_DIR}/${PACKAGE_NAME}/scripts/"*.sh
 
-    if [ "$VERSION" != "latest" ]; then
-        log_info "Pushing frontend:latest..."
-        docker push ${DOCKERHUB_USERNAME}/salon-frontend:latest
-    fi
+    # PowerShell helper (kept for reference, cron is the actual scheduler)
+    cp scripts/setup-auto-update.ps1 "${DIST_DIR}/${PACKAGE_NAME}/scripts/" 2>/dev/null || true
 
-    log_success "All images pushed to DockerHub"
+    # .env template
+    cp env.txt "${DIST_DIR}/${PACKAGE_NAME}/env.txt"
+
+    # Version marker (auto-update.sh reads this to name the install dir)
+    echo "${VERSION}" > "${DIST_DIR}/${PACKAGE_NAME}/VERSION"
+
+    # CLAUDE.md for context (optional)
+    cp .claude/CLAUDE.md "${DIST_DIR}/${PACKAGE_NAME}/" 2>/dev/null || true
+
+    log_success "Package directory created: ${DIST_DIR}/${PACKAGE_NAME}/"
 }
 
-create_deployment_package() {
-    log_info "Creating deployment package for clients..."
+# ─── Create tarball ───────────────────────────────────────────────────────────
+# COPYFILE_DISABLE=1 prevents macOS tar from embedding ._* Apple Double resource
+# fork files, which would cause the safety check on Linux to fail.
 
-    PACKAGE_DIR="dist/salon-os-${VERSION}"
-    rm -rf "$PACKAGE_DIR"
-    mkdir -p "$PACKAGE_DIR"
-
-    # Copy compose file
-    cp compose.production.yaml "$PACKAGE_DIR/docker-compose.yml"
-
-    # Update compose file with actual username
-    sed -i.bak "s/yourusername/$DOCKERHUB_USERNAME/g" "$PACKAGE_DIR/docker-compose.yml"
-    sed -i.bak "s/VERSION:-latest/VERSION:-$VERSION/g" "$PACKAGE_DIR/docker-compose.yml"
-    rm "$PACKAGE_DIR/docker-compose.yml.bak"
-
-    # Copy nginx config directory (includes SSL setup for HTTPS)
-    mkdir -p "$PACKAGE_DIR/nginx"
-    cp nginx/nginx.conf "$PACKAGE_DIR/nginx/"
-
-    # Copy environment example
-    cp .env.example "$PACKAGE_DIR/"
-
-    # Copy HTTPS setup files (CRITICAL for mobile camera)
-    cp scripts/setup-https.sh "$PACKAGE_DIR/"
-    chmod +x "$PACKAGE_DIR/setup-https.sh"
-    cp HTTPS-SETUP.md "$PACKAGE_DIR/" 2>/dev/null || true
-
-    # Copy quick start guide
-    cp docs/deployment/07-quickstart.md "$PACKAGE_DIR/QUICKSTART.md" 2>/dev/null || true
-
-    # Copy main documentation
-    cp README.md "$PACKAGE_DIR/" 2>/dev/null || true
-
-    # Copy installation guide
-    cp CLIENT_INSTALL_DOCKERHUB.md "$PACKAGE_DIR/INSTALL.md" 2>/dev/null || true
-
-    # Copy utility scripts
-    mkdir -p "$PACKAGE_DIR/scripts"
-
-    # Copy Windows/WSL2 networking scripts
-    cp scripts/wsl-port-forward.ps1 "$PACKAGE_DIR/scripts/" 2>/dev/null || true
-    cp scripts/setup-auto-forward.ps1 "$PACKAGE_DIR/scripts/" 2>/dev/null || true
-    cp scripts/diagnose-network.ps1 "$PACKAGE_DIR/scripts/" 2>/dev/null || true
-
-    # Create start script
-    cat > "$PACKAGE_DIR/scripts/start.sh" << 'EOF'
-#!/bin/bash
-docker compose up -d
-EOF
-    chmod +x "$PACKAGE_DIR/scripts/start.sh"
-
-    # Create stop script
-    cat > "$PACKAGE_DIR/scripts/stop.sh" << 'EOF'
-#!/bin/bash
-docker compose down
-EOF
-    chmod +x "$PACKAGE_DIR/scripts/stop.sh"
-
-    # Create backup script
-    cat > "$PACKAGE_DIR/scripts/backup.sh" << 'EOF'
-#!/bin/bash
-BACKUP_DIR="./backups"
-BACKUP_FILE="salon-backup-$(date +%Y%m%d-%H%M%S).sql"
-mkdir -p "$BACKUP_DIR"
-docker compose exec -T postgres pg_dump -U salon_user -Fc salon_db > "$BACKUP_DIR/$BACKUP_FILE"
-echo "Backup created: $BACKUP_DIR/$BACKUP_FILE"
-EOF
-    chmod +x "$PACKAGE_DIR/scripts/backup.sh"
-
-    # Create README
-    cat > "$PACKAGE_DIR/README.txt" << EOF
-SalonOS - Installation Package
-================================
-
-Version: ${VERSION}
-DockerHub: ${DOCKERHUB_USERNAME}/salon-backend:${VERSION}
-           ${DOCKERHUB_USERNAME}/salon-frontend:${VERSION}
-
-IMPORTANT: This version requires HTTPS for mobile camera scanning!
-
-Quick Start:
-1. Install Docker and Docker Compose
-2. Copy .env.example to .env and configure
-3. Run HTTPS setup: ./setup-https.sh
-4. Run: docker compose pull
-5. Run: docker compose up -d
-6. Install SSL certificate on mobile devices
-7. Access: https://[YOUR-SERVER-IP]
-
-For detailed instructions, see:
-- QUICKSTART.md - Simple 6-step setup
-- HTTPS-SETUP.md - Mobile certificate installation
-- INSTALL.md - DockerHub deployment
-
-HTTPS Setup (Required for Mobile):
-The setup-https.sh script will:
-- Generate SSL certificates
-- Configure nginx for HTTPS
-- Enable camera access on mobile devices
-
-Certificate location: nginx/ssl/salon.crt
-Install this certificate on mobile devices for camera scanning.
-
-Default Login:
-Username: owner
-Password: change_me_123
-(Change immediately after first login!)
-
-Support: [Your contact information]
-EOF
-
-    # Create tarball
-    cd dist
-    tar -czf salon-os-${VERSION}.tar.gz salon-os-${VERSION}
+create_tarball() {
+    log_info "Creating tarball ..."
+    cd "$DIST_DIR"
+    COPYFILE_DISABLE=1 tar -czf "${PACKAGE_NAME}.tar.gz" "${PACKAGE_NAME}"
     cd ..
 
-    log_success "Deployment package created: dist/salon-os-${VERSION}.tar.gz"
+    local SIZE
+    SIZE=$(du -sh "${DIST_DIR}/${PACKAGE_NAME}.tar.gz" | cut -f1)
+    log_success "Tarball: ${DIST_DIR}/${PACKAGE_NAME}.tar.gz (${SIZE})"
 }
 
-print_summary() {
-    echo ""
-    echo "================================================================================"
-    echo "                         BUILD & PUSH COMPLETE"
-    echo "================================================================================"
-    echo ""
-    echo "Version:          ${VERSION}"
-    echo "DockerHub User:   ${DOCKERHUB_USERNAME}"
-    echo ""
-    echo "Images Published:"
-    echo "  - ${DOCKERHUB_USERNAME}/salon-backend:${VERSION}"
-    echo "  - ${DOCKERHUB_USERNAME}/salon-backend:latest"
-    echo "  - ${DOCKERHUB_USERNAME}/salon-frontend:${VERSION}"
-    echo "  - ${DOCKERHUB_USERNAME}/salon-frontend:latest"
-    echo ""
-    echo "Client Package:   dist/salon-os-${VERSION}.tar.gz"
-    echo ""
-    echo "Package Contents:"
-    echo "  ✓ Docker Compose configuration"
-    echo "  ✓ Nginx config (HTTPS-enabled)"
-    echo "  ✓ setup-https.sh (HTTPS setup script)"
-    echo "  ✓ HTTPS-SETUP.md (Mobile certificate guide)"
-    echo "  ✓ QUICKSTART.md (Simple setup guide)"
-    echo "  ✓ .env.example (Environment template)"
-    echo "  ✓ Utility scripts (start, stop, backup)"
-    echo "  ✓ Windows/WSL2 scripts (port forwarding, diagnostics)"
-    echo ""
-    echo "Next Steps:"
-    echo "  1. Test the images: docker compose -f compose.production.yaml pull"
-    echo "  2. Distribute: dist/salon-os-${VERSION}.tar.gz to clients"
-    echo "  3. Clients setup HTTPS: ./setup-https.sh"
-    echo "  4. Clients run: docker compose pull && docker compose up -d"
-    echo "  5. Install SSL certificate on mobile devices (see HTTPS-SETUP.md)"
-    echo ""
-    echo "DockerHub URLs:"
-    echo "  Backend:  https://hub.docker.com/r/${DOCKERHUB_USERNAME}/salon-backend"
-    echo "  Frontend: https://hub.docker.com/r/${DOCKERHUB_USERNAME}/salon-frontend"
-    echo ""
-    echo "================================================================================"
+# ─── Publish to Backblaze B2 ──────────────────────────────────────────────────
+
+publish_to_b2() {
+    local tarball="${DIST_DIR}/${PACKAGE_NAME}.tar.gz"
+    local remote_filename="${PACKAGE_NAME}.tar.gz"
+
+    log_info "Authenticating with B2 ..."
+    local AUTH_RESPONSE
+    AUTH_RESPONSE=$(curl -fsSL --connect-timeout 10 --max-time 30 \
+        -u "${B2_KEY_ID}:${B2_APP_KEY}" \
+        "https://api.backblazeb2.com/b2api/v3/b2_authorize_account") \
+        || { log_error "B2 authentication failed"; exit 1; }
+
+    local B2_API_URL B2_AUTH_TOKEN B2_ACCOUNT_ID
+    B2_API_URL=$(echo "$AUTH_RESPONSE"   | grep -o '"apiUrl": *"[^"]*"'           | cut -d'"' -f4)
+    B2_AUTH_TOKEN=$(echo "$AUTH_RESPONSE" | grep -o '"authorizationToken": *"[^"]*"' | cut -d'"' -f4)
+    B2_ACCOUNT_ID=$(echo "$AUTH_RESPONSE" | grep -o '"accountId": *"[^"]*"'         | cut -d'"' -f4)
+
+    [ -z "$B2_API_URL" ] || [ -z "$B2_AUTH_TOKEN" ] || [ -z "$B2_ACCOUNT_ID" ] && \
+        { log_error "B2 auth response missing fields"; exit 1; }
+
+    # Get upload URL for this bucket
+    log_info "Getting B2 upload URL ..."
+    local UPLOAD_RESPONSE
+    UPLOAD_RESPONSE=$(curl -fsSL --connect-timeout 10 --max-time 30 \
+        -H "Authorization: ${B2_AUTH_TOKEN}" \
+        -d "{\"bucketName\": \"${B2_BUCKET_NAME}\"}" \
+        "${B2_API_URL}/b2api/v3/b2_get_upload_url_by_bucket_name") \
+        || { log_error "Failed to get B2 upload URL"; exit 1; }
+
+    local UPLOAD_URL UPLOAD_TOKEN
+    UPLOAD_URL=$(echo "$UPLOAD_RESPONSE"   | grep -o '"uploadUrl": *"[^"]*"'        | cut -d'"' -f4)
+    UPLOAD_TOKEN=$(echo "$UPLOAD_RESPONSE" | grep -o '"authorizationToken": *"[^"]*"' | cut -d'"' -f4)
+
+    [ -z "$UPLOAD_URL" ] || [ -z "$UPLOAD_TOKEN" ] && \
+        { log_error "B2 upload URL response missing fields"; exit 1; }
+
+    # SHA1 for B2 upload (B2 uses SHA1 for its own integrity, we use SHA256 in latest.json)
+    local SHA1
+    if command -v sha1sum &>/dev/null; then
+        SHA1=$(sha1sum "$tarball" | awk '{print $1}')
+    else
+        SHA1=$(shasum -a 1 "$tarball" | awk '{print $1}')
+    fi
+
+    # SHA256 for latest.json (what auto-update.sh verifies)
+    local SHA256
+    if command -v sha256sum &>/dev/null; then
+        SHA256=$(sha256sum "$tarball" | awk '{print $1}')
+    else
+        SHA256=$(shasum -a 256 "$tarball" | awk '{print $1}')
+    fi
+
+    # Upload tarball
+    log_info "Uploading ${remote_filename} to B2 bucket '${B2_BUCKET_NAME}' ..."
+    curl -fsSL --connect-timeout 10 --max-time 600 \
+        -H "Authorization: ${UPLOAD_TOKEN}" \
+        -H "X-Bz-File-Name: ${remote_filename}" \
+        -H "Content-Type: application/gzip" \
+        -H "X-Bz-Content-Sha1: ${SHA1}" \
+        -T "$tarball" \
+        "${UPLOAD_URL}" > /dev/null \
+        || { log_error "Tarball upload to B2 failed"; exit 1; }
+    log_success "Tarball uploaded"
+
+    # Write latest.json
+    local LATEST_JSON
+    LATEST_JSON=$(printf '{"version":"%s","filename":"%s","sha256":"%s"}' \
+        "$VERSION" "$remote_filename" "$SHA256")
+
+    # Upload latest.json (overwrite existing)
+    log_info "Updating latest.json ..."
+
+    # Get a fresh upload URL (single-use)
+    UPLOAD_RESPONSE=$(curl -fsSL --connect-timeout 10 --max-time 30 \
+        -H "Authorization: ${B2_AUTH_TOKEN}" \
+        -d "{\"bucketName\": \"${B2_BUCKET_NAME}\"}" \
+        "${B2_API_URL}/b2api/v3/b2_get_upload_url_by_bucket_name") \
+        || { log_error "Failed to get second B2 upload URL"; exit 1; }
+
+    UPLOAD_URL=$(echo "$UPLOAD_RESPONSE"   | grep -o '"uploadUrl": *"[^"]*"'          | cut -d'"' -f4)
+    UPLOAD_TOKEN=$(echo "$UPLOAD_RESPONSE" | grep -o '"authorizationToken": *"[^"]*"' | cut -d'"' -f4)
+
+    local JSON_SHA1
+    if command -v sha1sum &>/dev/null; then
+        JSON_SHA1=$(echo -n "$LATEST_JSON" | sha1sum | awk '{print $1}')
+    else
+        JSON_SHA1=$(echo -n "$LATEST_JSON" | shasum -a 1 | awk '{print $1}')
+    fi
+
+    echo -n "$LATEST_JSON" | curl -fsSL --connect-timeout 10 --max-time 30 \
+        -H "Authorization: ${UPLOAD_TOKEN}" \
+        -H "X-Bz-File-Name: latest.json" \
+        -H "Content-Type: application/json" \
+        -H "X-Bz-Content-Sha1: ${JSON_SHA1}" \
+        -d @- \
+        "${UPLOAD_URL}" > /dev/null \
+        || { log_error "latest.json upload to B2 failed"; exit 1; }
+
+    log_success "latest.json updated: ${LATEST_JSON}"
 }
+
+# ─── Tag git release ──────────────────────────────────────────────────────────
 
 tag_git_release() {
-    if [ "$VERSION" != "latest" ]; then
-        log_info "Tagging git release..."
-
-        if git rev-parse "v${VERSION}" >/dev/null 2>&1; then
-            log_warning "Git tag v${VERSION} already exists, skipping..."
-        else
-            git tag -a "v${VERSION}" -m "Release version ${VERSION}"
-            log_success "Git tagged: v${VERSION}"
-            log_info "Don't forget to push tags: git push origin v${VERSION}"
-        fi
+    if git rev-parse "v${VERSION}" >/dev/null 2>&1; then
+        log_warn "Git tag v${VERSION} already exists, skipping"
+    else
+        git tag -a "v${VERSION}" -m "Release ${VERSION}"
+        log_success "Git tagged: v${VERSION} (push with: git push origin v${VERSION})"
     fi
 }
 
-# =============================================================================
-# Main Execution
-# =============================================================================
+# ─── Main ─────────────────────────────────────────────────────────────────────
 
-main() {
-    echo ""
-    echo "================================================================================"
-    echo "              SalonOS - Build and Push to DockerHub"
-    echo "================================================================================"
-    echo ""
-    echo "Version: ${VERSION}"
-    echo "DockerHub Username: ${DOCKERHUB_USERNAME}"
-    echo ""
+check_docker_login
+build_and_push
 
-    check_requirements
-    check_docker_login
-
-    # Build images
-    build_backend
-    build_frontend
-
-    # Push to DockerHub
-    push_images
-
-    # Create deployment package
-    create_deployment_package
-
-    # Tag git release
+if $PUBLISH; then
+    create_package
+    create_tarball
+    publish_to_b2
     tag_git_release
 
-    # Print summary
-    print_summary
-
-    log_success "All done! 🎉"
-}
-
-# Run main function
-main
+    echo ""
+    echo "========================================================================"
+    echo "  PUBLISHED ${VERSION}"
+    echo "  Tarball:  ${DIST_DIR}/${PACKAGE_NAME}.tar.gz"
+    echo "  B2:       ${B2_BUCKET_NAME}/latest.json → ${VERSION}"
+    echo "  Client machines will pick this up within 30 minutes."
+    echo "========================================================================"
+else
+    echo ""
+    echo "========================================================================"
+    echo "  Images pushed to Docker Hub (no B2 publish — use --publish to release)"
+    echo "========================================================================"
+fi
