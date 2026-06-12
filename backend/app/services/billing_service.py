@@ -85,24 +85,37 @@ class BillingService:
             return date.fromisoformat(eff) if eff else None
         return eff
 
-    def _gst_mode_active(self) -> bool:
-        """True when the salon is GST-registered and past the effective date."""
+    def _split_billing_active(self) -> bool:
+        """True when the split-billing scheme is on (retail products on their own
+        18%-inclusive bill, services on theirs).
+
+        Gated on gst_effective_from being set — the "scheme start" — NOT on the
+        GST-registered toggle: products are always billed separately at 18%
+        inclusive once the salon opts in. The toggle only controls whether
+        SERVICES carry 5% GST (see _services_taxed)."""
         from app.services.settings_service import SettingsService
 
         settings = SettingsService.get_or_create_settings(self.db)
         eff = self._effective_date(settings)
-        if not settings.gst_registered or not eff:
+        if not eff:
             return False
         return datetime.now(IST).date() >= eff
 
-    def _gst_mode_for_bill(self, bill: Bill) -> bool:
-        """Whether a specific bill uses the GST scheme.
+    def _services_taxed(self) -> bool:
+        """True when services carry 5% GST (salon is GST-registered)."""
+        from app.services.settings_service import SettingsService
 
-        Bound to the BILL, not wall-clock: a bill created before the GST
-        effective date stays on legacy inclusive-18% math forever, so editing
-        an old bill (discount/item change) after registration never retro-taxes
-        it. New bills (created on/after the effective date) get the GST scheme.
-        An already-classified service/product bill always stays GST.
+        settings = SettingsService.get_or_create_settings(self.db)
+        return bool(settings.gst_registered)
+
+    def _split_billing_for_bill(self, bill: Bill) -> bool:
+        """Whether a specific bill uses the split-billing scheme.
+
+        Bound to the BILL, not wall-clock: a bill created before the scheme's
+        effective date stays on legacy inclusive-18% math forever, so editing an
+        old bill never retro-converts it. New bills (created on/after the
+        effective date) get the scheme. An already-classified service/product
+        bill always stays in the scheme.
         """
         if bill.bill_class in (BillClass.SERVICE, BillClass.PRODUCT):
             return True
@@ -110,7 +123,7 @@ class BillingService:
 
         settings = SettingsService.get_or_create_settings(self.db)
         eff = self._effective_date(settings)
-        if not settings.gst_registered or not eff:
+        if not eff:
             return False
         bill_date = (
             bill.created_at.astimezone(IST).date()
@@ -118,14 +131,17 @@ class BillingService:
         )
         return bill_date >= eff
 
-    @staticmethod
-    def _line_tax_params(item: BillItem) -> tuple[int, str]:
-        """(rate_percent, tax_mode) for a bill line in GST mode.
+    def _line_tax_params(self, item: BillItem) -> tuple[int, str]:
+        """(rate_percent, tax_mode) for a bill line in the split-billing scheme.
+
+        - Retail products: 18% inclusive, always (sold at MRP).
+        - Services: 5% exclusive when the salon is GST-registered, otherwise no
+          GST (menu price only).
+        - Package sale/redemption lines: no GST (redemptions have zero realized
+          value; package sales keep current treatment until revisited).
 
         Classified by FK first (historic rows predate item_type=PRODUCT being
-        set on retail lines), then by item_type. Package sale/redemption lines
-        carry no GST (owner decision: redemptions have zero realized value;
-        package sales keep current treatment until revisited).
+        set on retail lines), then by item_type.
         """
         if item.item_type in (
             BillItemType.PACKAGE_SALE_LINE, BillItemType.PACKAGE_REDEMPTION
@@ -134,7 +150,9 @@ class BillingService:
         if item.sku_id:
             return BillingService.PRODUCT_GST_RATE, TaxMode.INCLUSIVE.value
         if item.service_id:
-            return BillingService.SERVICE_GST_RATE, TaxMode.EXCLUSIVE.value
+            if self._services_taxed():
+                return BillingService.SERVICE_GST_RATE, TaxMode.EXCLUSIVE.value
+            return 0, TaxMode.NONE.value
         return 0, TaxMode.NONE.value
 
     def _recalculate_bill_tax(self, bill: Bill) -> None:
@@ -152,7 +170,7 @@ class BillingService:
         items = list(bill.items)
         discount = bill.discount_amount or 0
 
-        if not self._gst_mode_for_bill(bill):
+        if not self._split_billing_for_bill(bill):
             amount_after_discount = bill.subtotal - discount
             breakdown = TaxCalculator.calculate_tax_breakdown(amount_after_discount)
             bill.tax_amount = breakdown["total_tax"]
@@ -262,7 +280,7 @@ class BillingService:
         preserved exactly. Returns the new product bill, or None if no split
         is needed (single-class cart or GST mode off).
         """
-        if not self._gst_mode_for_bill(bill) or bill.status != BillStatus.DRAFT:
+        if not self._split_billing_for_bill(bill) or bill.status != BillStatus.DRAFT:
             return None
 
         items = list(bill.items)
@@ -584,7 +602,7 @@ class BillingService:
         discount_paise = discount_amount
         # In GST mode the discount applies to services only, so it cannot
         # exceed the services subtotal (retail products are sold at MRP).
-        if self._gst_mode_active():
+        if self._split_billing_active():
             services_subtotal = sum(
                 d["line_total"] for d in bill_items_data if not d.get("sku_id")
             )
@@ -1265,7 +1283,7 @@ class BillingService:
         # Services-only discount cap in GST mode (products sold at MRP). After a
         # mixed cart is split, a product bill has no service lines, so any
         # discount on it is rejected.
-        if self._gst_mode_for_bill(bill):
+        if self._split_billing_for_bill(bill):
             services_subtotal = sum(i.line_total for i in bill.items if not i.sku_id)
             if discount_amount > services_subtotal:
                 raise ValueError(

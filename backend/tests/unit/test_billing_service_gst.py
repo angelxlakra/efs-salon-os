@@ -219,6 +219,81 @@ class TestGstModeProductBill:
         assert item.taxable_value == 100000
 
 
+@pytest.fixture
+def scheme_on_unregistered(db_session):
+    """Split-billing scheme active (effective date set) but NOT GST-registered:
+    products split + 18% inclusive, services no GST."""
+    from app.models.settings import SalonSettings
+
+    s = db_session.query(SalonSettings).first()
+    if not s:
+        s = SalonSettings(salon_name="Test Salon", salon_address="Test Addr")
+        db_session.add(s)
+    s.gst_registered = False
+    s.gstin = ""
+    s.gst_effective_from = date.today() - timedelta(days=1)
+    db_session.flush()
+    return s
+
+
+class TestUnregisteredSplitBilling:
+    """Scheme active but salon not GST-registered: products always 18% inclusive
+    on their own bill; services carry NO GST."""
+
+    def test_service_only_cart_has_no_gst(
+        self, db_session, scheme_on_unregistered, gst_service, gst_user
+    ):
+        svc = BillingService(db_session)
+        bill = svc.create_bill(
+            items=[{"service_id": gst_service.id, "quantity": 1}],
+            created_by_id=gst_user.id,
+            customer_name="Cust",
+        )
+        # ₹500 service, no GST added
+        assert bill.subtotal == 50000
+        assert bill.cgst_amount == 0
+        assert bill.sgst_amount == 0
+        assert bill.total_amount == 50000
+        assert bill.bill_class == BillClass.SERVICE
+        assert bill.items[0].tax_mode == TaxMode.NONE
+
+    def test_product_only_cart_still_18_inclusive(
+        self, db_session, scheme_on_unregistered, sellable_sku, gst_user
+    ):
+        svc = BillingService(db_session)
+        bill = svc.create_bill(
+            items=[{"sku_id": sellable_sku.id, "quantity": 1}],
+            created_by_id=gst_user.id,
+            customer_name="Cust",
+        )
+        assert bill.subtotal == 118000
+        assert bill.cgst_amount == 9000
+        assert bill.sgst_amount == 9000
+        assert bill.total_amount == 118000
+        assert bill.bill_class == BillClass.PRODUCT
+
+    def test_mixed_cart_splits_even_when_unregistered(
+        self, db_session, scheme_on_unregistered, gst_service, sellable_sku, gst_user
+    ):
+        svc = BillingService(db_session)
+        bills = svc.create_bill_group(
+            items=[
+                {"service_id": gst_service.id, "quantity": 1},
+                {"sku_id": sellable_sku.id, "quantity": 1},
+            ],
+            created_by_id=gst_user.id,
+            customer_name="Cust",
+        )
+        assert len(bills) == 2
+        service_bill = next(b for b in bills if b.bill_class == BillClass.SERVICE)
+        product_bill = next(b for b in bills if b.bill_class == BillClass.PRODUCT)
+        # service: no GST, ₹500; product: 18% inclusive, ₹880-equivalent (MRP)
+        assert service_bill.cgst_amount == 0
+        assert service_bill.total_amount == 50000
+        assert product_bill.cgst_amount == 9000
+        assert product_bill.total_amount == 118000
+
+
 class TestBillGroupSplit:
     """Phase 5: mixed cart → service bill + product bill, one payment."""
 

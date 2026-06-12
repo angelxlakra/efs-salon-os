@@ -37,6 +37,8 @@ interface SettingsStore {
   isLoading: boolean;
   hasGST: () => boolean;
   isGstMode: () => boolean;
+  isSplitBilling: () => boolean;
+  servicesTaxed: () => boolean;
   fetchSettings: () => Promise<void>;
 }
 
@@ -49,9 +51,21 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
     return !!(settings?.gstin && settings.gstin.trim().length > 0);
   },
 
-  // GST split-billing mode (date check enforced server-side)
+  // Split-billing scheme: retail products on their own 18%-inclusive bill,
+  // services on theirs. Active once a GST effective date is set (and reached),
+  // independent of the GST-registered toggle (the date check mirrors the server).
+  isSplitBilling: () => {
+    const eff = get().settings?.gst_effective_from;
+    if (!eff) return false;
+    return new Date().toISOString().slice(0, 10) >= eff;
+  },
+
+  // Whether services carry 5% GST (salon is GST-registered).
+  servicesTaxed: () => !!get().settings?.gst_registered,
+
+  // Back-compat alias: "GST mode" now means the split-billing scheme is active.
   isGstMode: () => {
-    return !!get().settings?.gst_registered;
+    return get().isSplitBilling();
   },
 
   fetchSettings: async () => {

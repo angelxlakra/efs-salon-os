@@ -48,7 +48,7 @@ interface BillGroupResponse {
 
 export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
   const router = useRouter();
-  const { settings, isGstMode } = useSettingsStore();
+  const { settings, isGstMode, servicesTaxed } = useSettingsStore();
   const {
     items,
     customerName,
@@ -85,7 +85,8 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
   const [isDeletingPayment, setIsDeletingPayment] = useState<string | null>(null);
   // GST split-billing mode: preview math mirrors the server exactly
   const gstMode = isGstMode();
-  const gstBreakdown = gstMode ? computeGstBreakdown(items, discount) : null;
+  const svcTaxed = servicesTaxed();
+  const gstBreakdown = gstMode ? computeGstBreakdown(items, discount, svcTaxed) : null;
   // Live total the customer will pay — always reflects the current cart so the
   // displayed amount can never drift from what's quoted. (The cart is visible
   // beside the modal, so a discount can change after bills were created; the
@@ -110,7 +111,7 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
       setGroupBills([]);
       setServerGrandTotal(null);
       const totalPaise = gstMode
-        ? computeGstBreakdown(items, discount).grandTotal
+        ? computeGstBreakdown(items, discount, svcTaxed).grandTotal
         : getTotal();
       setAmountToPay((totalPaise / 100).toString());
     }
@@ -807,9 +808,11 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
                     <div className="flex justify-between">
                       <span className="text-text-muted">
                         Service Bill
-                        <span className="ml-1 text-xs">
-                          (CGST {formatPrice(gstBreakdown.serviceSection.cgst)} + SGST {formatPrice(gstBreakdown.serviceSection.sgst)})
-                        </span>
+                        {svcTaxed && (
+                          <span className="ml-1 text-xs">
+                            (CGST {formatPrice(gstBreakdown.serviceSection.cgst)} + SGST {formatPrice(gstBreakdown.serviceSection.sgst)})
+                          </span>
+                        )}
                       </span>
                       <span className="text-text-primary">{formatPrice(gstBreakdown.serviceSection.total)}</span>
                     </div>

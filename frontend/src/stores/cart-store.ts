@@ -83,14 +83,16 @@ export interface GstCartBreakdown {
 const floorToRupee = (paise: number) => Math.floor(paise / 100) * 100;
 
 /**
- * Compute the GST-mode cart preview: services at 5% exclusive (added on top),
- * products at 18% inclusive (extracted from MRP). The bill-level discount is
- * allocated proportionally across ALL lines (floor per line, remainder one
- * paise at a time to largest lines first, ties by position).
+ * Compute the split-billing cart preview: products at 18% inclusive (extracted
+ * from MRP) on their own bill; services at 5% exclusive (added on top) when the
+ * salon is GST-registered, otherwise no GST. The bill-level discount applies to
+ * services only (floor per line, remainder one paise at a time to largest lines
+ * first, ties by position).
  */
 export function computeGstBreakdown(
   items: CartItem[],
-  globalDiscount: number
+  globalDiscount: number,
+  servicesTaxed = true,
 ): GstCartBreakdown {
   const lines = items.map((item) => {
     const gross = item.unitPrice * item.quantity;
@@ -157,8 +159,9 @@ export function computeGstBreakdown(
       section.sgst += half;
       section.pays += amountAfterDiscount; // customer pays the (discounted) MRP
     } else {
-      // 5% exclusive: added on top of the discounted base
-      const half = Math.floor((amountAfterDiscount * 5) / 200);
+      // Services: 5% exclusive (added on top) only when GST-registered,
+      // otherwise no GST — the customer pays the discounted menu price.
+      const half = servicesTaxed ? Math.floor((amountAfterDiscount * 5) / 200) : 0;
       section.cgst += half;
       section.sgst += half;
       section.pays += amountAfterDiscount + half + half;

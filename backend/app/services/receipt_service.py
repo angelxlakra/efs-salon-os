@@ -130,7 +130,11 @@ class ReceiptService:
 
         # GST split-billing bills (service/product class) get a Rule 46 compliant
         # tax-invoice layout; mixed_legacy bills keep the original layout exactly.
-        is_gst_bill = bill.bill_class in (BillClass.SERVICE, BillClass.PRODUCT)
+        # Treat as a GST tax invoice only when the bill actually carries GST.
+        # A service bill for an unregistered salon has no GST, so it prints as a
+        # plain receipt (no TAX INVOICE title, GSTIN, tax lines or declarations).
+        has_gst = ((bill.cgst_amount or 0) + (bill.sgst_amount or 0)) != 0
+        is_gst_bill = bill.bill_class in (BillClass.SERVICE, BillClass.PRODUCT) and has_gst
         is_credit_note = bill.bill_type == BillType.CREDIT_NOTE
 
         # ==================== STYLES ====================
@@ -414,7 +418,7 @@ class ReceiptService:
                 Paragraph(f"SGST @ {ReceiptService._format_rate(half_rate)}{incl_note}:", ParagraphStyle('TL', parent=styles['Normal'], fontSize=8, alignment=TA_RIGHT)),
                 Paragraph(ReceiptService.format_currency(bill.sgst_amount), ParagraphStyle('TV', parent=styles['Normal'], fontSize=8, alignment=TA_RIGHT))
             ])
-        elif settings and settings.receipt_show_gstin:
+        elif settings and settings.receipt_show_gstin and bill.tax_amount:
             # Legacy inclusive-18% bills: keep the original CGST/SGST display.
             cgst = bill.tax_amount / 2
             sgst = bill.tax_amount / 2

@@ -13,9 +13,20 @@ producing a compliant tax invoice per rate-class.
 
 | Line kind | Rate | Mode | Who pays the tax |
 |-----------|------|------|------------------|
-| Service | 5% (2.5% CGST + 2.5% SGST) | **Exclusive** — added on top of the menu price | Customer pays menu price + 5% |
+| Service (GST-registered) | 5% (2.5% CGST + 2.5% SGST) | **Exclusive** — added on top of the menu price | Customer pays menu price + 5% |
+| Service (not registered) | — | None | No GST; customer pays the menu price |
 | Retail product | 18% (9% CGST + 9% SGST) | **Inclusive** — extracted from the MRP | Customer pays the MRP (tax already inside) |
 | Package sale / redemption | — | None | No GST line (redemptions have zero realised value) |
+
+**Two independent switches:**
+- **Effective date** (`gst_effective_from`) activates the *split-billing scheme*:
+  retail products always print on their own bill at 18% inclusive, services on
+  theirs. This is independent of registration — a salon can separate product
+  bills without charging GST on services.
+- **GST registered** (`gst_registered`) additionally puts **5% on services**.
+  When off, the service bill carries no GST and prints as a plain receipt (no
+  TAX INVOICE title/GSTIN/declarations); the product bill is still a 18% tax
+  invoice.
 
 - **CGST always equals SGST** (equal halves), each floored to the paise.
 - **Discounts apply before tax** and are allocated proportionally across all

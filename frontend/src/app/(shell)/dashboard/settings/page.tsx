@@ -522,14 +522,30 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          {/* GST registration mode — turns on dual-rate split billing
-              (5% services / 18% products) and Rule 46 tax invoices. */}
-          <div className="flex items-center justify-between border-t pt-4">
+          {/* Split-billing scheme — separate product bill (18% inclusive) from
+              the service bill. Activated by the effective date; the GST
+              Registered toggle additionally puts 5% on services. */}
+          <div className="space-y-2 border-t pt-4">
+            <Label htmlFor="gst_effective_from">Separate Product Billing — Effective From</Label>
+            <Input
+              id="gst_effective_from"
+              type="date"
+              value={formData.gst_effective_from}
+              onChange={(e) => handleChange('gst_effective_from', e.target.value)}
+            />
+            <p className="text-xs text-text-secondary">
+              From this date, retail products print on their own bill with 18%
+              GST included in MRP. Bills before this date are unchanged. Leave
+              blank to keep a single combined bill.
+            </p>
+          </div>
+
+          <div className="flex items-center justify-between">
             <div className="space-y-0.5">
-              <Label htmlFor="gst_registered">GST Registered</Label>
+              <Label htmlFor="gst_registered">GST Registered (charge 5% on services)</Label>
               <p className="text-xs text-text-secondary">
-                Charge GST on bills: services 5% (added on top), retail products
-                18% (included in MRP), shown on tax invoices. Requires a GSTIN.
+                When on, services carry 5% GST (added on top) and bills print as
+                tax invoices. When off, services have no GST. Requires a GSTIN.
               </p>
             </div>
             <Switch
@@ -538,22 +554,6 @@ export default function SettingsPage() {
               onCheckedChange={(checked) => handleChange('gst_registered', checked)}
             />
           </div>
-
-          {formData.gst_registered && (
-            <div className="space-y-2">
-              <Label htmlFor="gst_effective_from">GST Effective From</Label>
-              <Input
-                id="gst_effective_from"
-                type="date"
-                value={formData.gst_effective_from}
-                onChange={(e) => handleChange('gst_effective_from', e.target.value)}
-              />
-              <p className="text-xs text-text-secondary">
-                Bills dated on or after this date use GST billing; earlier bills
-                are unchanged. Set this to your GST registration date.
-              </p>
-            </div>
-          )}
         </CardContent>
       </Card>
 

@@ -70,7 +70,7 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
 
   const router = useRouter();
   const { user } = useAuthStore();
-  const { hasGST, isGstMode, fetchSettings, settings } = useSettingsStore();
+  const { hasGST, isGstMode, servicesTaxed, fetchSettings, settings } = useSettingsStore();
   const [discountInput, setDiscountInput] = useState('');
   const [isCustomerSearchOpen, setIsCustomerSearchOpen] = useState(false);
   const [isCreatingOrders, setIsCreatingOrders] = useState(false);
@@ -501,7 +501,8 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
 
   // GST split-billing mode: services 5% exclusive, products 18% inclusive
   const gstMode = isGstMode();
-  const gstBreakdown = gstMode ? computeGstBreakdown(items, discount) : null;
+  const svcTaxed = servicesTaxed();
+  const gstBreakdown = gstMode ? computeGstBreakdown(items, discount, svcTaxed) : null;
   const total = gstBreakdown ? gstBreakdown.grandTotal : getTotal();
 
   // Discounts apply to services only in GST mode (retail products sold at MRP),
@@ -828,14 +829,18 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
                       <span>-{formatPrice(gstBreakdown.serviceSection.discount)}</span>
                     </div>
                   )}
-                  <div className="flex justify-between text-text-secondary">
-                    <span>CGST (2.5%)</span>
-                    <span>{formatPrice(gstBreakdown.serviceSection.cgst)}</span>
-                  </div>
-                  <div className="flex justify-between text-text-secondary">
-                    <span>SGST (2.5%)</span>
-                    <span>{formatPrice(gstBreakdown.serviceSection.sgst)}</span>
-                  </div>
+                  {svcTaxed && (
+                    <>
+                      <div className="flex justify-between text-text-secondary">
+                        <span>CGST (2.5%)</span>
+                        <span>{formatPrice(gstBreakdown.serviceSection.cgst)}</span>
+                      </div>
+                      <div className="flex justify-between text-text-secondary">
+                        <span>SGST (2.5%)</span>
+                        <span>{formatPrice(gstBreakdown.serviceSection.sgst)}</span>
+                      </div>
+                    </>
+                  )}
                 </>
               )}
               {/* Retail products: 18% GST included in MRP */}
