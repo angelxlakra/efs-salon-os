@@ -238,7 +238,7 @@ publish_to_b2() {
         -H "X-Bz-File-Name: ${remote_filename}" \
         -H "Content-Type: application/gzip" \
         -H "X-Bz-Content-Sha1: ${SHA1}" \
-        -T "$tarball" \
+        --data-binary @"$tarball" \
         "${UPLOAD_URL}" > /dev/null \
         || { log_error "Tarball upload to B2 failed"; exit 1; }
     log_success "Tarball uploaded"
