@@ -187,13 +187,25 @@ publish_to_b2() {
     [ -z "$B2_API_URL" ] || [ -z "$B2_AUTH_TOKEN" ] || [ -z "$B2_ACCOUNT_ID" ] && \
         { log_error "B2 auth response missing fields"; exit 1; }
 
+    # Resolve bucketName → bucketId (b2_get_upload_url requires the ID, not the name)
+    log_info "Resolving bucket ID for '${B2_BUCKET_NAME}' ..."
+    local BUCKETS_RESPONSE B2_BUCKET_ID
+    BUCKETS_RESPONSE=$(curl -fsSL --connect-timeout 10 --max-time 30 \
+        -H "Authorization: ${B2_AUTH_TOKEN}" \
+        -d "{\"accountId\": \"${B2_ACCOUNT_ID}\", \"bucketName\": \"${B2_BUCKET_NAME}\"}" \
+        "${B2_API_URL}/b2api/v3/b2_list_buckets") \
+        || { log_error "Failed to list B2 buckets"; exit 1; }
+    B2_BUCKET_ID=$(echo "$BUCKETS_RESPONSE" | grep -o '"bucketId": *"[^"]*"' | head -1 | cut -d'"' -f4)
+    [ -z "$B2_BUCKET_ID" ] && \
+        { log_error "Bucket '${B2_BUCKET_NAME}' not found (check key scope)"; exit 1; }
+
     # Get upload URL for this bucket
     log_info "Getting B2 upload URL ..."
     local UPLOAD_RESPONSE
     UPLOAD_RESPONSE=$(curl -fsSL --connect-timeout 10 --max-time 30 \
         -H "Authorization: ${B2_AUTH_TOKEN}" \
-        -d "{\"bucketName\": \"${B2_BUCKET_NAME}\"}" \
-        "${B2_API_URL}/b2api/v3/b2_get_upload_url_by_bucket_name") \
+        -d "{\"bucketId\": \"${B2_BUCKET_ID}\"}" \
+        "${B2_API_URL}/b2api/v3/b2_get_upload_url") \
         || { log_error "Failed to get B2 upload URL"; exit 1; }
 
     local UPLOAD_URL UPLOAD_TOKEN
@@ -242,8 +254,8 @@ publish_to_b2() {
     # Get a fresh upload URL (single-use)
     UPLOAD_RESPONSE=$(curl -fsSL --connect-timeout 10 --max-time 30 \
         -H "Authorization: ${B2_AUTH_TOKEN}" \
-        -d "{\"bucketName\": \"${B2_BUCKET_NAME}\"}" \
-        "${B2_API_URL}/b2api/v3/b2_get_upload_url_by_bucket_name") \
+        -d "{\"bucketId\": \"${B2_BUCKET_ID}\"}" \
+        "${B2_API_URL}/b2api/v3/b2_get_upload_url") \
         || { log_error "Failed to get second B2 upload URL"; exit 1; }
 
     UPLOAD_URL=$(echo "$UPLOAD_RESPONSE"   | grep -o '"uploadUrl": *"[^"]*"'          | cut -d'"' -f4)
@@ -261,7 +273,7 @@ publish_to_b2() {
         -H "X-Bz-File-Name: latest.json" \
         -H "Content-Type: application/json" \
         -H "X-Bz-Content-Sha1: ${JSON_SHA1}" \
-        -d @- \
+        --data-binary @- \
         "${UPLOAD_URL}" > /dev/null \
         || { log_error "latest.json upload to B2 failed"; exit 1; }
 
