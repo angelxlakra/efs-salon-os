@@ -246,9 +246,21 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
   // (mixed carts return TWO bills settled by ONE payment); otherwise legacy.
   // Returns the single bill id (null when a 2-bill group was created) and group id.
   const ensureBillsCreated = async (): Promise<{ billId: string | null; groupId: string | null; grandTotal: number; billIds: string[] }> => {
-    if (billId || groupId) {
+    // Reuse already-created bills ONLY if they still match the current cart
+    // total. If the cart changed since (discount/items added beside the open
+    // modal), the cached bills are stale — fall through to create fresh ones,
+    // so payment never settles a mismatched amount (e.g. a 2-bill group total
+    // paid to a single stale service bill).
+    if ((billId || groupId) && serverGrandTotal === total) {
       const existingIds = groupId ? groupBills.map(b => b.id) : (billId ? [billId] : []);
-      return { billId, groupId, grandTotal: serverGrandTotal ?? total, billIds: existingIds };
+      return { billId, groupId, grandTotal: serverGrandTotal, billIds: existingIds };
+    }
+    // Discard any stale cached bills before recreating.
+    if (billId || groupId) {
+      setBillId(null);
+      setGroupId(null);
+      setGroupBills([]);
+      setServerGrandTotal(null);
     }
 
     if (gstMode) {
