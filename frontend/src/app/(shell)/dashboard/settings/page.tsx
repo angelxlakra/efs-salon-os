@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { useAuthStore } from '@/stores/auth-store';
+import { useSettingsStore } from '@/stores/settings-store';
 import { apiClient } from '@/lib/api-client';
 import { toast } from 'sonner';
 import {
@@ -65,6 +66,9 @@ interface FormDataType {
 export default function SettingsPage() {
   const { user } = useAuthStore();
   const isOwner = user?.role === 'owner';
+  // Refresh the app-wide settings store after saving so other screens (POS
+  // cart GST mode, receipts) pick up the change without a reload.
+  const refreshGlobalSettings = useSettingsStore((s) => s.fetchSettings);
 
   const [settings, setSettings] = useState<Record<string, unknown> | null>(null);
   const [originalData, setOriginalData] = useState<FormDataType | null>(null);
@@ -252,6 +256,7 @@ export default function SettingsPage() {
       toast.success('Settings updated successfully');
       setHasChanges(false);
       fetchSettings();
+      refreshGlobalSettings();
     } catch (error: unknown) {
       const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
       toast.error(detail || 'Failed to update settings');

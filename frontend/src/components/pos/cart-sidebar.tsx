@@ -97,11 +97,11 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
   const [teamEditorItemId, setTeamEditorItemId] = useState<string | null>(null);
   const [availableStaff, setAvailableStaff] = useState<AvailableStaff[]>([]);
 
-  // Fetch settings and staff on mount
+  // Fetch settings and staff on mount. Always refetch (don't skip when the
+  // store is already populated) so a GST-mode toggle saved on the settings
+  // page is reflected the next time POS opens.
   useEffect(() => {
-    if (!settings) {
-      fetchSettings();
-    }
+    fetchSettings();
     fetchAvailableStaff();
   }, []);
 
