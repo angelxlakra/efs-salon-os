@@ -72,6 +72,18 @@ session pool. Governed lines carry `sale_block_id` and are excluded from
 counter under the sale-row lock; `find_eligible_packages` keeps such lines eligible
 while the block has budget (and past EXHAUSTED, like pool-exempt lines).
 
+**Buy-and-use-immediately (since 2026-06-16):** one cart can sell a v2 package AND redeem
+its services in the same checkout. Because the `PackageSale` is created at POSTING, a
+service line carries `BillItem.redeem_from_definition_id` (the package's *definition* id,
+not a sale id). On a draft bill it stays a normal charged `SERVICE`; at posting,
+`_create_package_sales_for_bill` creates the sale first, then a second pass redeems each
+flagged service line against the new sale via `apply_redemption` (which validates
+coverage + budget + quantity, so an over-claim raises and aborts the post). The POS cart
+previews this by allocating against the cart package's *definition* budget
+(`definitionServiceBudgets`, the cart-side mirror of `_block_sale_lines`) **after** owned
+packages; the payload sends `redeem_from_definition_id` for those lines (vs
+`package_sale_id` for owned-package redemptions).
+
 New columns: `package_sale_items.pool_exempt` (unlimited lines bypass the session pool +
 EXHAUSTED gate; honoured in apply/undo redemption + eligibility), and
 `package_sale_items.package_definition_item_id` is now **nullable** (v2 lines have no
