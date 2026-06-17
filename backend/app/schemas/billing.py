@@ -39,6 +39,9 @@ class BillItemCreate(BaseModel):
     # Live-in-cart redemption: a service line covered by an owned package; the
     # backend redeems it (not charges) at bill creation.
     package_sale_id: Optional[str] = Field(None, min_length=26, max_length=26)
+    # Buy-and-use-immediately: redeem this service from a package being SOLD in
+    # the same cart (by definition id; resolved to the new sale at posting).
+    redeem_from_definition_id: Optional[str] = Field(None, min_length=26, max_length=26)
 
     @model_validator(mode='after')
     def validate_item_type(self):

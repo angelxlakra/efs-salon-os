@@ -586,6 +586,7 @@ class BillingService:
                     "line_total": line_total,
                     "cogs_amount": cogs_amount,
                     "item_type": BillItemType.SERVICE,
+                    "redeem_from_definition_id": item.get("redeem_from_definition_id"),
                     "staff_id": item.get("staff_id"),
                     "appointment_id": item.get("appointment_id"),
                     "walkin_id": item.get("walkin_id"),

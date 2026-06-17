@@ -71,3 +71,13 @@ def test_create_bill_without_package_sale_id_still_charges(
     )
     line = next(i for i in bill.items if i.service_id == svc.id)
     assert line.item_type == BillItemType.SERVICE
+
+
+def test_bill_item_create_schema_preserves_redeem_from_definition_id():
+    """The API schema must carry redeem_from_definition_id to the service."""
+    from app.schemas.billing import BillItemCreate
+    dumped = BillItemCreate(
+        service_id="01HXX" + "A" * 21,
+        redeem_from_definition_id="01HZZ" + "C" * 21,
+    ).model_dump()
+    assert dumped.get("redeem_from_definition_id") == "01HZZ" + "C" * 21
