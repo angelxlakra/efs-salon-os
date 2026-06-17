@@ -2,6 +2,7 @@
 
 import enum
 from sqlalchemy import CheckConstraint, Column, DateTime, Enum, ForeignKey, Integer, String, Text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from app.database import Base
 from app.models.base import TimestampMixin, ULIDMixin
@@ -258,6 +259,9 @@ class BillItem(Base, ULIDMixin, TimestampMixin):
         String(26), ForeignKey("package_definitions.id", ondelete="RESTRICT"),
         nullable=True, index=True,
     )
+    # v2 packages: service_ids chosen at purchase for choice blocks, locked into
+    # the PackageSale snapshot at settlement. NULL for v1 / non-package lines.
+    package_locked_choices = Column(JSONB, nullable=True)
 
     # Relationships
     bill = relationship("Bill", back_populates="items")

@@ -35,7 +35,7 @@ function enrich(
     .map(appt => ({
       appt,
       staffName: staffMap.get(appt.assigned_staff_id ?? '') ?? 'Unassigned',
-      serviceName: serviceMap.get(appt.service_id) ?? 'Service',
+      serviceName: serviceMap.get(appt.service_id ?? '') ?? 'Service',
       minsUntil: Math.max(0, differenceInMinutes(parseISO(appt.scheduled_at), now)),
     }));
 }

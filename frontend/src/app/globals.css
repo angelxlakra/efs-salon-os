@@ -50,6 +50,10 @@
   --color-info-bg-soft:       var(--info-bg-soft);
   --color-info-border:        var(--info-border);
 
+  --color-purple-fg:          var(--purple-fg);
+  --color-purple-bg-soft:     var(--purple-bg-soft);
+  --color-purple-border:      var(--purple-border);
+
   /* Radius */
   --radius-sm:                var(--radius-sm);
   --radius-md:                var(--radius-md);

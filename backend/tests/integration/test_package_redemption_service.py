@@ -33,6 +33,44 @@ def test_apply_redemption_decrements_per_line_remaining(
     assert sale_item.remaining == 2
 
 
+def test_pool_exempt_line_redeems_after_pool_exhausted(
+    db_session, service_factory, customer_factory, package_sale_factory,
+    bill_item_factory, user_factory,
+):
+    """An unlimited (pool_exempt) line stays redeemable when sessions hit 0."""
+    from app.models.package import PackageSaleStatus
+
+    svc = service_factory(base_price=100000)
+    customer = customer_factory()
+    # Pool already exhausted → sale EXHAUSTED
+    sale = package_sale_factory(customer=customer, services=[svc], sessions_remaining=0)
+    sale.status = PackageSaleStatus.EXHAUSTED
+    user = user_factory()
+
+    sale_item = next(it for it in sale.items if it.service_id == svc.id)
+    sale_item.pool_exempt = True
+    sale_item.max_redemptions = None
+    sale_item.remaining = None
+    db_session.flush()
+
+    bi = bill_item_factory(service_id=svc.id, base_price=100000)
+    audit = apply_redemption(db_session, sale.id, bi.id, customer.id, user.id)
+    db_session.flush()
+    db_session.refresh(sale)
+
+    # Pool untouched, status unchanged, redemption free
+    assert sale.sessions_remaining == 0
+    assert sale.status == PackageSaleStatus.EXHAUSTED
+    assert audit.session_number is None
+
+    # Undo restores nothing to the pool
+    undo_redemption(db_session, audit.id, user.id)
+    db_session.flush()
+    db_session.refresh(sale)
+    assert sale.sessions_remaining == 0
+    assert sale.status == PackageSaleStatus.EXHAUSTED
+
+
 def test_apply_redemption_rejects_when_per_line_remaining_zero(
     db_session, service_factory, customer_factory, package_sale_factory,
     bill_item_factory, user_factory,

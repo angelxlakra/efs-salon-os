@@ -33,24 +33,12 @@ def apply_redemption(
     if not sale:
         raise ValueError(f"PackageSale {package_sale_id} not found")
 
-    # 1. Status must be ACTIVE (EXHAUSTED, EXPIRED, REFUNDED are all disallowed here)
-    if sale.status != PackageSaleStatus.ACTIVE:
-        raise ValueError(f"Package not active (status={sale.status.value})")
-
-    # 2. Expiry check
-    if sale.expires_at <= now:
-        raise ValueError("Package expired")
-
-    # 3. Sessions check (COUNTED packages only)
-    if sale.entitlement_type_snapshot == EntitlementType.COUNTED:
-        if not sale.sessions_remaining or sale.sessions_remaining <= 0:
-            raise ValueError("no sessions remaining")
-
     bill_item = db.get(BillItem, bill_item_id)
     if not bill_item:
         raise ValueError(f"BillItem {bill_item_id} not found")
 
-    # Match by service_id to find the PackageSaleItem
+    # Match by service_id to find the PackageSaleItem (resolved BEFORE the
+    # status/sessions gates so a pool-exempt unlimited line can relax them).
     sale_item = next(
         (i for i in sale.items if i.service_id == bill_item.service_id),
         None,
@@ -58,33 +46,66 @@ def apply_redemption(
     if not sale_item:
         raise ValueError("Service not covered by this package")
 
-    # Per-line cap enforcement
-    # TODO: all ValueError in this codebase maps to HTTP 400 at the router layer.
-    # When router-layer exception handling is unified to 422 for domain rule
-    # violations, this will surface with the correct status code.
-    if sale_item.remaining is not None and sale_item.remaining <= 0:
-        raise ValueError("Per-line redemption cap exhausted for this service")
+    # A line is governed by EXACTLY one budget: an independent block counter,
+    # the pool-exempt (unlimited) free perk, or the global session pool.
+    block = None
+    if sale_item.sale_block_id is not None:
+        block = next(
+            (b for b in sale.block_counters if b.id == sale_item.sale_block_id), None
+        )
+    independent = sale_item.pool_exempt or block is not None
+
+    # 1. Status gate. EXHAUSTED blocks redemption EXCEPT for independent lines
+    #    (block-counted or pool-exempt), which stay redeemable until expiry.
+    if sale.status == PackageSaleStatus.EXHAUSTED and independent:
+        pass
+    elif sale.status != PackageSaleStatus.ACTIVE:
+        raise ValueError(f"Package not active (status={sale.status.value})")
+
+    # 2. Expiry check (applies to everything)
+    if sale.expires_at <= now:
+        raise ValueError("Package expired")
+
+    # A redeemed line covers `quantity` units, each consuming one budget unit.
+    qty = bill_item.quantity or 1
+
+    # 3. Budget check — enough budget to cover the WHOLE line.
+    if block is not None:
+        if block.remaining < qty:
+            raise ValueError(f"'{block.name}' budget exhausted for this package")
+    elif not sale_item.pool_exempt:
+        # Global session pool (COUNTED only).
+        if sale.entitlement_type_snapshot == EntitlementType.COUNTED:
+            if not sale.sessions_remaining or sale.sessions_remaining < qty:
+                raise ValueError("no sessions remaining")
+        # Per-line cap enforcement.
+        # TODO: all ValueError in this codebase maps to HTTP 400 at the router
+        # layer. When router-layer exception handling is unified to 422 for
+        # domain rule violations, this surfaces with the correct status code.
+        if sale_item.remaining is not None and sale_item.remaining < qty:
+            raise ValueError("Per-line redemption cap exhausted for this service")
 
     # Update BillItem — set price to the snapshotted package price
     bill_item.item_type = BillItemType.PACKAGE_REDEMPTION
     bill_item.package_sale_id = sale.id
     bill_item.package_sale_item_id = sale_item.id
     bill_item.base_price = sale_item.snapshot_unit_price_paise
-    bill_item.line_total = bill_item.base_price * bill_item.quantity
+    bill_item.line_total = bill_item.base_price * qty
 
-    # Decrement sessions (COUNTED only)
+    # Decrement the governing budget by the line quantity.
     session_number = None
-    if sale.entitlement_type_snapshot == EntitlementType.COUNTED:
-        session_number = (
-            (sale.total_sessions_snapshot or 0) - (sale.sessions_remaining or 0) + 1
-        )
-        sale.sessions_remaining -= 1
-        if sale.sessions_remaining == 0:
-            sale.status = PackageSaleStatus.EXHAUSTED
-
-    # Decrement per-line counter
-    if sale_item.remaining is not None:
-        sale_item.remaining -= 1
+    if block is not None:
+        block.remaining -= qty  # safe: guarded by the sale-row lock
+    elif not sale_item.pool_exempt:
+        if sale.entitlement_type_snapshot == EntitlementType.COUNTED:
+            session_number = (
+                (sale.total_sessions_snapshot or 0) - (sale.sessions_remaining or 0) + 1
+            )
+            sale.sessions_remaining -= qty
+            if sale.sessions_remaining == 0:
+                sale.status = PackageSaleStatus.EXHAUSTED
+        if sale_item.remaining is not None:
+            sale_item.remaining -= qty
 
     # Audit row
     audit = PackageRedemptionAudit(
@@ -156,16 +177,27 @@ def undo_redemption(db: Session, audit_id: str, user_id: str) -> None:
     bill_item.base_price = original_price
     bill_item.line_total = original_price * bill_item.quantity
 
-    # Restore session counter
-    if sale.entitlement_type_snapshot == EntitlementType.COUNTED:
-        sale.sessions_remaining = (sale.sessions_remaining or 0) + 1
-        if sale.status == PackageSaleStatus.EXHAUSTED:
-            sale.status = PackageSaleStatus.ACTIVE
-
-    # Restore per-line counter
+    # Restore whichever budget the redemption drew from. A block-counted or
+    # pool-exempt line never touched the global session pool.
     sale_item = db.get(PackageSaleItem, audit.package_sale_item_id)
-    if sale_item is not None and sale_item.remaining is not None:
-        sale_item.remaining += 1
+    block = None
+    if sale_item is not None and sale_item.sale_block_id is not None:
+        from app.models.package import PackageSaleBlock
+        block = db.get(PackageSaleBlock, sale_item.sale_block_id)
+    pool_exempt = bool(sale_item and sale_item.pool_exempt)
+    qty = bill_item.quantity or 1  # apply_redemption drew `quantity` budget units
+
+    if block is not None:
+        block.remaining += qty
+    elif not pool_exempt:
+        # Restore global session counter (COUNTED only).
+        if sale.entitlement_type_snapshot == EntitlementType.COUNTED:
+            sale.sessions_remaining = (sale.sessions_remaining or 0) + qty
+            if sale.status == PackageSaleStatus.EXHAUSTED:
+                sale.status = PackageSaleStatus.ACTIVE
+        # Restore per-line counter.
+        if sale_item is not None and sale_item.remaining is not None:
+            sale_item.remaining += qty
 
     # NOTE: Payment is matched by (bill_id, payment_method, amount). This triple is not
     # unique if two redemptions of equal value occur on the same bill. A future migration

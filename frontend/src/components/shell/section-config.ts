@@ -37,17 +37,17 @@ export const SHELL_SECTIONS: ShellSection[] = [
     id: "today",
     label: "Today",
     items: [
-      { label: "Today",        href: "/dashboard",              icon: Home },
+      { label: "Today", href: "/dashboard", icon: Home },
+      { label: "POS", href: "/dashboard/pos", icon: ShoppingCart },
       { label: "Appointments", href: "/dashboard/appointments", icon: Calendar },
-      { label: "POS",          href: "/dashboard/pos",          icon: ShoppingCart },
-      { label: "Bills",        href: "/dashboard/bills",        icon: Receipt },
+      { label: "Bills", href: "/dashboard/bills", icon: Receipt },
     ],
   },
   {
     id: "people",
     label: "People",
     items: [
-      { label: "Customers",  href: "/dashboard/customers",  icon: Users },
+      { label: "Customers", href: "/dashboard/customers", icon: Users },
       { label: "Attendance", href: "/dashboard/attendance", icon: Clock },
     ],
   },
@@ -55,29 +55,29 @@ export const SHELL_SECTIONS: ShellSection[] = [
     id: "catalogue",
     label: "Catalogue",
     items: [
-      { label: "Services",   href: "/dashboard/services",   icon: Tag },
-      { label: "Inventory",  href: "/dashboard/inventory",  icon: Package },
-      { label: "Packages",       href: "/dashboard/packages",       icon: Gift },
-      { label: "Sold Packages",  href: "/dashboard/packages/sold",  icon: Receipt },
-      { label: "Purchases",      href: "/dashboard/purchases",      icon: FileText },
+      { label: "Services", href: "/dashboard/services", icon: Tag },
+      { label: "Inventory", href: "/dashboard/inventory", icon: Package },
+      { label: "Packages", href: "/dashboard/packages", icon: Gift },
+      { label: "Sold Packages", href: "/dashboard/packages/sold", icon: Receipt },
+      { label: "Purchases", href: "/dashboard/purchases", icon: FileText },
     ],
   },
   {
     id: "insight",
     label: "Insight",
     items: [
-      { label: "Reports",         href: "/dashboard/reports",         icon: TrendingUp },
-      { label: "Expenses",        href: "/dashboard/expenses",        icon: Wallet },
-      { label: "Cash Drawer",     href: "/dashboard/cash-drawer",     icon: CreditCard },
-      { label: "Reconciliation",  href: "/dashboard/reconciliation",  icon: Scale },
+      { label: "Reports", href: "/dashboard/reports", icon: TrendingUp },
+      { label: "Expenses", href: "/dashboard/expenses", icon: Wallet },
+      { label: "Cash Drawer", href: "/dashboard/cash-drawer", icon: CreditCard },
+      { label: "Reconciliation", href: "/dashboard/reconciliation", icon: Scale },
     ],
   },
   {
     id: "admin",
     label: "Admin",
     items: [
-      { label: "Users & Staff", href: "/dashboard/users",    icon: UserCog },
-      { label: "Settings",      href: "/dashboard/settings", icon: SettingsIcon },
+      { label: "Users & Staff", href: "/dashboard/users", icon: UserCog },
+      { label: "Settings", href: "/dashboard/settings", icon: SettingsIcon },
     ],
   },
 ];
@@ -87,9 +87,9 @@ export const SHELL_SECTIONS: ShellSection[] = [
  *  Today → Appointments → POS → More.
  */
 export const MOBILE_TABS: ShellNavItem[] = [
-  { label: "Today",        href: "/dashboard",              icon: Home },
+  { label: "Today", href: "/dashboard", icon: Home },
   { label: "Appointments", href: "/dashboard/appointments", icon: Calendar },
-  { label: "POS",          href: "/dashboard/pos",          icon: ShoppingCart },
+  { label: "POS", href: "/dashboard/pos", icon: ShoppingCart },
   // "More" tab is rendered specially in BottomTabNav — opens MoreSheet, not a route.
 ];
 

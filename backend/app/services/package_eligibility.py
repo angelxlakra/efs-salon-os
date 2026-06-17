@@ -38,24 +38,65 @@ def find_eligible_packages(
     """
     now = datetime.now(timezone.utc)
 
+    from app.models.package import PackageSaleBlock
+
+    # Block counters (choice@visit / pool) that still have budget.
+    good_blocks = (
+        db.query(PackageSaleBlock.id).filter(PackageSaleBlock.remaining > 0)
+    )
+
+    # Sales whose matching line is "independent" of the global session pool —
+    # a pool-exempt (unlimited) line OR a block-counted line. These bypass the
+    # EXHAUSTED status and empty-pool gates, staying redeemable to expiry.
+    independent_sales = (
+        db.query(PackageSaleItem.package_sale_id)
+          .filter(PackageSaleItem.service_id == service_id)
+          .filter(or_(
+              PackageSaleItem.pool_exempt.is_(True),
+              PackageSaleItem.sale_block_id.isnot(None),
+          ))
+    )
+
+    # Sales with a matching line that has budget right now.
+    budget_ok_sales = (
+        db.query(PackageSaleItem.package_sale_id)
+          .filter(PackageSaleItem.service_id == service_id)
+          .filter(or_(
+              # Block-counted line whose block still has budget.
+              and_(
+                  PackageSaleItem.sale_block_id.isnot(None),
+                  PackageSaleItem.sale_block_id.in_(good_blocks),
+              ),
+              # Pool-exempt (unlimited) line — always.
+              PackageSaleItem.pool_exempt.is_(True),
+              # Global-pool / per-line-capped line.
+              and_(
+                  PackageSaleItem.sale_block_id.is_(None),
+                  PackageSaleItem.pool_exempt.is_(False),
+                  or_(
+                      PackageSaleItem.max_redemptions.is_(None),
+                      PackageSaleItem.remaining > 0,
+                  ),
+              ),
+          ))
+    )
+
     return (
         db.query(PackageSale)
           .filter(and_(
-              PackageSale.status == PackageSaleStatus.ACTIVE,
-              PackageSale.expires_at > now,
-              PackageSale.id.in_(
-                  db.query(PackageSaleItem.package_sale_id)
-                    .filter(PackageSaleItem.service_id == service_id)
-                    .filter(
-                        or_(
-                            PackageSaleItem.max_redemptions.is_(None),
-                            PackageSaleItem.remaining > 0,
-                        )
-                    )
+              or_(
+                  PackageSale.status == PackageSaleStatus.ACTIVE,
+                  and_(
+                      PackageSale.status == PackageSaleStatus.EXHAUSTED,
+                      PackageSale.id.in_(independent_sales),
+                  ),
               ),
+              PackageSale.expires_at > now,
+              PackageSale.id.in_(budget_ok_sales),
               or_(
                   PackageSale.entitlement_type_snapshot == EntitlementType.UNLIMITED,
                   PackageSale.sessions_remaining > 0,
+                  PackageSale.id.in_(independent_sales),
               ),
               or_(
                   and_(

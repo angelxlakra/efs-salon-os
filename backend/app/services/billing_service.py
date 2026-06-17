@@ -529,6 +529,35 @@ class BillingService:
         inventory_service = InventoryService(self.db)
 
         for item in items:
+            # Package-sale line: one line sold at the package's price; the
+            # PackageSale is created at settlement (see _create_package_sales).
+            if item.get("package_definition_id"):
+                from app.models.package import PackageDefinition
+                pkg = self.db.get(PackageDefinition, item["package_definition_id"])
+                if not pkg or pkg.deleted_at:
+                    raise ValueError(f"Package not found: {item['package_definition_id']}")
+                price = item.get("unit_price")
+                if price is None:
+                    price = pkg.final_price_paise
+                subtotal += price
+                bill_items_data.append({
+                    "service_id": None,
+                    "sku_id": None,
+                    "item_name": pkg.name,
+                    "base_price": price,
+                    "quantity": 1,
+                    "line_total": price,
+                    "cogs_amount": 0,
+                    "item_type": BillItemType.PACKAGE_SALE_LINE,
+                    "package_definition_id": pkg.id,
+                    "package_locked_choices": item.get("locked_choices"),
+                    "staff_id": item.get("staff_id"),
+                    "appointment_id": None,
+                    "walkin_id": None,
+                    "notes": item.get("notes"),
+                })
+                continue
+
             # Check if item is a service or product
             if "service_id" in item and item["service_id"]:
                 # Service item
@@ -561,7 +590,10 @@ class BillingService:
                     "appointment_id": item.get("appointment_id"),
                     "walkin_id": item.get("walkin_id"),
                     "notes": item.get("notes"),
-                    "staff_contributions": item.get("staff_contributions")  # Multi-staff data
+                    "staff_contributions": item.get("staff_contributions"),  # Multi-staff data
+                    # Live-in-cart redemption: the cart resolved an eligible package
+                    # for this line; apply it after the bill item exists.
+                    "_redeem_package_sale_id": item.get("package_sale_id"),
                 }
                 bill_items_data.append(bill_item_data)
 
@@ -640,9 +672,11 @@ class BillingService:
         self.db.add(bill)
         self.db.flush() # Get bill.id without committing
 
+        redemption_intents: list[tuple[str, str]] = []  # (bill_item_id, package_sale_id)
         for item_data in bill_items_data:
-            # Extract staff_contributions before creating bill_item
+            # Extract non-column extras before creating bill_item
             staff_contributions_data = item_data.pop("staff_contributions", None)
+            redeem_sale_id = item_data.pop("_redeem_package_sale_id", None)
 
             # Create bill item
             bill_item = BillItem(
@@ -653,6 +687,9 @@ class BillingService:
             self.db.add(bill_item)
             self.db.flush()  # Get bill_item.id
 
+            if redeem_sale_id:
+                redemption_intents.append((bill_item.id, redeem_sale_id))
+
             # Handle multi-staff contributions if present
             if staff_contributions_data:
                 self._create_staff_contributions(
@@ -660,6 +697,21 @@ class BillingService:
                     line_total_paise=bill_item.line_total,
                     contributions_data=staff_contributions_data
                 )
+
+        # Apply cart-resolved package redemptions: converts each flagged service
+        # line to PACKAGE_REDEMPTION, decrements the package, and books an
+        # internal payment that covers the line (no cash due for it).
+        if redemption_intents and customer_id:
+            from app.services import package_redemption_service
+            for bill_item_id, sale_id in redemption_intents:
+                package_redemption_service.apply_redemption(
+                    db=self.db,
+                    package_sale_id=sale_id,
+                    bill_item_id=bill_item_id,
+                    redeemed_for_customer_id=customer_id,
+                    user_id=created_by_id,
+                )
+            self.db.flush()
 
         # Compute taxes now that all items exist (per-line in GST mode)
         self._recalculate_bill_tax(bill)
@@ -1815,6 +1867,7 @@ class BillingService:
                     bill_id=bill.id,
                     customer_id=bill.customer_id,
                     selling_staff_id=item.staff_id,
+                    locked_choices=item.package_locked_choices,
                 )
                 item.package_sale_id = sale.id
                 # flush so FK assignment is visible before the outer commit

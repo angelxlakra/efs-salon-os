@@ -27,6 +27,7 @@ import { ActiveServicesModal } from './active-services-modal';
 import { AdHocStaffTeamEditor } from './AdHocStaffTeamEditor';
 import { apiClient } from '@/lib/api-client';
 import { toast } from 'sonner';
+import { getApiErrorMessage } from '@/lib/api-error';
 import { useRouter } from 'next/navigation';
 import { StaffContributionCreate } from '@/types/multi-staff';
 
@@ -41,6 +42,13 @@ interface CartSidebarProps {
   customerSearchRef?: RefObject<{ openSearch: () => void } | null>;
 }
 
+// A bookable service line: not a retail product AND not a package-sale line.
+// Package lines are isProduct:false but must never enter service-only flows
+// (walk-in booking, staff assignment, service-order creation).
+function isServiceLine(item: { isProduct: boolean; kind?: string }): boolean {
+  return !item.isProduct && item.kind !== "package_sale";
+}
+
 export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps) {
   const {
     items,
@@ -52,6 +60,7 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
     removeItem,
     updateQuantity,
     addItem,
+    setLineRedemption,
     setCustomer,
     setGlobalDiscount,
     setItemStaff,
@@ -397,7 +406,7 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
       toast.success(`Service "${item.serviceName}" cancelled`);
     } catch (error: any) {
       console.error('Error cancelling service:', error);
-      toast.error(error.response?.data?.detail || 'Failed to cancel service');
+      toast.error(getApiErrorMessage(error, 'Failed to cancel service'));
     } finally {
       setCancellingItemId(null);
     }
@@ -436,7 +445,7 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
     const unbookedItems = getUnbookedItems();
 
     // Validate unbooked service items (not products) have staff assigned
-    const unbookedServices = unbookedItems.filter((item) => !item.isProduct);
+    const unbookedServices = unbookedItems.filter(isServiceLine);
     const unassigned = unbookedServices.filter((item) => !item.staffId);
     if (unassigned.length > 0) {
       toast.error('Please assign staff to all services');
@@ -461,7 +470,7 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
       const currentSessionId = sessionId || generateSessionId();
 
       // Create bulk walk-ins for unbooked service items only (not products)
-      const unbookedServices = unbookedItems.filter((item) => !item.isProduct);
+      const unbookedServices = unbookedItems.filter(isServiceLine);
       const response = await apiClient.post('/appointments/walkins/bulk', {
         session_id: currentSessionId,
         customer_name: customerName,
@@ -488,7 +497,7 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
     } catch (error: any) {
       console.error('Error creating service orders:', error);
       toast.error(
-        error.response?.data?.detail || 'Failed to create service orders'
+        getApiErrorMessage(error, 'Failed to create service orders')
       );
     } finally {
       setIsCreatingOrders(false);
@@ -512,7 +521,7 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
     : subtotal;
 
   // Check if all service items have staff assigned (products don't need staff)
-  const serviceItems = items.filter((item) => !item.isProduct);
+  const serviceItems = items.filter(isServiceLine);
   const allItemsHaveStaff = serviceItems.every((item) => {
     // Multi-staff services need staffContributions array with at least one contribution
     if (item.isMultiStaff) {
@@ -524,7 +533,7 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
 
   // Get unbooked items
   const unbookedItems = getUnbookedItems();
-  const unbookedServices = unbookedItems.filter((item) => !item.isProduct);
+  const unbookedServices = unbookedItems.filter(isServiceLine);
   const hasUnbookedItems = unbookedServices.length > 0;
   const allUnbookedHaveStaff = unbookedServices.every((item) => {
     // Multi-staff services need staffContributions array with at least one contribution
@@ -668,8 +677,8 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
                   </Button>
                 </div>
 
-                {/* Staff Assignment (Services only) */}
-                {!item.isProduct && (
+                {/* Staff Assignment (Services only — never package-sale lines) */}
+                {isServiceLine(item) && (
                   item.isMultiStaff && item.staffContributions && item.staffContributions.length > 0 ? (
                     // Multi-staff service - show list of staff with roles
                     <div className="space-y-2">
@@ -761,10 +770,42 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
                       <Plus className="h-3 w-3" />
                     </Button>
                   </div>
-                  <span className="font-semibold text-sm">
-                    {formatPrice(item.unitPrice * item.quantity)}
-                  </span>
+                  {item.redemption ? (
+                    (() => {
+                      const charged = Math.max(0, item.quantity - item.redemption.coveredQuantity);
+                      return (
+                        <span className="flex flex-col items-end">
+                          <span className="text-xs text-text-muted line-through">
+                            {formatPrice(item.unitPrice * item.quantity)}
+                          </span>
+                          <span className="text-sm font-semibold text-success-fg">
+                            {charged > 0 ? formatPrice(item.unitPrice * charged) : 'Free'}
+                          </span>
+                        </span>
+                      );
+                    })()
+                  ) : (
+                    <span className="font-semibold text-sm">
+                      {formatPrice(item.unitPrice * item.quantity)}
+                    </span>
+                  )}
                 </div>
+                {item.redemption && (
+                  <div className="mt-1 flex items-center justify-between rounded-md bg-success-bg-soft px-2 py-1">
+                    <span className="text-xs font-medium text-success-fg">
+                      {item.redemption.coveredQuantity < item.quantity
+                        ? `${item.redemption.coveredQuantity} of ${item.quantity} free · ${item.redemption.packageName}`
+                        : `Redeemed · ${item.redemption.packageName}`}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setLineRedemption(item.id, null)}
+                      className="text-xs text-text-muted hover:text-text-secondary"
+                    >
+                      Pay instead
+                    </button>
+                  </div>
+                )}
               </div>
               </Fragment>
             ))}

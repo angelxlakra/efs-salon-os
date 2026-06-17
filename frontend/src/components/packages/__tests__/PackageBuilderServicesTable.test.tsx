@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
+import { useState } from "react";
 import { PackageBuilderServicesTable } from "@/components/packages/PackageBuilderServicesTable";
 import type { LineItem } from "@/components/packages/PackageBuilderServicesTable";
 
@@ -200,5 +201,58 @@ describe("PackageBuilderServicesTable", () => {
         expect.objectContaining({ unit_price_paise: 75000 }),
       ])
     );
+  });
+
+  // Typing behavior — controlled inputs must not reformat mid-edit
+
+  function StatefulHarness({ initial }: { initial: LineItem[] }) {
+    const [items, setItems] = useState(initial);
+    return (
+      <div>
+        <PackageBuilderServicesTable
+          items={items}
+          onChange={setItems}
+          entitlementType="counted"
+        />
+        <output data-testid="state">{JSON.stringify(items)}</output>
+      </div>
+    );
+  }
+
+  function committed(): LineItem[] {
+    return JSON.parse(screen.getByTestId("state").textContent!);
+  }
+
+  it("lets the user type a price freely without reformatting each keystroke", () => {
+    render(<StatefulHarness initial={[makeItem({ unit_price_paise: 50000 })]} />);
+    const price = screen.getByRole("spinbutton", { name: /price/i }) as HTMLInputElement;
+
+    fireEvent.focus(price);
+    fireEvent.change(price, { target: { value: "" } });
+    expect(price.value).toBe(""); // not snapped back to "0.00"
+
+    fireEvent.change(price, { target: { value: "2749" } });
+    expect(price.value).toBe("2749"); // not reformatted to "2749.00" mid-typing
+    expect(committed()[0].unit_price_paise).toBe(274900);
+
+    fireEvent.blur(price);
+    expect(price.value).toBe("2749.00"); // formatted only on blur
+  });
+
+  it("lets the user backspace a single-digit qty and restores 1 on blur", () => {
+    render(<StatefulHarness initial={[makeItem({ quantity: 2 })]} />);
+    const qty = screen.getByRole("spinbutton", { name: /qty/i }) as HTMLInputElement;
+
+    fireEvent.focus(qty);
+    fireEvent.change(qty, { target: { value: "" } });
+    expect(qty.value).toBe(""); // can clear it
+
+    fireEvent.change(qty, { target: { value: "5" } });
+    expect(committed()[0].quantity).toBe(5);
+
+    fireEvent.change(qty, { target: { value: "" } });
+    fireEvent.blur(qty);
+    expect(qty.value).toBe("1"); // empty on blur falls back to 1
+    expect(committed()[0].quantity).toBe(1);
   });
 });

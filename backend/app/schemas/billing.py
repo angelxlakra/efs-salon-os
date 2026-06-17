@@ -32,14 +32,22 @@ class BillItemCreate(BaseModel):
     appointment_id: Optional[str] = Field(None, min_length=26, max_length=26)
     walkin_id: Optional[str] = Field(None, min_length=26, max_length=26)
     notes: Optional[str] = Field(None, max_length=500)
+    # Package-sale line: sells a package (turned into a PackageSale at settlement).
+    package_definition_id: Optional[str] = Field(None, min_length=26, max_length=26)
+    unit_price: Optional[int] = Field(None, ge=0, description="Override price in paise (package lines)")
+    locked_choices: Optional[List[str]] = Field(None, description="Purchase-time choice service_ids")
+    # Live-in-cart redemption: a service line covered by an owned package; the
+    # backend redeems it (not charges) at bill creation.
+    package_sale_id: Optional[str] = Field(None, min_length=26, max_length=26)
 
     @model_validator(mode='after')
     def validate_item_type(self):
-        """Ensure exactly one of service_id or sku_id is set."""
-        if not self.service_id and not self.sku_id:
-            raise ValueError("Either service_id or sku_id must be provided")
-        if self.service_id and self.sku_id:
-            raise ValueError("Cannot specify both service_id and sku_id")
+        """Exactly one of service_id, sku_id, or package_definition_id."""
+        ids = [bool(self.service_id), bool(self.sku_id), bool(self.package_definition_id)]
+        if sum(ids) != 1:
+            raise ValueError(
+                "Exactly one of service_id, sku_id, or package_definition_id must be provided"
+            )
         return self
 
     class Config:

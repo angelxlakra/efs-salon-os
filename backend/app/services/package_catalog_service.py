@@ -12,8 +12,14 @@ from app.services.package_pricing_engine import (
 )
 
 
-def _apply_discount(payload_items, discount):
-    """Apply optional discount distribution to item price list."""
+def _validate_discount(payload_items, discount):
+    """Dry-run the discount distribution so invalid discounts fail at save time.
+
+    Items are persisted at GROSS prices and the discount is stored alongside;
+    actual distribution happens at sale time (and in final_price_paise).
+    """
+    if not discount:
+        return
     item_drafts = [
         DiscountedItem(
             unit_price_paise=i.unit_price_paise,
@@ -22,25 +28,21 @@ def _apply_discount(payload_items, discount):
         )
         for i in payload_items
     ]
-    if discount:
-        item_drafts = distribute_discount(
-            item_drafts, DiscountMode(discount.mode), discount.value,
-        )
-    return item_drafts
+    distribute_discount(item_drafts, DiscountMode(discount.mode), discount.value)
 
 
-def _build_items(payload_items, item_drafts):
-    """Zip payload items with discounted drafts into ORM objects."""
+def _build_items(payload_items):
+    """Build ORM items at their gross (entered) prices."""
     return [
         PackageDefinitionItem(
             service_id=src.service_id,
-            quantity=draft.quantity,
-            unit_price_paise=draft.unit_price_paise,
-            locked=draft.locked,
+            quantity=src.quantity,
+            unit_price_paise=src.unit_price_paise,
+            locked=src.locked,
             display_order=src.display_order,
             max_redemptions=src.max_redemptions,
         )
-        for src, draft in zip(payload_items, item_drafts, strict=True)
+        for src in payload_items
     ]
 
 
@@ -49,9 +51,10 @@ def create_definition(
 ) -> PackageDefinition:
     """Create a new PackageDefinition in DRAFT status.
 
-    Applies optional discount distribution to item prices before persisting.
+    Persists gross item prices plus the discount; validation dry-runs the
+    distribution so an impossible discount is rejected up front.
     """
-    item_drafts = _apply_discount(payload.items, payload.discount)
+    _validate_discount(payload.items, payload.discount)
     pkg = PackageDefinition(
         name=payload.name,
         description=payload.description,
@@ -61,10 +64,14 @@ def create_definition(
         validity_days=payload.validity_days,
         auto_apply=payload.auto_apply,
         cancellation_fee_pct=payload.cancellation_fee_pct,
+        discount_mode=payload.discount.mode if payload.discount else None,
+        discount_value=payload.discount.value if payload.discount else None,
+        blocks=payload.blocks,
+        stored_price_paise=payload.final_price_paise,
         created_by_user_id=user_id,
         status=PackageDefinitionStatus.DRAFT,
     )
-    pkg.items = _build_items(payload.items, item_drafts)
+    pkg.items = _build_items(payload.items)
     db.add(pkg)
     db.flush()
     return pkg
@@ -88,11 +95,15 @@ def update_definition(
     pkg.validity_days = payload.validity_days
     pkg.auto_apply = payload.auto_apply
     pkg.cancellation_fee_pct = payload.cancellation_fee_pct
+    pkg.discount_mode = payload.discount.mode if payload.discount else None
+    pkg.discount_value = payload.discount.value if payload.discount else None
+    pkg.blocks = payload.blocks
+    pkg.stored_price_paise = payload.final_price_paise
     pkg.items.clear()
     db.flush()  # DELETE orphans before re-inserting
 
-    item_drafts = _apply_discount(payload.items, payload.discount)
-    pkg.items = _build_items(payload.items, item_drafts)
+    _validate_discount(payload.items, payload.discount)
+    pkg.items = _build_items(payload.items)
     db.flush()
     return pkg
 

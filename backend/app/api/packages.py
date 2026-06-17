@@ -8,7 +8,7 @@ from app.database import get_db
 from app.auth.dependencies import require_permission
 from app.models.user import User
 from app.models.package import PackageDefinition, PackageDefinitionItem, PackageDefinitionStatus
-from app.models.package import PackageSale, PackageSaleItem, PackageSaleStatus
+from app.models.package import PackageSale, PackageSaleItem, PackageSaleStatus, EntitlementType
 from app.schemas.package import (
     PackageDefinitionCreate, PackageDefinitionUpdate, PackageDefinitionResponse,
 )
@@ -259,19 +259,55 @@ def check_eligibility(
             joinedload(PackageSale.customer),
             joinedload(PackageSale.definition),
             joinedload(PackageSale.items),  # needed — prevents N+1 on sale.items access
+            joinedload(PackageSale.block_counters),
         )
         .filter(PackageSale.id.in_(sale_ids))
         .order_by(PackageSale.expires_at.asc())
         .all()
     )
 
+    UNLIMITED = 9999  # sentinel for pool-exempt / uncapped lines
+
     out = []
     for sale in loaded_sales:
-        snapshot = next(
-            (i.snapshot_unit_price_paise for i in sale.items if i.service_id == payload.service_id),
-            0,
+        item = next(
+            (i for i in sale.items if i.service_id == payload.service_id), None
         )
-        out.append(EligiblePackageResponse(package_sale=sale, snapshot_price_paise=snapshot))
+        snapshot = item.snapshot_unit_price_paise if item else 0
+
+        # Two budget levels the cart allocates against:
+        #   line_remaining  — this service's OWN cap (independent per service)
+        #   shared (key + remaining) — a budget pooled across services that share
+        #     it (the global session pool, or a choice/pool block counter)
+        if item is None:
+            line_remaining, shared_key, shared_remaining = 0, None, 0
+        elif item.sale_block_id is not None:
+            blk = next(
+                (b for b in sale.block_counters if b.id == item.sale_block_id), None
+            )
+            # Block-counted lines have no per-line cap; the block IS the budget.
+            line_remaining = UNLIMITED
+            shared_key = f"{sale.id}:block:{item.sale_block_id}"
+            shared_remaining = blk.remaining if blk else 0
+        elif item.pool_exempt:
+            line_remaining, shared_key, shared_remaining = UNLIMITED, None, UNLIMITED
+        else:
+            # Fixed-items / choice@purchase: own per-line cap + the global pool.
+            line_remaining = item.remaining if item.remaining is not None else UNLIMITED
+            if sale.entitlement_type_snapshot == EntitlementType.COUNTED:
+                shared_key = f"{sale.id}:pool"
+                shared_remaining = sale.sessions_remaining or 0
+            else:
+                shared_key, shared_remaining = None, UNLIMITED
+
+        out.append(EligiblePackageResponse(
+            package_sale=sale,
+            snapshot_price_paise=snapshot,
+            remaining_uses=min(line_remaining, shared_remaining),
+            line_remaining=line_remaining,
+            shared_budget_key=shared_key,
+            shared_remaining=shared_remaining,
+        ))
     return out
 
 

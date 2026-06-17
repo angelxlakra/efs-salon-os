@@ -30,7 +30,7 @@ export function AppointmentBlock({
   isDraggable = true,
   onResizeStart,
 }: AppointmentBlockProps) {
-  const color = getServiceColor(appointment.service_id);
+  const color = getServiceColor(appointment.service_id ?? "");
   const offHours = isOffHours(appointment.scheduled_at);
   const timeStr = formatApptTime(appointment.scheduled_at);
 
