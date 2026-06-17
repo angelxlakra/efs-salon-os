@@ -793,9 +793,11 @@ export function CartSidebar({ onCheckout, customerSearchRef }: CartSidebarProps)
                 {item.redemption && (
                   <div className="mt-1 flex items-center justify-between rounded-md bg-success-bg-soft px-2 py-1">
                     <span className="text-xs font-medium text-success-fg">
-                      {item.redemption.coveredQuantity < item.quantity
-                        ? `${item.redemption.coveredQuantity} of ${item.quantity} free · ${item.redemption.packageName}`
-                        : `Redeemed · ${item.redemption.packageName}`}
+                      {item.redemption.fromDefinitionId
+                        ? `Free with this package · ${item.redemption.packageName}`
+                        : item.redemption.coveredQuantity < item.quantity
+                          ? `${item.redemption.coveredQuantity} of ${item.quantity} free · ${item.redemption.packageName}`
+                          : `Redeemed · ${item.redemption.packageName}`}
                     </span>
                     <button
                       type="button"

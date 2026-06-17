@@ -233,7 +233,9 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
               quantity: covered,
               unit_price: item.unitPrice,
               discount: 0,
-              package_sale_id: item.redemption!.packageSaleId,
+              ...(item.redemption!.packageSaleId
+                ? { package_sale_id: item.redemption!.packageSaleId }
+                : { redeem_from_definition_id: item.redemption!.fromDefinitionId }),
               ...staffFields,
             });
           }
