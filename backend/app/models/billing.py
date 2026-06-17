@@ -262,6 +262,13 @@ class BillItem(Base, ULIDMixin, TimestampMixin):
     # v2 packages: service_ids chosen at purchase for choice blocks, locked into
     # the PackageSale snapshot at settlement. NULL for v1 / non-package lines.
     package_locked_choices = Column(JSONB, nullable=True)
+    # Buy-and-use-immediately: a SERVICE line that should be redeemed from a
+    # package SOLD IN THE SAME BILL (its PackageSale doesn't exist until posting,
+    # so we reference the definition; settlement resolves it to the new sale).
+    redeem_from_definition_id = Column(
+        String(26), ForeignKey("package_definitions.id", ondelete="RESTRICT"),
+        nullable=True, index=True,
+    )
 
     # Relationships
     bill = relationship("Bill", back_populates="items")
