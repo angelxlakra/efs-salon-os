@@ -1874,6 +1874,29 @@ class BillingService:
                 # flush so FK assignment is visible before the outer commit
                 self.db.flush()
 
+        # Buy-and-use-immediately: redeem service lines flagged to draw from a
+        # package SOLD in this same bill, now that the sale exists.
+        from app.services import package_redemption_service
+        sale_by_definition = {
+            i.package_definition_id: i.package_sale_id
+            for i in bill.items
+            if i.item_type == BillItemType.PACKAGE_SALE_LINE and i.package_sale_id
+        }
+        for item in bill.items:
+            if (
+                item.item_type == BillItemType.SERVICE
+                and item.redeem_from_definition_id
+                and item.redeem_from_definition_id in sale_by_definition
+            ):
+                package_redemption_service.apply_redemption(
+                    db=self.db,
+                    package_sale_id=sale_by_definition[item.redeem_from_definition_id],
+                    bill_item_id=item.id,
+                    redeemed_for_customer_id=bill.customer_id,
+                    user_id=user_id,
+                )
+                self.db.flush()
+
     def _update_customer_stats(
         self,
         customer_id: str,
