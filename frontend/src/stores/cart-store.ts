@@ -27,7 +27,8 @@ export interface CartItem {
   // package — it contributes 0 to the cash total and is sent to the backend with
   // package_sale_id so the package is decremented at checkout.
   redemption?: {
-    packageSaleId: string;
+    packageSaleId: string | null; // owned package (null when redeeming from a cart package)
+    fromDefinitionId?: string; // cart package being sold this checkout
     packageName: string;
     // How many of this line's `quantity` units the package covers (free).
     // The remaining (quantity - coveredQuantity) units are charged.

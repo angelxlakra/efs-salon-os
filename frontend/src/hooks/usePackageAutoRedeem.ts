@@ -10,6 +10,8 @@
 import { useEffect, useRef } from "react";
 import { useCartStore } from "@/stores/cart-store";
 import { packagesApi } from "@/lib/api/packages";
+import { usePackagesStore } from "@/stores/packages-store";
+import { definitionServiceBudgets } from "@/lib/packages/definition-budget";
 
 interface Elig {
   packageSaleId: string;
@@ -23,6 +25,7 @@ export function usePackageAutoRedeem() {
   const items = useCartStore((s) => s.items);
   const customerId = useCartStore((s) => s.customerId);
   const setLineRedemption = useCartStore((s) => s.setLineRedemption);
+  const definitions = usePackagesStore((s) => s.definitions);
 
   const eligByService = useRef<Map<string, Elig | null>>(new Map());
   const inFlight = useRef<Set<string>>(new Set());
@@ -81,48 +84,85 @@ export function usePackageAutoRedeem() {
     allocate(serviceLines);
 
     function allocate(lines: typeof serviceLines) {
-      // Per-service line budget (independent) and per-shared-key pool budget.
-      const lineBudget = new Map<string, number>(); // service_id -> remaining
-      const sharedBudget = new Map<string, number>(); // shared_key -> remaining
+      const lineBudget = new Map<string, number>();
+      const sharedBudget = new Map<string, number>();
       for (const sid of new Set(lines.map((l) => l.serviceId!))) {
         const e = eligByService.current.get(sid);
         if (!e) continue;
         lineBudget.set(sid, e.lineRemaining);
-        if (e.sharedKey && !sharedBudget.has(e.sharedKey)) {
-          sharedBudget.set(e.sharedKey, e.sharedRemaining);
-        }
+        if (e.sharedKey && !sharedBudget.has(e.sharedKey)) sharedBudget.set(e.sharedKey, e.sharedRemaining);
       }
 
+      // Cart packages being sold this checkout — budgets from their definitions.
+      const cartPkgs = items.filter((it) => it.kind === "package_sale" && it.packageDefinitionId);
+      const cartBudgets = cartPkgs.map((p) => {
+        const def = definitions?.find((d) => d.id === p.packageDefinitionId);
+        return {
+          definitionId: p.packageDefinitionId!,
+          packageName: p.packageName ?? "Package",
+          budgets: def?.blocks ? definitionServiceBudgets(def.id, def.blocks) : new Map(),
+        };
+      });
+      const cartLineBudget = new Map<string, number>();   // `${defId}:${sid}`
+      const cartSharedBudget = new Map<string, number>(); // sharedKey
+
       for (const line of lines) {
-        const e = eligByService.current.get(line.serviceId!);
+        const sid = line.serviceId!;
+        let coveredByOwned = 0;
         let next:
-          | { packageSaleId: string; packageName: string; coveredQuantity: number }
+          | { packageSaleId: string | null; fromDefinitionId?: string; packageName: string; coveredQuantity: number }
           | null = null;
+
+        // 1) Owned package first.
+        const e = eligByService.current.get(sid);
         if (e) {
-          const lineLeft = lineBudget.get(line.serviceId!) ?? 0;
-          const poolLeft = e.sharedKey
-            ? sharedBudget.get(e.sharedKey) ?? 0
-            : Number.POSITIVE_INFINITY;
-          const covered = Math.min(line.quantity, lineLeft, poolLeft);
-          if (covered > 0) {
-            next = {
-              packageSaleId: e.packageSaleId,
-              packageName: e.packageName,
-              coveredQuantity: covered,
-            };
-            lineBudget.set(line.serviceId!, lineLeft - covered);
-            if (e.sharedKey) sharedBudget.set(e.sharedKey, poolLeft - covered);
+          const lineLeft = lineBudget.get(sid) ?? 0;
+          const poolLeft = e.sharedKey ? sharedBudget.get(e.sharedKey) ?? 0 : Infinity;
+          coveredByOwned = Math.min(line.quantity, lineLeft, poolLeft);
+          if (coveredByOwned > 0) {
+            next = { packageSaleId: e.packageSaleId, packageName: e.packageName, coveredQuantity: coveredByOwned };
+            lineBudget.set(sid, lineLeft - coveredByOwned);
+            if (e.sharedKey) sharedBudget.set(e.sharedKey, poolLeft - coveredByOwned);
           }
         }
+
+        // 2) Cart package covers the remaining units.
+        let remaining = line.quantity - coveredByOwned;
+        if (remaining > 0) {
+          for (const cp of cartBudgets) {
+            const sb = (cp.budgets as Map<string, { lineRemaining: number; sharedKey: string | null; sharedRemaining: number }>).get(sid);
+            if (!sb) continue;
+            const lk = `${cp.definitionId}:${sid}`;
+            if (!cartLineBudget.has(lk)) cartLineBudget.set(lk, sb.lineRemaining);
+            const sk = sb.sharedKey;
+            if (sk && !cartSharedBudget.has(sk)) cartSharedBudget.set(sk, sb.sharedRemaining);
+            const lineLeft = cartLineBudget.get(lk)!;
+            const poolLeft = sk ? cartSharedBudget.get(sk)! : Infinity;
+            const cover = Math.min(remaining, lineLeft, poolLeft);
+            if (cover > 0) {
+              cartLineBudget.set(lk, lineLeft - cover);
+              if (sk) cartSharedBudget.set(sk, poolLeft - cover);
+              next = {
+                packageSaleId: null,
+                fromDefinitionId: cp.definitionId,
+                packageName: cp.packageName,
+                coveredQuantity: coveredByOwned + cover,
+              };
+              remaining -= cover;
+              break;
+            }
+          }
+        }
+
         const cur = line.redemption ?? null;
         const same =
           (cur === null && next === null) ||
-          (!!cur &&
-            !!next &&
+          (!!cur && !!next &&
             cur.packageSaleId === next.packageSaleId &&
+            (cur.fromDefinitionId ?? null) === (next.fromDefinitionId ?? null) &&
             cur.coveredQuantity === next.coveredQuantity);
         if (!same) setLineRedemption(line.id, next);
       }
     }
-  }, [items, customerId, setLineRedemption]);
+  }, [items, customerId, setLineRedemption, definitions]);
 }

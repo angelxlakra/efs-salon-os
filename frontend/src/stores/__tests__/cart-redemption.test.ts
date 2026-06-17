@@ -57,4 +57,14 @@ describe("cart redemption math", () => {
     const gst = computeGstBreakdown(items, 0, true);
     expect(gst.serviceSection.subtotal).toBe(400000); // 1 uncovered unit
   });
+
+  it("treats a cart-package redemption like any other for charged units", () => {
+    const store = useCartStore.getState();
+    store.addItem(svc({ serviceId: "s1", unitPrice: 3000, quantity: 1 }));
+    const line = useCartStore.getState().items.find((i) => i.serviceId === "s1")!;
+    store.setLineRedemption(line.id, {
+      packageSaleId: null, fromDefinitionId: "def1", packageName: "Basic Care", coveredQuantity: 1,
+    });
+    expect(useCartStore.getState().getSubtotal()).toBe(0);
+  });
 });
