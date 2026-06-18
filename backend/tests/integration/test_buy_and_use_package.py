@@ -95,3 +95,36 @@ def test_redeem_from_definition_not_in_cart_stays_charged(
     # No sale was created for an un-sold package.
     assert db_session.query(PackageSale).filter(
         PackageSale.package_definition_id == pkg.id).first() is None
+
+
+def test_voiding_buy_and_use_draft_drops_the_sale_and_redemption(
+    db_session, customer_factory, test_user
+):
+    """Voiding a draft buy-and-use bill must not mint an unpaid package."""
+    eyebrow = _make_service(db_session, "EB3", 3000)
+    pkg = _basic_pkg(db_session, test_user, "EB3", eyebrow)
+    customer = customer_factory()
+
+    svc = BillingService(db_session)
+    bill = svc.create_bill(
+        items=[
+            BillItemCreate(package_definition_id=pkg.id).model_dump(),
+            BillItemCreate(service_id=eyebrow.id, quantity=1,
+                           redeem_from_definition_id=pkg.id).model_dump(),
+        ],
+        created_by_id=test_user.id,
+        customer_id=customer.id,
+    )
+    assert db_session.query(PackageSale).filter(
+        PackageSale.package_definition_id == pkg.id).count() == 1
+
+    svc.void_bill(bill.id, voided_by_id=test_user.id, reason="customer left")
+    db_session.flush()
+
+    # The in-cart sale is gone — no unpaid package owned.
+    assert db_session.query(PackageSale).filter(
+        PackageSale.package_definition_id == pkg.id).count() == 0
+    # No internal redemption payments remain.
+    assert db_session.query(Payment).filter(
+        Payment.bill_id == bill.id,
+        Payment.payment_method == PaymentMethod.PACKAGE_REDEMPTION).count() == 0

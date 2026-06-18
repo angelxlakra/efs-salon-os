@@ -1315,10 +1315,34 @@ class BillingService:
             raise ValueError(f"Bill not found: {bill_id}")
 
         if bill.status == BillStatus.DRAFT:
-            # Delete any partial payment records — the bill was never finalized,
-            # so these payments are orphaned and should be treated as if they
-            # never occurred (cash must be returned to the customer manually).
+            # Undo any package redemptions applied at draft (owned OR buy-and-use):
+            # restores the package budget, reverts the line to SERVICE, and removes
+            # the internal redemption payment + audit row. Must run while the bill
+            # is still DRAFT (undo_redemption requires it).
+            from app.models.package import PackageRedemptionAudit, PackageSale
+            from app.services import package_redemption_service
+            audit_ids = [
+                a.id for a in self.db.query(PackageRedemptionAudit)
+                .join(BillItem, PackageRedemptionAudit.bill_item_id == BillItem.id)
+                .filter(BillItem.bill_id == bill_id).all()
+            ]
+            for aid in audit_ids:
+                package_redemption_service.undo_redemption(self.db, aid, voided_by_id)
+
+            # Delete any remaining (cash) payment records — the bill was never
+            # finalized, so these are orphaned (cash returned to the customer
+            # manually). undo_redemption already removed the internal ones.
             self.db.query(Payment).filter(Payment.bill_id == bill_id).delete()
+
+            # Drop any PackageSale created in-cart for THIS draft (buy-and-use):
+            # voiding must never mint a package the customer didn't pay for. Unlink
+            # the package-sale-line items first (FK is RESTRICT); sale items/blocks
+            # cascade-delete at the DB level.
+            for it in bill.items:
+                if it.item_type == BillItemType.PACKAGE_SALE_LINE and it.package_sale_id:
+                    it.package_sale_id = None
+            self.db.flush()
+            self.db.query(PackageSale).filter(PackageSale.bill_id == bill_id).delete()
         elif bill.status == BillStatus.POSTED and allow_posted:
             # Reverse customer stats that were recorded on posting
             if bill.customer_id:
