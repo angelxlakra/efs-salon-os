@@ -674,6 +674,7 @@ class BillingService:
         self.db.flush() # Get bill.id without committing
 
         redemption_intents: list[tuple[str, str]] = []  # (bill_item_id, package_sale_id)
+        created_items: list[BillItem] = []
         for item_data in bill_items_data:
             # Extract non-column extras before creating bill_item
             staff_contributions_data = item_data.pop("staff_contributions", None)
@@ -687,6 +688,7 @@ class BillingService:
             )
             self.db.add(bill_item)
             self.db.flush()  # Get bill_item.id
+            created_items.append(bill_item)
 
             if redeem_sale_id:
                 redemption_intents.append((bill_item.id, redeem_sale_id))
@@ -713,6 +715,53 @@ class BillingService:
                     user_id=created_by_id,
                 )
             self.db.flush()
+
+        # Buy-and-use-immediately: for any package SOLD in this cart that a service
+        # line wants to redeem from, create its PackageSale NOW (at draft, BEFORE
+        # the tax recompute below) and redeem the flagged lines — exactly like the
+        # owned-package path above, so the bill total and the internal redemption
+        # payments reconcile (the customer pays the package price, the services
+        # are covered). Package lines NOT referenced by a redemption keep their
+        # sale deferred to posting (see _create_package_sales_for_bill).
+        buy_use_defs = {
+            it.redeem_from_definition_id
+            for it in created_items
+            if it.item_type == BillItemType.SERVICE and it.redeem_from_definition_id
+        }
+        if buy_use_defs and customer_id:
+            from app.services import package_sales_service, package_redemption_service
+            sale_by_def: dict[str, str] = {}
+            for it in created_items:
+                if (
+                    it.item_type == BillItemType.PACKAGE_SALE_LINE
+                    and not it.package_sale_id
+                    and it.package_definition_id in buy_use_defs
+                ):
+                    sale = package_sales_service.create_sale(
+                        self.db,
+                        package_definition_id=it.package_definition_id,
+                        bill_id=bill.id,
+                        customer_id=customer_id,
+                        selling_staff_id=it.staff_id,
+                        locked_choices=it.package_locked_choices,
+                    )
+                    it.package_sale_id = sale.id
+                    sale_by_def[it.package_definition_id] = sale.id
+                    self.db.flush()
+            for it in created_items:
+                if (
+                    it.item_type == BillItemType.SERVICE
+                    and it.redeem_from_definition_id
+                    and it.redeem_from_definition_id in sale_by_def
+                ):
+                    package_redemption_service.apply_redemption(
+                        db=self.db,
+                        package_sale_id=sale_by_def[it.redeem_from_definition_id],
+                        bill_item_id=it.id,
+                        redeemed_for_customer_id=customer_id,
+                        user_id=created_by_id,
+                    )
+                    self.db.flush()
 
         # Compute taxes now that all items exist (per-line in GST mode)
         self._recalculate_bill_tax(bill)
@@ -1872,29 +1921,6 @@ class BillingService:
                 )
                 item.package_sale_id = sale.id
                 # flush so FK assignment is visible before the outer commit
-                self.db.flush()
-
-        # Buy-and-use-immediately: redeem service lines flagged to draw from a
-        # package SOLD in this same bill, now that the sale exists.
-        from app.services import package_redemption_service
-        sale_by_definition = {
-            i.package_definition_id: i.package_sale_id
-            for i in bill.items
-            if i.item_type == BillItemType.PACKAGE_SALE_LINE and i.package_sale_id
-        }
-        for item in bill.items:
-            if (
-                item.item_type == BillItemType.SERVICE
-                and item.redeem_from_definition_id
-                and item.redeem_from_definition_id in sale_by_definition
-            ):
-                package_redemption_service.apply_redemption(
-                    db=self.db,
-                    package_sale_id=sale_by_definition[item.redeem_from_definition_id],
-                    bill_item_id=item.id,
-                    redeemed_for_customer_id=bill.customer_id,
-                    user_id=user_id,
-                )
                 self.db.flush()
 
     def _update_customer_stats(

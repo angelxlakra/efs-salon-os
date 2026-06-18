@@ -51,6 +51,13 @@ class BillItemCreate(BaseModel):
             raise ValueError(
                 "Exactly one of service_id, sku_id, or package_definition_id must be provided"
             )
+        # A redemption draws from EITHER an owned package OR a cart package, never
+        # both — otherwise the line could be redeemed twice.
+        if self.package_sale_id and self.redeem_from_definition_id:
+            raise ValueError(
+                "A line may redeem from an owned package (package_sale_id) OR a "
+                "cart package (redeem_from_definition_id), not both"
+            )
         return self
 
     class Config:
