@@ -1,4 +1,5 @@
 "use client";
+import { useState } from "react";
 import { Lock, Unlock, Trash2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -27,6 +28,41 @@ function paise(rupees: string): number {
 
 function rupees(p: number): string {
   return (p / 100).toFixed(2);
+}
+
+// Numeric cell that shows the raw typed string while focused and only
+// formats/normalizes on blur — a fully controlled value={formatted} input
+// reformats every keystroke, which breaks typing and backspace.
+function NumericCell({
+  value,
+  onCommit,
+  onBlurEmpty,
+  ...inputProps
+}: {
+  value: string;
+  onCommit: (raw: string) => void;
+  onBlurEmpty?: () => void;
+} & Omit<
+  React.InputHTMLAttributes<HTMLInputElement>,
+  "value" | "onChange" | "onFocus" | "onBlur"
+>) {
+  const [draft, setDraft] = useState<string | null>(null);
+
+  return (
+    <input
+      {...inputProps}
+      value={draft ?? value}
+      onFocus={() => setDraft(value)}
+      onChange={(e) => {
+        setDraft(e.target.value);
+        onCommit(e.target.value);
+      }}
+      onBlur={() => {
+        if (draft === "" && onBlurEmpty) onBlurEmpty();
+        setDraft(null);
+      }}
+    />
+  );
 }
 
 // Shared base classes for inline inputs — bypasses the wrapper div from the full Input component
@@ -124,43 +160,47 @@ export function PackageBuilderServicesTable({ items, onChange, entitlementType }
 
           {/* Qty (hidden for unlimited) */}
           {!isUnlimited && (
-            <input
+            <NumericCell
+              aria-label="Qty"
               type="number"
               min={1}
-              value={item.quantity}
-              onChange={(e) =>
-                update(i, { quantity: parseInt(e.target.value) || 1 })
-              }
+              value={String(item.quantity)}
+              onCommit={(raw) => {
+                const n = parseInt(raw);
+                if (Number.isFinite(n) && n >= 1) update(i, { quantity: n });
+              }}
+              onBlurEmpty={() => update(i, { quantity: 1 })}
               className={cn(inlineInput, "text-center")}
             />
           )}
 
           {/* Limit (max_redemptions) */}
-          <input
+          <NumericCell
             aria-label="Limit"
             type="number"
             min={1}
-            value={item.max_redemptions ?? ""}
+            value={item.max_redemptions === null ? "" : String(item.max_redemptions)}
             placeholder="Unlimited"
-            onChange={(e) =>
-              update(i, {
-                max_redemptions:
-                  e.target.value === ""
-                    ? null
-                    : Math.max(1, Math.round(Number(e.target.value))) || null,
-              })
-            }
+            onCommit={(raw) => {
+              if (raw === "") {
+                update(i, { max_redemptions: null });
+                return;
+              }
+              const n = Math.round(Number(raw));
+              if (Number.isFinite(n) && n >= 1) update(i, { max_redemptions: n });
+            }}
             className={cn(inlineInput, "text-center")}
           />
 
           {/* Price */}
-          <input
+          <NumericCell
+            aria-label="Price (₹)"
             type="number"
             step="0.01"
             min={0}
             value={rupees(item.unit_price_paise)}
-            onChange={(e) =>
-              update(i, { unit_price_paise: paise(e.target.value) })
+            onCommit={(raw) =>
+              update(i, { unit_price_paise: paise(raw) })
             }
             className={cn(inlineInput, "text-right")}
           />

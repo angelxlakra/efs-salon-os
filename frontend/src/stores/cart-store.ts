@@ -16,6 +16,24 @@ export interface CartItem {
   // Product fields (when isProduct=true)
   skuId?: string;
   productName?: string;
+  // Package-sale fields (when kind === 'package_sale'). A package enters the
+  // cart as ONE line; it is never combined with anything else.
+  kind?: 'service' | 'product' | 'package_sale';
+  packageDefinitionId?: string;
+  packageName?: string;
+  lockedChoices?: { service_id: string; service_name: string }[]; // choices fixed at purchase
+  expiresLabel?: string; // e.g. "expires 12 Sep 2026"
+  // Live-in-cart redemption: when set, this service line is covered by an owned
+  // package — it contributes 0 to the cash total and is sent to the backend with
+  // package_sale_id so the package is decremented at checkout.
+  redemption?: {
+    packageSaleId: string | null; // owned package (null when redeeming from a cart package)
+    fromDefinitionId?: string; // cart package being sold this checkout
+    packageName: string;
+    // How many of this line's `quantity` units the package covers (free).
+    // The remaining (quantity - coveredQuantity) units are charged.
+    coveredQuantity: number;
+  } | null;
   // Common fields
   isProduct: boolean; // true for retail products, false for services
   quantity: number;
@@ -41,6 +59,7 @@ export interface CartState {
   removeItem: (id: string) => void;
   updateQuantity: (id: string, quantity: number) => void;
   updateDiscount: (id: string, discount: number) => void;
+  setLineRedemption: (itemId: string, redemption: CartItem['redemption']) => void;
   setItemStaff: (itemId: string, staffId: string | null, staffName: string | null) => void;
   setItemStaffContributions: (itemId: string, contributions: StaffContributionCreate[]) => void;
   setCustomer: (customerId: string | null, customerName: string | null, customerPhone?: string | null) => void;
@@ -89,27 +108,40 @@ const floorToRupee = (paise: number) => Math.floor(paise / 100) * 100;
  * services only (floor per line, remainder one paise at a time to largest lines
  * first, ties by position).
  */
+/** Units of a line that are actually charged (uncovered by any redemption). */
+export function chargedUnits(item: CartItem): number {
+  if (!item.redemption) return item.quantity;
+  return Math.max(0, item.quantity - item.redemption.coveredQuantity);
+}
+
 export function computeGstBreakdown(
   items: CartItem[],
   globalDiscount: number,
   servicesTaxed = true,
 ): GstCartBreakdown {
-  const lines = items.map((item) => {
-    const gross = item.unitPrice * item.quantity;
-    const itemDiscount = item.discount * item.quantity;
-    return {
-      item,
-      gross,
-      itemDiscount,
-      base: gross - itemDiscount, // line total before bill-level discount
-      alloc: 0, // allocated share of bill-level discount
-    };
-  });
+  // Fully-covered lines drop out (charged units = 0); a partially-covered line
+  // contributes only its uncovered units to the GST cash split.
+  const lines = items
+    .filter((item) => chargedUnits(item) > 0)
+    .map((item) => {
+      const gross = item.unitPrice * chargedUnits(item);
+      const itemDiscount = item.discount * chargedUnits(item);
+      return {
+        item,
+        gross,
+        itemDiscount,
+        base: gross - itemDiscount, // line total before bill-level discount
+        alloc: 0, // allocated share of bill-level discount
+      };
+    });
 
   // Bill-level discount applies to SERVICE lines only — retail products are
-  // sold at MRP and never discounted. Allocate proportionally across the
-  // service lines, capped at each line's base (mirrors the backend allocator).
-  const serviceLines = lines.filter((l) => !l.item.isProduct);
+  // sold at MRP and packages at their fixed price, neither discounted here.
+  // Allocate proportionally across the service lines, capped at each line's
+  // base (mirrors the backend allocator).
+  const serviceLines = lines.filter(
+    (l) => !l.item.isProduct && l.item.kind !== 'package_sale',
+  );
   const totalServiceBase = serviceLines.reduce((sum, l) => sum + l.base, 0);
   if (globalDiscount > 0 && totalServiceBase > 0) {
     let allocated = 0;
@@ -152,7 +184,11 @@ export function computeGstBreakdown(
     section.subtotal += line.gross;
     section.discount += line.itemDiscount + line.alloc;
 
-    if (line.item.isProduct) {
+    if (line.item.kind === 'package_sale') {
+      // Packages are GST-exempt — the backend taxes PACKAGE_SALE_LINE as NONE.
+      // The customer pays the package's fixed price, no CGST/SGST added.
+      section.pays += amountAfterDiscount;
+    } else if (line.item.isProduct) {
       // 18% inclusive in MRP: extract tax from the discounted price
       const half = Math.floor((amountAfterDiscount * 18) / 236);
       section.cgst += half;
@@ -206,7 +242,10 @@ export const useCartStore = create<CartState>((set, get) => ({
     // For products: Combine if same SKU and not yet booked
     let existingItem;
 
-    if (item.isProduct) {
+    if (item.kind === 'package_sale') {
+      // Packages are always a distinct line — never merge.
+      existingItem = undefined;
+    } else if (item.isProduct) {
       // For products, combine by SKU
       existingItem = items.find(
         i => i.isProduct && i.skuId === item.skuId && !i.isBooked
@@ -261,6 +300,14 @@ export const useCartStore = create<CartState>((set, get) => ({
     set({
       items: get().items.map(item =>
         item.id === id ? { ...item, discount } : item
+      ),
+    });
+  },
+
+  setLineRedemption: (itemId, redemption) => {
+    set({
+      items: get().items.map(item =>
+        item.id === itemId ? { ...item, redemption } : item
       ),
     });
   },
@@ -333,17 +380,18 @@ export const useCartStore = create<CartState>((set, get) => ({
     });
   },
 
-  // Calculate subtotal (before tax and discount)
+  // Calculate subtotal (before tax and discount). For a redeemed line, only the
+  // UNCOVERED units are charged (the package covers `coveredQuantity` of them).
   getSubtotal: () => {
     return get().items.reduce((sum, item) => {
-      return sum + (item.unitPrice * item.quantity);
+      return sum + (item.unitPrice * chargedUnits(item));
     }, 0);
   },
 
   // Calculate total tax amount
   getTaxAmount: () => {
     return get().items.reduce((sum, item) => {
-      const itemTotal = item.unitPrice * item.quantity;
+      const itemTotal = item.unitPrice * chargedUnits(item);
       // Tax is already included in price, extract it
       // Formula: tax = (inclusive_price * rate) / (100 + rate)
       // Guard against a missing/invalid taxRate (services carry no tax_rate
@@ -357,6 +405,7 @@ export const useCartStore = create<CartState>((set, get) => ({
   // Calculate total discount amount
   getDiscountAmount: () => {
     const itemDiscounts = get().items.reduce((sum, item) => {
+      if (item.redemption) return sum;
       return sum + (item.discount * item.quantity);
     }, 0);
     return itemDiscounts + get().discount;

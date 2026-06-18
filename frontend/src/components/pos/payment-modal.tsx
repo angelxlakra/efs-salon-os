@@ -18,6 +18,7 @@ import { useCartStore, computeGstBreakdown } from '@/stores/cart-store';
 import { CustomerSearch } from '@/components/pos/customer-search';
 import { apiClient } from '@/lib/api-client';
 import { toast } from 'sonner';
+import { getApiErrorMessage } from '@/lib/api-error';
 import { useRouter } from 'next/navigation';
 import { sendReceiptToWhatsApp } from '@/lib/whatsapp-receipt';
 import { useSettingsStore } from '@/stores/settings-store';
@@ -199,33 +200,63 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
   // Build the bill creation payload (shared by /pos/bills and /pos/bills/group)
   const buildBillPayload = () => {
     const billPayload: any = {
-      items: items.map(item => {
+      items: items.flatMap(item => {
+        // For package sales — one line that the backend turns into a
+        // PackageSale at settlement (carries purchase-time locked choices).
+        if (item.kind === 'package_sale') {
+          return [{
+            package_definition_id: item.packageDefinitionId,
+            quantity: 1,
+            unit_price: item.unitPrice,
+            discount: 0,
+            locked_choices: (item.lockedChoices ?? []).map((c) => c.service_id),
+          }];
+        }
         // For services
         if (!item.isProduct) {
-          const serviceItem: any = {
-            service_id: item.serviceId,
-            quantity: item.quantity,
-            unit_price: item.unitPrice,
-            discount: item.discount,
-          };
-
-          // Multi-staff service with contributions
+          const staffFields: any = {};
           if (item.isMultiStaff && item.staffContributions && item.staffContributions.length > 0) {
-            serviceItem.staff_contributions = item.staffContributions;
+            staffFields.staff_contributions = item.staffContributions;
           } else {
-            // Single-staff service
-            serviceItem.staff_id = item.staffId;
+            staffFields.staff_id = item.staffId;
           }
 
-          return serviceItem;
+          // Live-in-cart redemption: the package covers `coveredQuantity` units;
+          // split into a redeemed line + a charged remainder so a qty-3 line
+          // with a 2-use budget bills 2 free + 1 charged.
+          const covered = item.redemption ? item.redemption.coveredQuantity : 0;
+          const charged = item.quantity - covered;
+          const out: any[] = [];
+          if (covered > 0) {
+            out.push({
+              service_id: item.serviceId,
+              quantity: covered,
+              unit_price: item.unitPrice,
+              discount: 0,
+              ...(item.redemption!.packageSaleId
+                ? { package_sale_id: item.redemption!.packageSaleId }
+                : { redeem_from_definition_id: item.redemption!.fromDefinitionId }),
+              ...staffFields,
+            });
+          }
+          if (charged > 0) {
+            out.push({
+              service_id: item.serviceId,
+              quantity: charged,
+              unit_price: item.unitPrice,
+              discount: item.discount,
+              ...staffFields,
+            });
+          }
+          return out;
         }
         // For products
-        return {
+        return [{
           sku_id: item.skuId,
           quantity: item.quantity,
           unit_price: item.unitPrice,
           discount: item.discount,
-        };
+        }];
       }),
       customer_name: customerName || 'Walk-in Customer',
       discount_amount: discount,
@@ -411,7 +442,7 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
 
     } catch (error: any) {
       setStatus('error');
-      toast.error(error.response?.data?.detail || 'Payment failed');
+      toast.error(getApiErrorMessage(error, 'Payment failed'));
       console.error('Payment error:', error);
       // Reset status to idle so they can try again if it was a recoverable error
       setTimeout(() => setStatus('idle'), 2000); 
@@ -455,7 +486,7 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
 
     } catch (error: any) {
       setStatus('error');
-      toast.error(error.response?.data?.detail || 'Failed to complete bill');
+      toast.error(getApiErrorMessage(error, 'Failed to complete bill'));
       console.error('Complete bill error:', error);
       setTimeout(() => setStatus('idle'), 2000);
     }
@@ -498,7 +529,7 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
 
     } catch (error: any) {
       setStatus('error');
-      toast.error(error.response?.data?.detail || 'Failed to collect payment');
+      toast.error(getApiErrorMessage(error, 'Failed to collect payment'));
       console.error('Collect pending error:', error);
       setTimeout(() => setStatus('idle'), 2000);
     }
@@ -515,7 +546,7 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
       setAmountToPay(((total - newTotalPaid) / 100).toFixed(2));
       toast.success('Payment removed');
     } catch (error: any) {
-      toast.error(error.response?.data?.detail || 'Failed to remove payment');
+      toast.error(getApiErrorMessage(error, 'Failed to remove payment'));
     } finally {
       setIsDeletingPayment(null);
     }
@@ -566,7 +597,7 @@ export function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
       await showReceipt(win, { groupId: created.groupId, billId: created.billId });
     } catch (error: any) {
       win?.close();
-      toast.error(error.response?.data?.detail || 'Failed to print bill');
+      toast.error(getApiErrorMessage(error, 'Failed to print bill'));
     } finally {
       setIsPrintingDraft(false);
     }

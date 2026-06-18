@@ -38,9 +38,66 @@ PackageSale ─────────────────── Bill (orig
 | `validity_days` | `Integer` | Must be > 0 |
 | `auto_apply` | `Boolean` | Auto-redeem when exactly 1 eligible package |
 | `cancellation_fee_pct` | `Numeric(5,2)` | 0–100; default 20.00 |
+| `discount_mode` | `String(8)` | Optional: `pct` \| `flat` \| `final`. NULL = no discount |
+| `discount_value` | `Numeric(12,2)` | Paise for flat/final, percentage for pct. Paired with `discount_mode` |
+| `blocks` | `JSONB` | Package Builder v2 entitlement-block stack. NULL = v1 (items-based) package |
+| `stored_price_paise` | `Integer` | v2 builder-computed sell price. NULL = derive from items+discount |
 | `created_by_user_id` | `FK → users.id` | |
 
-**Constraints**: `ck_package_def_entitlement_sessions` enforces counted↔total_sessions pairing.
+**Constraints**: `ck_package_def_entitlement_sessions` enforces counted↔total_sessions pairing **for v1 rows** (relaxed: any row with non-NULL `blocks` is exempt, since v2 packages have no sessions envelope); `ck_package_def_discount_pair` enforces mode↔value pairing.
+
+**Package Builder v2 (since 2026-06)**: the v2 builder models a package as a stack of
+**entitlement blocks** (`items` · `choice` · `unlimited` · `pool` · `credit`) instead of
+a flat items list. The block stack is stored as JSON in `blocks` and the builder's
+computed sell price in `stored_price_paise` (which `final_price_paise` returns verbatim
+when set). v2 packages persist with **empty `items`**. **Selling + redemption are wired** (since
+2026-06-13): a `package_sale_line` BillItem carries `package_definition_id` +
+`package_locked_choices`; at settlement `create_sale` projects the block stack onto the
+existing session-pool model via `_block_sale_lines`:
+
+| Block | Sale mapping | Budget |
+|---|---|---|
+| items | one capped line/row (max = qty) | global pool (Σ qty) |
+| choice @purchase | single-use line per **locked** service | global pool (picks) |
+| choice @visit | **independent counter** of `picks`, shared across options | own `package_sale_blocks` row |
+| pool | **independent counter** of `sessions`, shared across services | own `package_sale_blocks` row |
+| unlimited | `pool_exempt` free lines (survive EXHAUSTED to expiry) | none (unlimited) |
+| credit | *skipped — wallet redemption not yet modelled* | none |
+
+**Independent block counters (since 2026-06-14):** choice @visit and pool blocks each
+get a `package_sale_blocks` row — `remaining` is a budget shared across that block's
+option lines (use any option, N times total, any day), wholly separate from the global
+session pool. Governed lines carry `sale_block_id` and are excluded from
+`total_sessions`. `apply_redemption`/`undo_redemption` decrement/restore the block
+counter under the sale-row lock; `find_eligible_packages` keeps such lines eligible
+while the block has budget (and past EXHAUSTED, like pool-exempt lines).
+
+**Buy-and-use-immediately (since 2026-06-16):** one cart can sell a v2 package AND redeem
+its services in the same checkout. Because the `PackageSale` is created at POSTING, a
+service line carries `BillItem.redeem_from_definition_id` (the package's *definition* id,
+not a sale id). On a draft bill it stays a normal charged `SERVICE`; at posting,
+`_create_package_sales_for_bill` creates the sale first, then a second pass redeems each
+flagged service line against the new sale via `apply_redemption` (which validates
+coverage + budget + quantity, so an over-claim raises and aborts the post). The POS cart
+previews this by allocating against the cart package's *definition* budget
+(`definitionServiceBudgets`, the cart-side mirror of `_block_sale_lines`) **after** owned
+packages; the payload sends `redeem_from_definition_id` for those lines (vs
+`package_sale_id` for owned-package redemptions).
+
+New columns: `package_sale_items.pool_exempt` (unlimited lines bypass the session pool +
+EXHAUSTED gate; honoured in apply/undo redemption + eligibility), and
+`package_sale_items.package_definition_item_id` is now **nullable** (v2 lines have no
+definition item). **Known gaps:** per-visit choice is a *soft* budget (the global pool
+caps the true total but a single option could be over-redeemed), credit blocks aren't
+redeemable yet, and counted-refund value for v2 sales is approximate. v1 packages
+untouched.
+
+**Discount persistence (since 2026-06)**: items store **gross** (entered) prices and the
+package-level discount lives on the definition, so edits round-trip exactly what was
+entered. The discount is applied by `distribute_discount` at **sale time** (snapshot
+prices on `PackageSaleItem`) and exposed read-only as `final_price_paise` on the API
+response. Definitions created before this change have NULL discount and already-net
+item prices, which remain correct as-is.
 
 ---
 
@@ -54,7 +111,7 @@ PackageSale ─────────────────── Bill (orig
 | `package_definition_id` | `FK → package_definitions.id` | CASCADE delete |
 | `service_id` | `FK → services.id` | RESTRICT |
 | `quantity` | `Integer` | ≥ 1 |
-| `unit_price_paise` | `Integer` | ≥ 0; snapshotted to PackageSaleItem at sale |
+| `unit_price_paise` | `Integer` | ≥ 0; GROSS (entered) price. The discounted effective price is snapshotted to PackageSaleItem at sale |
 | `locked` | `Boolean` | Locked lines are skipped during package-level discount distribution |
 | `display_order` | `Integer` | |
 | `max_redemptions` | `Integer` | Optional. Per-line cap: max times this line can be redeemed across the package's lifetime. `NULL` = no per-line cap (draws from global sessions pool only). CHECK >= 1. |

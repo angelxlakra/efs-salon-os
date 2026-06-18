@@ -6,6 +6,7 @@ from sqlalchemy import (
     Boolean, CheckConstraint, Column, Enum, ForeignKey,
     Integer, Numeric, String, Text,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 # Re-exported for Task 4 (sales/expiry/audit models)
 from sqlalchemy import DateTime, Index  # noqa: F401
 from sqlalchemy.orm import relationship
@@ -54,6 +55,16 @@ class PackageDefinition(Base, ULIDMixin, TimestampMixin, SoftDeleteMixin):
     validity_days = Column(Integer, nullable=False)
     auto_apply = Column(Boolean, nullable=False, default=True)
     cancellation_fee_pct = Column(Numeric(5, 2), nullable=False, default=Decimal("20.00"))
+    # Package-level discount, persisted so edits round-trip the entered values.
+    # Items keep their GROSS prices; the discount is applied at sale time.
+    # discount_value is paise for flat/final modes, a percentage for pct.
+    discount_mode = Column(String(8), nullable=True)
+    discount_value = Column(Numeric(12, 2), nullable=True)
+    # Package Builder v2: the entitlement-block stack (source of truth for the
+    # v2 builder UI) and the builder-computed sell price. NULL for v1 packages,
+    # whose price is still derived from `items` + discount.
+    blocks = Column(JSONB, nullable=True)
+    stored_price_paise = Column(Integer, nullable=True)
     created_by_user_id = Column(String(26), ForeignKey("users.id"), nullable=False)
 
     items = relationship(
@@ -65,14 +76,69 @@ class PackageDefinition(Base, ULIDMixin, TimestampMixin, SoftDeleteMixin):
 
     __table_args__ = (
         CheckConstraint(
-            "(entitlement_type = 'counted' AND total_sessions IS NOT NULL AND total_sessions >= 1) "
+            "(blocks IS NOT NULL) "  # v2 block packages don't use the sessions envelope
+            "OR (entitlement_type = 'counted' AND total_sessions IS NOT NULL AND total_sessions >= 1) "
             "OR (entitlement_type = 'unlimited' AND total_sessions IS NULL)",
             name="ck_package_def_entitlement_sessions",
         ),
         CheckConstraint("cancellation_fee_pct >= 0 AND cancellation_fee_pct <= 100",
                         name="ck_package_def_fee_range"),
         CheckConstraint("validity_days > 0", name="ck_package_def_validity_positive"),
+        CheckConstraint(
+            "(discount_mode IS NULL AND discount_value IS NULL) "
+            "OR (discount_mode IN ('pct', 'flat', 'final') AND discount_value IS NOT NULL)",
+            name="ck_package_def_discount_pair",
+        ),
     )
+
+    @property
+    def discount(self) -> dict | None:
+        """Discount as {mode, value} for API serialization, or None."""
+        if self.discount_mode is None:
+            return None
+        return {"mode": self.discount_mode, "value": self.discount_value}
+
+    def effective_item_prices(self) -> list[int]:
+        """Per-item unit prices with the package discount applied (paise).
+
+        Pure computation — pricing engine owns the distribution math.
+        """
+        from app.services.package_pricing_engine import (
+            distribute_discount, DiscountedItem, DiscountMode,
+        )
+        drafts = [
+            DiscountedItem(
+                unit_price_paise=i.unit_price_paise,
+                quantity=i.quantity,
+                locked=i.locked,
+            )
+            for i in self.items
+        ]
+        if self.discount_mode is not None:
+            drafts = distribute_discount(
+                drafts, DiscountMode(self.discount_mode), self.discount_value,
+            )
+        return [d.unit_price_paise for d in drafts]
+
+    @property
+    def final_price_paise(self) -> int:
+        """Effective selling price of the whole package (paise).
+
+        Computed at total level so FINAL/FLAT are exact; per-unit floor
+        division (effective_item_prices) can drift by a few paise on
+        qty>1 lines and is only used for sale snapshots.
+        """
+        # v2 block packages carry a builder-computed price; trust it.
+        if self.stored_price_paise is not None:
+            return self.stored_price_paise
+        gross = sum(i.unit_price_paise * i.quantity for i in self.items)
+        if self.discount_mode is None:
+            return gross
+        if self.discount_mode == "pct":
+            return int(gross * (Decimal("100") - self.discount_value) / Decimal("100"))
+        if self.discount_mode == "flat":
+            return gross - int(self.discount_value)
+        return int(self.discount_value)  # final
 
 
 class PackageDefinitionItem(Base, ULIDMixin, TimestampMixin):
@@ -148,6 +214,9 @@ class PackageSale(Base, ULIDMixin, TimestampMixin):
     cancellation_fee_pct_snapshot = Column(Numeric(5, 2), nullable=False)
     total_sessions_snapshot = Column(Integer, nullable=True)
     sessions_remaining = Column(Integer, nullable=True)
+    # v2: the block stack as sold, for block-labelled entitlement display.
+    # NULL for v1 (items) sales. Per-line consumption lives on PackageSaleItem.
+    blocks_snapshot = Column(JSONB, nullable=True)
 
     status = Column(
         Enum(PackageSaleStatus, name="packagesalestatus",
@@ -162,6 +231,12 @@ class PackageSale(Base, ULIDMixin, TimestampMixin):
         back_populates="sale",
         cascade="all, delete-orphan",
         order_by="PackageSaleItem.display_order",
+    )
+    block_counters = relationship(
+        "PackageSaleBlock",
+        back_populates="sale",
+        cascade="all, delete-orphan",
+        order_by="PackageSaleBlock.block_index",
     )
     customer = relationship("Customer", foreign_keys=[customer_id])
     definition = relationship("PackageDefinition", foreign_keys=[package_definition_id])
@@ -197,9 +272,11 @@ class PackageSaleItem(Base, ULIDMixin, TimestampMixin):
         String(26), ForeignKey("package_sales.id", ondelete="CASCADE"),
         nullable=False, index=True,
     )
+    # Nullable: v2 block packages have no PackageDefinitionItem rows — their
+    # sale items are synthesized from the block stack instead.
     package_definition_item_id = Column(
         String(26), ForeignKey("package_definition_items.id", ondelete="RESTRICT"),
-        nullable=False,
+        nullable=True,
     )
     service_id = Column(
         String(26), ForeignKey("services.id", ondelete="RESTRICT"),
@@ -212,6 +289,15 @@ class PackageSaleItem(Base, ULIDMixin, TimestampMixin):
     display_order = Column(Integer, nullable=False)
     max_redemptions = Column(Integer, nullable=True)  # null = no per-line cap
     remaining = Column(Integer, nullable=True)        # null iff max_redemptions is null
+    # v2 unlimited blocks: this line is redeemable without limit and does NOT
+    # draw from the global session pool (survives EXHAUSTED until expiry).
+    pool_exempt = Column(Boolean, nullable=False, default=False)
+    # v2 choice@visit / pool blocks: this line draws from an INDEPENDENT
+    # per-block counter (PackageSaleBlock) instead of the global session pool.
+    sale_block_id = Column(
+        String(26), ForeignKey("package_sale_blocks.id", ondelete="CASCADE"),
+        nullable=True, index=True,
+    )
 
     sale = relationship("PackageSale", back_populates="items")
     service = relationship("Service")
@@ -240,6 +326,32 @@ class PackageSaleItem(Base, ULIDMixin, TimestampMixin):
             "OR (max_redemptions IS NOT NULL AND remaining IS NOT NULL)",
             name="ck_package_sale_item_remaining_matches_cap",
         ),
+    )
+
+
+class PackageSaleBlock(Base, ULIDMixin, TimestampMixin):
+    """Independent per-block redemption counter for a sold v2 package.
+
+    A choice@visit or pool block gets one of these: `remaining` is a budget
+    shared across all its option lines (use any option, N times total), wholly
+    separate from the global session pool. Mutated only under the PackageSale
+    row lock in apply_redemption/undo_redemption.
+    """
+    __tablename__ = "package_sale_blocks"
+
+    package_sale_id = Column(
+        String(26), ForeignKey("package_sales.id", ondelete="CASCADE"),
+        nullable=False, index=True,
+    )
+    block_index = Column(Integer, nullable=False)  # index into blocks_snapshot
+    kind = Column(String(16), nullable=False)
+    name = Column(String(255), nullable=False)
+    remaining = Column(Integer, nullable=False)
+
+    sale = relationship("PackageSale", back_populates="block_counters")
+
+    __table_args__ = (
+        CheckConstraint("remaining >= 0", name="ck_package_sale_block_remaining_non_negative"),
     )
 
 

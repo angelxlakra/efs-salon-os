@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Plus, Loader2, Edit2, Trash2, Search, User, Wallet, History, UserX, Receipt } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -38,6 +39,7 @@ interface ApiResponse {
 }
 
 export default function CustomersPage() {
+  const router = useRouter();
   const { user } = useAuthStore();
   const isOwner = user?.role === 'owner';
   const canEdit = isOwner || user?.role === 'receptionist';
@@ -330,9 +332,13 @@ export default function CustomersPage() {
                     <tr key={customer.id} className="hover:bg-surface-row">
                       <td className="px-4 py-3 whitespace-nowrap">
                         <div>
-                          <div className="text-sm font-medium text-text-primary">
+                          <button
+                            type="button"
+                            onClick={() => router.push(`/dashboard/customers/${customer.id}`)}
+                            className="text-sm font-medium text-text-primary hover:text-accent hover:underline"
+                          >
                             {titleCase(customer.first_name)} {titleCase(customer.last_name || '')}
-                          </div>
+                          </button>
                           {customer.gender && (
                             <div className="text-sm text-text-secondary capitalize">
                               {customer.gender}

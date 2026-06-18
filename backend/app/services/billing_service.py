@@ -529,6 +529,35 @@ class BillingService:
         inventory_service = InventoryService(self.db)
 
         for item in items:
+            # Package-sale line: one line sold at the package's price; the
+            # PackageSale is created at settlement (see _create_package_sales).
+            if item.get("package_definition_id"):
+                from app.models.package import PackageDefinition
+                pkg = self.db.get(PackageDefinition, item["package_definition_id"])
+                if not pkg or pkg.deleted_at:
+                    raise ValueError(f"Package not found: {item['package_definition_id']}")
+                price = item.get("unit_price")
+                if price is None:
+                    price = pkg.final_price_paise
+                subtotal += price
+                bill_items_data.append({
+                    "service_id": None,
+                    "sku_id": None,
+                    "item_name": pkg.name,
+                    "base_price": price,
+                    "quantity": 1,
+                    "line_total": price,
+                    "cogs_amount": 0,
+                    "item_type": BillItemType.PACKAGE_SALE_LINE,
+                    "package_definition_id": pkg.id,
+                    "package_locked_choices": item.get("locked_choices"),
+                    "staff_id": item.get("staff_id"),
+                    "appointment_id": None,
+                    "walkin_id": None,
+                    "notes": item.get("notes"),
+                })
+                continue
+
             # Check if item is a service or product
             if "service_id" in item and item["service_id"]:
                 # Service item
@@ -557,11 +586,15 @@ class BillingService:
                     "line_total": line_total,
                     "cogs_amount": cogs_amount,
                     "item_type": BillItemType.SERVICE,
+                    "redeem_from_definition_id": item.get("redeem_from_definition_id"),
                     "staff_id": item.get("staff_id"),
                     "appointment_id": item.get("appointment_id"),
                     "walkin_id": item.get("walkin_id"),
                     "notes": item.get("notes"),
-                    "staff_contributions": item.get("staff_contributions")  # Multi-staff data
+                    "staff_contributions": item.get("staff_contributions"),  # Multi-staff data
+                    # Live-in-cart redemption: the cart resolved an eligible package
+                    # for this line; apply it after the bill item exists.
+                    "_redeem_package_sale_id": item.get("package_sale_id"),
                 }
                 bill_items_data.append(bill_item_data)
 
@@ -640,9 +673,12 @@ class BillingService:
         self.db.add(bill)
         self.db.flush() # Get bill.id without committing
 
+        redemption_intents: list[tuple[str, str]] = []  # (bill_item_id, package_sale_id)
+        created_items: list[BillItem] = []
         for item_data in bill_items_data:
-            # Extract staff_contributions before creating bill_item
+            # Extract non-column extras before creating bill_item
             staff_contributions_data = item_data.pop("staff_contributions", None)
+            redeem_sale_id = item_data.pop("_redeem_package_sale_id", None)
 
             # Create bill item
             bill_item = BillItem(
@@ -652,6 +688,10 @@ class BillingService:
             )
             self.db.add(bill_item)
             self.db.flush()  # Get bill_item.id
+            created_items.append(bill_item)
+
+            if redeem_sale_id:
+                redemption_intents.append((bill_item.id, redeem_sale_id))
 
             # Handle multi-staff contributions if present
             if staff_contributions_data:
@@ -660,6 +700,68 @@ class BillingService:
                     line_total_paise=bill_item.line_total,
                     contributions_data=staff_contributions_data
                 )
+
+        # Apply cart-resolved package redemptions: converts each flagged service
+        # line to PACKAGE_REDEMPTION, decrements the package, and books an
+        # internal payment that covers the line (no cash due for it).
+        if redemption_intents and customer_id:
+            from app.services import package_redemption_service
+            for bill_item_id, sale_id in redemption_intents:
+                package_redemption_service.apply_redemption(
+                    db=self.db,
+                    package_sale_id=sale_id,
+                    bill_item_id=bill_item_id,
+                    redeemed_for_customer_id=customer_id,
+                    user_id=created_by_id,
+                )
+            self.db.flush()
+
+        # Buy-and-use-immediately: for any package SOLD in this cart that a service
+        # line wants to redeem from, create its PackageSale NOW (at draft, BEFORE
+        # the tax recompute below) and redeem the flagged lines — exactly like the
+        # owned-package path above, so the bill total and the internal redemption
+        # payments reconcile (the customer pays the package price, the services
+        # are covered). Package lines NOT referenced by a redemption keep their
+        # sale deferred to posting (see _create_package_sales_for_bill).
+        buy_use_defs = {
+            it.redeem_from_definition_id
+            for it in created_items
+            if it.item_type == BillItemType.SERVICE and it.redeem_from_definition_id
+        }
+        if buy_use_defs and customer_id:
+            from app.services import package_sales_service, package_redemption_service
+            sale_by_def: dict[str, str] = {}
+            for it in created_items:
+                if (
+                    it.item_type == BillItemType.PACKAGE_SALE_LINE
+                    and not it.package_sale_id
+                    and it.package_definition_id in buy_use_defs
+                ):
+                    sale = package_sales_service.create_sale(
+                        self.db,
+                        package_definition_id=it.package_definition_id,
+                        bill_id=bill.id,
+                        customer_id=customer_id,
+                        selling_staff_id=it.staff_id,
+                        locked_choices=it.package_locked_choices,
+                    )
+                    it.package_sale_id = sale.id
+                    sale_by_def[it.package_definition_id] = sale.id
+                    self.db.flush()
+            for it in created_items:
+                if (
+                    it.item_type == BillItemType.SERVICE
+                    and it.redeem_from_definition_id
+                    and it.redeem_from_definition_id in sale_by_def
+                ):
+                    package_redemption_service.apply_redemption(
+                        db=self.db,
+                        package_sale_id=sale_by_def[it.redeem_from_definition_id],
+                        bill_item_id=it.id,
+                        redeemed_for_customer_id=customer_id,
+                        user_id=created_by_id,
+                    )
+                    self.db.flush()
 
         # Compute taxes now that all items exist (per-line in GST mode)
         self._recalculate_bill_tax(bill)
@@ -1213,10 +1315,34 @@ class BillingService:
             raise ValueError(f"Bill not found: {bill_id}")
 
         if bill.status == BillStatus.DRAFT:
-            # Delete any partial payment records — the bill was never finalized,
-            # so these payments are orphaned and should be treated as if they
-            # never occurred (cash must be returned to the customer manually).
+            # Undo any package redemptions applied at draft (owned OR buy-and-use):
+            # restores the package budget, reverts the line to SERVICE, and removes
+            # the internal redemption payment + audit row. Must run while the bill
+            # is still DRAFT (undo_redemption requires it).
+            from app.models.package import PackageRedemptionAudit, PackageSale
+            from app.services import package_redemption_service
+            audit_ids = [
+                a.id for a in self.db.query(PackageRedemptionAudit)
+                .join(BillItem, PackageRedemptionAudit.bill_item_id == BillItem.id)
+                .filter(BillItem.bill_id == bill_id).all()
+            ]
+            for aid in audit_ids:
+                package_redemption_service.undo_redemption(self.db, aid, voided_by_id)
+
+            # Delete any remaining (cash) payment records — the bill was never
+            # finalized, so these are orphaned (cash returned to the customer
+            # manually). undo_redemption already removed the internal ones.
             self.db.query(Payment).filter(Payment.bill_id == bill_id).delete()
+
+            # Drop any PackageSale created in-cart for THIS draft (buy-and-use):
+            # voiding must never mint a package the customer didn't pay for. Unlink
+            # the package-sale-line items first (FK is RESTRICT); sale items/blocks
+            # cascade-delete at the DB level.
+            for it in bill.items:
+                if it.item_type == BillItemType.PACKAGE_SALE_LINE and it.package_sale_id:
+                    it.package_sale_id = None
+            self.db.flush()
+            self.db.query(PackageSale).filter(PackageSale.bill_id == bill_id).delete()
         elif bill.status == BillStatus.POSTED and allow_posted:
             # Reverse customer stats that were recorded on posting
             if bill.customer_id:
@@ -1815,6 +1941,7 @@ class BillingService:
                     bill_id=bill.id,
                     customer_id=bill.customer_id,
                     selling_staff_id=item.staff_id,
+                    locked_choices=item.package_locked_choices,
                 )
                 item.package_sale_id = sale.id
                 # flush so FK assignment is visible before the outer commit

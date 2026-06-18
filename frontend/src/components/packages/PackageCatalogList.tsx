@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, Archive, Loader2, Layers } from "lucide-react";
+import { Plus, Archive, Loader2, Layers, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +23,7 @@ export function PackageCatalogList() {
   const { hasPermission } = useAuthStore();
   const canCreate = hasPermission("packages", "create");
   const canUpdate = hasPermission("packages", "update");
+  const canDelete = hasPermission("packages", "delete");
 
   const [definitions, setDefinitions] = useState<PackageDefinition[]>([]);
   const [loading, setLoading] = useState(true);
@@ -65,6 +66,17 @@ export function PackageCatalogList() {
       toast.success("Archived");
     } catch {
       toast.error("Failed to archive");
+    }
+  }
+
+  async function handleDelete(id: string, name: string) {
+    if (!window.confirm(`Delete "${name}"? This cannot be undone.`)) return;
+    try {
+      await packagesApi.deleteDefinition(id);
+      setDefinitions((prev) => prev.filter((d) => d.id !== id));
+      toast.success("Deleted");
+    } catch {
+      toast.error("Failed to delete");
     }
   }
 
@@ -196,6 +208,17 @@ export function PackageCatalogList() {
                           onClick={() => router.push(`/dashboard/packages/${d.id}/edit`)}
                         >
                           Edit
+                        </Button>
+                      )}
+                      {canDelete && d.status === "draft" && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          aria-label={`Delete ${d.name}`}
+                          onClick={() => handleDelete(d.id, d.name)}
+                          className="text-muted-foreground hover:text-danger-fg"
+                        >
+                          <Trash2 size={14} />
                         </Button>
                       )}
                     </div>

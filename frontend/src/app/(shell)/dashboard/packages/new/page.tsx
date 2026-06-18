@@ -1,10 +1,8 @@
 "use client";
-import { useRouter } from "next/navigation";
 import { PackageBuilder } from "@/components/packages/PackageBuilder";
 
 export default function NewPackagePage() {
-  const router = useRouter();
-  return (
-    <PackageBuilder onSaved={(id) => router.push(`/dashboard/packages/${id}`)} />
-  );
+  // The builder owns its own save/publish lifecycle (it tracks the created id
+  // internally and navigates to POS on publish), so no onSaved handoff here.
+  return <PackageBuilder />;
 }

@@ -56,6 +56,11 @@
   --info-bg-soft:       #dbeafe;
   --info-border:        #bfdbfe;
 
+  /* Purple — session-pool block accent (data-series-5 family) */
+  --purple-fg:          #6b21a8;
+  --purple-bg-soft:     #f3e8ff;
+  --purple-border:      #e9d5ff;
+
   /* Data viz */
   --data-series-1:      #1c104c;
   --data-series-2:      #1e40af;
@@ -125,6 +130,10 @@
   --info-fg:            #93c5fd;
   --info-bg-soft:       #1e2a4a;
   --info-border:        #2a3d6e;
+
+  --purple-fg:          #d8b4fe;
+  --purple-bg-soft:     #2a1a3d;
+  --purple-border:      #3f2a5a;
 
   --data-series-1:      #c9a96e;
   --data-series-2:      #7aa0e8;

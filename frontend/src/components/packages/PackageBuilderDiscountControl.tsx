@@ -1,6 +1,8 @@
 "use client";
+import { useId } from "react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import type { DiscountMode } from "@/types/package";
 
 interface Discount {
@@ -9,30 +11,60 @@ interface Discount {
 }
 
 interface Props {
-  items: Array<{ unit_price_paise: number; quantity: number; locked: boolean }>;
+  /** Chargeable total (paise) the discount applies to. */
+  totalPaise: number;
   discount: Discount | undefined;
   onChange: (discount: Discount | undefined) => void;
 }
 
-const MODES: Array<{ value: DiscountMode; label: string }> = [
-  { value: "pct", label: "% off" },
-  { value: "flat", label: "₹ off" },
-  { value: "final", label: "Final" },
+const FIELDS: Array<{ mode: DiscountMode; label: string; step: string }> = [
+  { mode: "pct", label: "% off", step: "0.1" },
+  { mode: "flat", label: "₹ off", step: "0.01" },
+  { mode: "final", label: "Final price", step: "0.01" },
 ];
 
-export function PackageBuilderDiscountControl({ discount, onChange }: Props) {
-  const mode = discount?.mode ?? "pct";
+// Format a paise amount as a rupee string without trailing zeros ("900", "12.5")
+function paiseToRupeeString(paise: number): string {
+  return String(Math.round(paise) / 100);
+}
 
-  function setMode(m: DiscountMode) {
-    onChange({ mode: m, value: discount?.value ?? "" });
+function trimNumber(n: number): string {
+  return String(Math.round(n * 100) / 100);
+}
+
+export function PackageBuilderDiscountControl({
+  totalPaise,
+  discount,
+  onChange,
+}: Props) {
+  const idPrefix = useId();
+
+  // The last-edited field is authoritative (saved as-is); the other two are
+  // derived from it and the current package total.
+  function derivedValue(mode: DiscountMode): string {
+    if (!discount?.value) return "";
+    if (discount.mode === mode) return discount.value;
+    if (totalPaise <= 0) return "";
+
+    const v = parseFloat(discount.value);
+    if (!Number.isFinite(v)) return "";
+
+    let discountPaise: number;
+    if (discount.mode === "pct") {
+      discountPaise = Math.round((totalPaise * v) / 100);
+    } else if (discount.mode === "flat") {
+      discountPaise = Math.round(v * 100);
+    } else {
+      discountPaise = totalPaise - Math.round(v * 100);
+    }
+
+    if (mode === "pct") return trimNumber((discountPaise / totalPaise) * 100);
+    if (mode === "flat") return paiseToRupeeString(discountPaise);
+    return paiseToRupeeString(totalPaise - discountPaise);
   }
 
-  function setValue(v: string) {
-    if (!v) {
-      onChange(undefined);
-      return;
-    }
-    onChange({ mode, value: v });
+  function setValue(mode: DiscountMode, v: string) {
+    onChange(v ? { mode, value: v } : undefined);
   }
 
   return (
@@ -41,39 +73,34 @@ export function PackageBuilderDiscountControl({ discount, onChange }: Props) {
         Package discount
       </p>
 
-      {/* Segmented control */}
-      <div className="flex rounded-lg border border-border overflow-hidden">
-        {MODES.map((m) => (
-          <button
-            key={m.value}
-            type="button"
-            onClick={() => setMode(m.value)}
-            className={cn(
-              "flex-1 py-1.5 text-xs font-medium transition-colors",
-              mode === m.value
-                ? "bg-accent text-accent-foreground"
-                : "bg-surface-row text-muted-foreground hover:bg-surface-card"
-            )}
-          >
-            {m.label}
-          </button>
+      <div className="grid grid-cols-3 gap-2">
+        {FIELDS.map((f) => (
+          <div key={f.mode} className="space-y-1">
+            <Label
+              htmlFor={`${idPrefix}-${f.mode}`}
+              className={cn(
+                "text-xs",
+                discount?.mode === f.mode && discount.value
+                  ? "text-accent-foreground font-medium"
+                  : "text-muted-foreground"
+              )}
+            >
+              {f.label}
+            </Label>
+            <Input
+              id={`${idPrefix}-${f.mode}`}
+              type="number"
+              step={f.step}
+              min={0}
+              value={derivedValue(f.mode)}
+              onChange={(e) => setValue(f.mode, e.target.value)}
+              size="sm"
+              leadingAddon={f.mode !== "pct" ? "₹" : undefined}
+              trailingAddon={f.mode === "pct" ? "%" : undefined}
+            />
+          </div>
         ))}
       </div>
-
-      {/* Value input */}
-      <Input
-        type="number"
-        step={mode === "pct" ? "0.1" : "0.01"}
-        min={0}
-        value={discount?.value ?? ""}
-        onChange={(e) => setValue(e.target.value)}
-        placeholder={
-          mode === "pct" ? "e.g. 10" : mode === "flat" ? "e.g. 200" : "e.g. 1500"
-        }
-        size="sm"
-        leadingAddon={mode === "final" ? "₹" : undefined}
-        trailingAddon={mode === "pct" ? "%" : undefined}
-      />
     </div>
   );
 }

@@ -100,6 +100,37 @@ export default function PackageDetailPage() {
               </tr>
             ))}
           </tbody>
+          <tfoot>
+            {(() => {
+              const mrp = pkg.items.reduce(
+                (s, i) => s + i.unit_price_paise * i.quantity,
+                0
+              );
+              const discounted = pkg.final_price_paise < mrp;
+              return (
+                <>
+                  <tr className="border-t border-border">
+                    <td className="px-4 py-2.5 font-medium" colSpan={2}>
+                      Package MRP
+                    </td>
+                    <td className="px-4 py-2.5 text-right tabular-nums">
+                      ₹{(mrp / 100).toFixed(2)}
+                    </td>
+                  </tr>
+                  {discounted && (
+                    <tr>
+                      <td className="px-4 py-2.5 font-semibold" colSpan={2}>
+                        Final price
+                      </td>
+                      <td className="px-4 py-2.5 text-right tabular-nums font-semibold">
+                        ₹{(pkg.final_price_paise / 100).toFixed(2)}
+                      </td>
+                    </tr>
+                  )}
+                </>
+              );
+            })()}
+          </tfoot>
         </table>
       </div>
     </div>

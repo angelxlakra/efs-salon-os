@@ -3,6 +3,7 @@ import { apiClient } from "@/lib/api-client";
 import type {
   PackageDefinition,
   PackageDefinitionCreate,
+  PackageDefinitionV2Payload,
   PackageSale,
   PackageSaleSummary,
   EligiblePackage,
@@ -18,11 +19,13 @@ export const packagesApi = {
   getDefinition: (id: string) =>
     apiClient.get<PackageDefinition>(`/packages/definitions/${id}`),
 
-  createDefinition: (payload: PackageDefinitionCreate) =>
+  createDefinition: (payload: PackageDefinitionCreate | PackageDefinitionV2Payload) =>
     apiClient.post<PackageDefinition>("/packages/definitions", payload),
 
-  updateDefinition: (id: string, payload: PackageDefinitionCreate) =>
-    apiClient.put<PackageDefinition>(`/packages/definitions/${id}`, payload),
+  updateDefinition: (
+    id: string,
+    payload: PackageDefinitionCreate | PackageDefinitionV2Payload
+  ) => apiClient.put<PackageDefinition>(`/packages/definitions/${id}`, payload),
 
   publishDefinition: (id: string) =>
     apiClient.post<PackageDefinition>(`/packages/definitions/${id}/publish`),

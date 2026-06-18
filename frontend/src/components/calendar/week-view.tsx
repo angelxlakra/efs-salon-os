@@ -123,7 +123,7 @@ export function WeekView({
                     <AppointmentBlock
                       key={appt.id}
                       appointment={appt}
-                      serviceName={serviceMap.get(appt.service_id)?.name ?? "Service"}
+                      serviceName={serviceMap.get(appt.service_id ?? "")?.name ?? "Service"}
                       top={timeToTopOffset(appt.scheduled_at)}
                       height={minutesToPx(appt.duration_minutes)}
                       onClick={onAppointmentClick}

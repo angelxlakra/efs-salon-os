@@ -12,12 +12,26 @@ import { useCartStore } from '@/stores/cart-store';
 import { EntitlementsRail } from '@/components/packages/EntitlementsRail';
 import { PackageSelectorChip } from '@/components/packages/PackageSelectorChip';
 import { usePackagesStore } from '@/stores/packages-store';
+import { ConfigureSellSheet } from '@/components/packages/ConfigureSellSheet';
+import { blockSummary, totalValueOf } from '@/lib/packages/block-pricing';
+import { usePackageAutoRedeem } from '@/hooks/usePackageAutoRedeem';
+import { toast } from 'sonner';
+import type { PackageDefinition } from '@/types/package';
 
 // ---------------------------------------------------------------------------
 // Inline component: grid of published packages for POS selection
 // ---------------------------------------------------------------------------
+function packageComposition(pkg: PackageDefinition): string {
+  if (!pkg.blocks?.length) return `${pkg.validity_days}d validity`;
+  return pkg.blocks
+    .map((b) => (b.bonus ? 'Free: ' : '') + blockSummary(b))
+    .join('  ·  ');
+}
+
 function PackagesSelectorView() {
   const definitions = usePackagesStore((s) => s.definitions);
+  const customerId = useCartStore((s) => s.customerId);
+  const [selected, setSelected] = useState<PackageDefinition | null>(null);
 
   if (!definitions || definitions.length === 0) {
     return (
@@ -27,37 +41,49 @@ function PackagesSelectorView() {
     );
   }
 
+  const published = definitions.filter((d) => d.status === 'published');
+
   return (
-    <div className="grid grid-cols-2 gap-3 p-1">
-      {definitions
-        .filter((d) => d.status === 'published')
-        .map((pkg) => (
-          <button
-            key={pkg.id}
-            type="button"
-            className="rounded-xl border border-border bg-card p-4 text-left hover:border-accent transition-colors"
-            onClick={() => {
-              // TODO: add package_sale_line item to bill (requires backend integration)
-            }}
-          >
-            <p className="font-medium text-sm">{pkg.name}</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              {pkg.entitlement_type === 'counted'
-                ? `${pkg.total_sessions} sessions · ${pkg.validity_days}d`
-                : `Unlimited · ${pkg.validity_days}d`}
-            </p>
-            <p className="text-sm font-semibold tabular-nums mt-2">
-              ₹
-              {(
-                pkg.items.reduce(
-                  (s, i) => s + i.unit_price_paise * i.quantity,
-                  0
-                ) / 100
-              ).toFixed(0)}
-            </p>
-          </button>
-        ))}
-    </div>
+    <>
+      <div className="grid grid-cols-2 gap-3 p-1">
+        {published.map((pkg) => {
+          const worth = pkg.blocks?.length ? totalValueOf(pkg.blocks) : 0;
+          return (
+            <button
+              key={pkg.id}
+              type="button"
+              className="rounded-xl border border-border bg-card p-4 text-left transition-colors hover:border-accent hover:shadow-[var(--shadow-xs)]"
+              onClick={() => {
+                // Packages bind to a customer — require one before selling.
+                if (!customerId) {
+                  toast.error('Select a customer before selling a package');
+                  return;
+                }
+                setSelected(pkg);
+              }}
+            >
+              <p className="text-sm font-medium">{pkg.name}</p>
+              <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+                {packageComposition(pkg)}
+              </p>
+              <div className="mt-2 flex items-center justify-between border-t border-border-subtle pt-2">
+                {worth > pkg.final_price_paise ? (
+                  <span className="text-xs text-muted-foreground line-through">
+                    worth ₹{(worth / 100).toLocaleString('en-IN')}
+                  </span>
+                ) : (
+                  <span />
+                )}
+                <span className="text-base font-bold tabular-nums text-accent">
+                  ₹{(pkg.final_price_paise / 100).toFixed(0)}
+                </span>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+      <ConfigureSellSheet pkg={selected} open={!!selected} onClose={() => setSelected(null)} />
+    </>
   );
 }
 
@@ -71,6 +97,9 @@ export default function POSPage() {
   const { items, customerId } = useCartStore();
   const serviceSearchRef = useRef<HTMLInputElement>(null);
   const customerSearchRef = useRef<{ openSearch: () => void }>(null);
+
+  // Auto-redeem cart service lines covered by the customer's packages.
+  usePackageAutoRedeem();
 
   // Load published package definitions for the chip count + grid
   const definitions = usePackagesStore((s) => s.definitions);

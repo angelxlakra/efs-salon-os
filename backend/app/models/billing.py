@@ -2,6 +2,7 @@
 
 import enum
 from sqlalchemy import CheckConstraint, Column, DateTime, Enum, ForeignKey, Integer, String, Text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from app.database import Base
 from app.models.base import TimestampMixin, ULIDMixin
@@ -255,6 +256,16 @@ class BillItem(Base, ULIDMixin, TimestampMixin):
     # FK to PackageDefinition — set when item_type=PACKAGE_SALE_LINE; used at bill
     # finalization to create the PackageSale row. NULL for all other item types.
     package_definition_id = Column(
+        String(26), ForeignKey("package_definitions.id", ondelete="RESTRICT"),
+        nullable=True, index=True,
+    )
+    # v2 packages: service_ids chosen at purchase for choice blocks, locked into
+    # the PackageSale snapshot at settlement. NULL for v1 / non-package lines.
+    package_locked_choices = Column(JSONB, nullable=True)
+    # Buy-and-use-immediately: a SERVICE line that should be redeemed from a
+    # package SOLD IN THE SAME BILL (its PackageSale doesn't exist until posting,
+    # so we reference the definition; settlement resolves it to the new sale).
+    redeem_from_definition_id = Column(
         String(26), ForeignKey("package_definitions.id", ondelete="RESTRICT"),
         nullable=True, index=True,
     )
