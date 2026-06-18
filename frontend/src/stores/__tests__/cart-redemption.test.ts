@@ -58,6 +58,23 @@ describe("cart redemption math", () => {
     expect(gst.serviceSection.subtotal).toBe(400000); // 1 uncovered unit
   });
 
+  it("does not add GST to a package-sale line (backend taxes packages as NONE)", () => {
+    const items: CartItem[] = [
+      { id: "p", kind: "package_sale", packageDefinitionId: "d1", packageName: "Basic Care",
+        serviceName: "Basic Care", isProduct: false, quantity: 1,
+        unitPrice: 199900, discount: 0, taxRate: 0, isBooked: false },
+      // a service the package covers — fully redeemed, contributes nothing
+      { id: "s", serviceId: "s1", serviceName: "Forehead", isProduct: false, quantity: 1,
+        unitPrice: 3000, discount: 0, taxRate: 5, isBooked: false,
+        redemption: { packageSaleId: null, fromDefinitionId: "d1", packageName: "Basic Care", coveredQuantity: 1 } },
+    ];
+    const gst = computeGstBreakdown(items, 0, true);
+    // No GST on the package; customer pays exactly the package price.
+    expect(gst.serviceSection.cgst).toBe(0);
+    expect(gst.serviceSection.sgst).toBe(0);
+    expect(gst.grandTotal).toBe(199900);
+  });
+
   it("treats a cart-package redemption like any other for charged units", () => {
     const store = useCartStore.getState();
     store.addItem(svc({ serviceId: "s1", unitPrice: 3000, quantity: 1 }));

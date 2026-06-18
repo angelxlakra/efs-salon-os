@@ -136,9 +136,12 @@ export function computeGstBreakdown(
     });
 
   // Bill-level discount applies to SERVICE lines only — retail products are
-  // sold at MRP and never discounted. Allocate proportionally across the
-  // service lines, capped at each line's base (mirrors the backend allocator).
-  const serviceLines = lines.filter((l) => !l.item.isProduct);
+  // sold at MRP and packages at their fixed price, neither discounted here.
+  // Allocate proportionally across the service lines, capped at each line's
+  // base (mirrors the backend allocator).
+  const serviceLines = lines.filter(
+    (l) => !l.item.isProduct && l.item.kind !== 'package_sale',
+  );
   const totalServiceBase = serviceLines.reduce((sum, l) => sum + l.base, 0);
   if (globalDiscount > 0 && totalServiceBase > 0) {
     let allocated = 0;
@@ -181,7 +184,11 @@ export function computeGstBreakdown(
     section.subtotal += line.gross;
     section.discount += line.itemDiscount + line.alloc;
 
-    if (line.item.isProduct) {
+    if (line.item.kind === 'package_sale') {
+      // Packages are GST-exempt — the backend taxes PACKAGE_SALE_LINE as NONE.
+      // The customer pays the package's fixed price, no CGST/SGST added.
+      section.pays += amountAfterDiscount;
+    } else if (line.item.isProduct) {
       // 18% inclusive in MRP: extract tax from the discounted price
       const half = Math.floor((amountAfterDiscount * 18) / 236);
       section.cgst += half;
