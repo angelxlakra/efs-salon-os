@@ -766,6 +766,12 @@ class BillingService:
         # Compute taxes now that all items exist (per-line in GST mode)
         self._recalculate_bill_tax(bill)
 
+        # Revenue-attribution date: the IST day the WORK was done. Default to
+        # today; if this bill settles walk-ins booked earlier (a "pay later"
+        # checkout days after service), use the earliest walk-in's day so revenue
+        # lands on the work day, not the late-checkout day.
+        bill.business_date = datetime.now(IST).date()
+
         # Link walk-ins to bill if session_id provided
         if session_id:
             walkins = self.db.query(WalkIn).filter(
@@ -775,6 +781,14 @@ class BillingService:
 
             for walkin in walkins:
                 walkin.bill_id = bill.id
+
+            work_dates = [
+                (w.checked_in_at or w.created_at).astimezone(IST).date()
+                for w in walkins
+                if (w.checked_in_at or w.created_at) is not None
+            ]
+            if work_dates:
+                bill.business_date = min(work_dates)
 
         if not commit:
             self.db.flush()

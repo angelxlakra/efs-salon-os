@@ -1,7 +1,7 @@
 """Billing models for bills, bill items, and payments."""
 
 import enum
-from sqlalchemy import CheckConstraint, Column, DateTime, Enum, ForeignKey, Integer, String, Text
+from sqlalchemy import CheckConstraint, Column, Date, DateTime, Enum, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from app.database import Base
@@ -103,6 +103,12 @@ class Bill(Base, ULIDMixin, TimestampMixin):
     # Status
     status = Column(Enum(BillStatus), nullable=False, default=BillStatus.DRAFT, index=True)
     posted_at = Column(DateTime(timezone=True), index=True)
+
+    # Revenue-attribution date (IST calendar day the WORK was done), set at bill
+    # creation from the earliest linked walk-in's day, else the creation day. A
+    # "pay later" bill checked out days later still counts revenue on the work
+    # day, not the late-checkout day. (Tax filing still uses posted_at.)
+    business_date = Column(Date, index=True)
 
     # Optional customer info (for anonymous bills)
     customer_name = Column(String)

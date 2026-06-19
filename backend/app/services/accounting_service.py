@@ -28,6 +28,20 @@ from app.services.cache_service import cache
 DASHBOARD_CACHE_TTL = 60
 
 
+def _revenue_date():
+    """SQL expression for the IST day revenue is attributed to.
+
+    Prefers the bill's business_date (the day the WORK was done, set at
+    creation), falling back to the bill's IST creation day for any legacy row
+    a backfill missed. Use this everywhere revenue is bucketed by day so a
+    late "pay later" checkout counts on the work day, not the checkout day.
+    """
+    return func.coalesce(
+        Bill.business_date,
+        func.date(func.timezone("Asia/Kolkata", Bill.created_at)),
+    )
+
+
 class AccountingService:
     """Service for accounting and financial reporting operations."""
 
@@ -67,10 +81,9 @@ class AccountingService:
         start_of_day = datetime.combine(target_date, time.min)
         end_of_day = datetime.combine(target_date, time.max)
 
-        # Get bill metrics
+        # Get bill metrics — attributed to the work day (business_date).
         bills_query = self.db.query(Bill).filter(
-            Bill.created_at >= start_of_day,
-            Bill.created_at <= end_of_day,
+            _revenue_date() == target_date,
             Bill.status.in_([BillStatus.POSTED, BillStatus.REFUNDED])
         )
 
@@ -285,8 +298,7 @@ class AccountingService:
             func.count(Bill.id).label('bills_count'),
             func.sum(Bill.rounded_total).label('revenue_paise')
         ).filter(
-            Bill.created_at >= start_utc,
-            Bill.created_at <= end_utc,
+            _revenue_date() == target_date,
             Bill.status == BillStatus.POSTED
         ).group_by(ist_bill_hour).all()
 
@@ -425,8 +437,7 @@ class AccountingService:
         ).join(
             Bill, BillItem.bill_id == Bill.id
         ).filter(
-            Bill.created_at >= start_of_day,
-            Bill.created_at <= end_of_day,
+            _revenue_date() == target_date,
             Bill.status == BillStatus.POSTED
         ).group_by(
             Service.id, Service.name
@@ -538,10 +549,9 @@ class AccountingService:
             DaySummary.summary_date == target_date
         ).first()
 
-        # Calculate bill metrics
+        # Calculate bill metrics — attributed to the work day (business_date).
         bills_query = self.db.query(Bill).filter(
-            Bill.created_at >= start_of_day,
-            Bill.created_at <= end_of_day,
+            _revenue_date() == target_date,
             Bill.status.in_([BillStatus.POSTED, BillStatus.REFUNDED])
         )
 
