@@ -693,6 +693,34 @@ class AccountingService:
             self.db.refresh(summary)
             return summary
 
+    def regenerate_recent_summaries(
+        self,
+        days: int = 7,
+        end_date: Optional[date] = None,
+        generated_by: Optional[str] = None,
+    ) -> List[DaySummary]:
+        """(Re)generate the daily summaries for the last `days` days.
+
+        Each call upserts, so a late 'pay later' checkout whose revenue now
+        attributes to an earlier work day (business_date) is reflected in that
+        day's frozen snapshot — not just the live dashboard. Returns the
+        summaries newest-first (index 0 = end_date).
+
+        Args:
+            days: how many days back to refresh (default 7).
+            end_date: the most recent day to refresh (default yesterday IST).
+            generated_by: user id, or None for system-generated.
+        """
+        if end_date is None:
+            end_date = (datetime.now(IST) - timedelta(days=1)).date()
+        summaries = []
+        for i in range(days):
+            day = end_date - timedelta(days=i)
+            summaries.append(self.generate_daily_summary(
+                target_date=day, generated_by=generated_by, is_final=True,
+            ))
+        return summaries
+
     def get_daily_summaries(
         self,
         start_date: Optional[date] = None,

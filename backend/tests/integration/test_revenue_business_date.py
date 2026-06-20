@@ -70,3 +70,27 @@ def test_dashboard_counts_revenue_on_business_date_not_checkout_day(
     acct = AccountingService(db_session)
     assert acct.get_dashboard_metrics(yesterday)["net_revenue"] == bill.rounded_total
     assert acct.get_dashboard_metrics(today)["net_revenue"] == 0
+
+
+def test_regenerate_recent_summaries_picks_up_back_dated_revenue(
+    db_session, service_factory, customer_factory, test_user
+):
+    """A late checkout posted today but attributed to a work day 3 days ago must
+    show up in that day's frozen DaySummary once the nightly refresh re-runs."""
+    svc = service_factory(base_price=100000)
+    customer = customer_factory()
+    bs = BillingService(db_session)
+    bill = bs.create_bill(
+        items=[{"service_id": svc.id, "quantity": 1}],
+        created_by_id=test_user.id, customer_id=customer.id,
+    )
+    work_day = (datetime.now(IST) - timedelta(days=3)).date()
+    bill.status = BillStatus.POSTED
+    bill.business_date = work_day
+    db_session.flush()
+
+    summaries = AccountingService(db_session).regenerate_recent_summaries(days=7)
+
+    by_date = {s.summary_date: s for s in summaries}
+    assert work_day in by_date
+    assert by_date[work_day].net_revenue == bill.rounded_total

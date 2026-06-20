@@ -24,6 +24,12 @@ from app.utils import IST, generate_ulid
 
 logger = logging.getLogger(__name__)
 
+# How many recent days the nightly summary job re-generates each run. A late
+# "pay later" checkout attributes its revenue to an earlier work day
+# (business_date); refreshing a trailing window keeps those frozen DaySummary
+# snapshots correct without an unbounded rescan.
+SUMMARY_REFRESH_WINDOW_DAYS = 7
+
 
 def generate_daily_summary_job():
     """Generate daily summary for yesterday.
@@ -50,20 +56,32 @@ def generate_daily_summary_job():
         # Create accounting service
         service = AccountingService(db)
 
-        # Generate summary with is_final=True
-        summary = service.generate_daily_summary(
-            target_date=yesterday,
+        # Generate yesterday's summary AND refresh the preceding days, so a late
+        # "pay later" checkout whose revenue attributes to an earlier work day
+        # (business_date) updates that day's frozen snapshot, not just the live
+        # dashboard. Each call upserts; newest (yesterday) is returned first.
+        summaries = service.regenerate_recent_summaries(
+            days=SUMMARY_REFRESH_WINDOW_DAYS,
+            end_date=yesterday,
             generated_by=None,  # System-generated
-            is_final=True
         )
+        summary = summaries[0]
 
-        # Push metrics to cloud
+        # Push each refreshed day's metrics to cloud so reports stay in sync.
         from app.services.backup_service import BackupService
         backup_service = BackupService()
-        backup_service.push_daily_metrics(summary)
+        for s in summaries:
+            try:
+                backup_service.push_daily_metrics(s)
+            except Exception as e:  # a back-day push failure must not fail the job
+                logger.error(
+                    f"Failed to push daily metrics for {s.summary_date}: {e}",
+                    exc_info=True,
+                )
 
         logger.info(
-            f"✅ Daily summary generated successfully for {yesterday}: "
+            f"✅ Daily summary generated for {yesterday} "
+            f"(+{len(summaries) - 1} prior days refreshed): "
             f"₹{summary.net_revenue_rupees:.2f} net revenue"
         )
 
