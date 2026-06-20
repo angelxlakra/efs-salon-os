@@ -4,7 +4,7 @@
 
 import pytest
 
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import NullPool
 from _pytest import monkeypatch
@@ -86,20 +86,38 @@ def test_engine(postgres_admin_engine, test_db_url):
 
 @pytest.fixture(scope="function")
 def db_session(test_engine):
-    """
-      Provide a database session for a single test.
-    """
+    """Provide an isolated database session for a single test.
 
-    SessionLocal = sessionmaker(bind=test_engine)
+    Services under test call ``session.commit()`` themselves, so a plain
+    ``session.rollback()`` at teardown cannot undo their durable rows — they
+    leak into the next test (e.g. a duplicate seeded ``OWNER`` role). We instead
+    use SQLAlchemy's "join an external transaction" recipe: bind the session to a
+    single connection wrapped in an outer transaction, and run the test inside a
+    SAVEPOINT that auto-restarts every time the test code commits. The outer
+    transaction is never committed, so teardown rolls back *everything* the test
+    did — service commits included — giving true per-test isolation.
+    """
+    connection = test_engine.connect()
+    outer = connection.begin()
 
+    SessionLocal = sessionmaker(bind=connection)
     session = SessionLocal()
+    session.begin_nested()
 
-    session.begin()
+    @event.listens_for(session, "after_transaction_end")
+    def _restart_savepoint(sess, transaction):
+        # When the test code commits/rolls back the SAVEPOINT, open a fresh one
+        # so the session stays usable while the outer transaction stays open.
+        if transaction.nested and not transaction._parent.nested:
+            sess.begin_nested()
 
-    yield session
-
-    session.rollback()
-    session.close()
+    try:
+        yield session
+    finally:
+        event.remove(session, "after_transaction_end", _restart_savepoint)
+        session.close()
+        outer.rollback()
+        connection.close()
 
 @pytest.fixture(scope="function")
 def test_role(db_session):
