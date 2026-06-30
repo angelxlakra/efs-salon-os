@@ -1,8 +1,8 @@
-# SalonOS Design System
+# Aasan Design System
 
 **Status:** Living document — keep in sync with `frontend/src/styles/tokens.css` and the primitives library.
 **Owner:** Frontend team
-**Last updated:** 2026-04-23 (V2 initial draft)
+**Last updated:** 2026-06-28 (V3 brand sync — teal/gold)
 
 > The strategic "why" lives in `docs/superpowers/specs/2026-04-23-v2-redesign-design.md`.
 > This document is the "how" — concrete tokens, primitives, patterns, and rules.
@@ -32,19 +32,22 @@ All tokens are defined in `frontend/src/styles/tokens.css` and mapped to Tailwin
 | `surface` | `page`, `card`, `row`, `row-hover`, `sidebar`, `overlay` | Container backgrounds |
 | `border` | `subtle`, `default`, `strong`, `focus` | Dividers, outlines, focus rings |
 | `text` | `primary`, `secondary`, `muted`, `disabled`, `inverse` | All text |
-| `accent` | `default`, `hover`, `active`, `bg-soft`, `fg-on-accent` | Primary actions, active nav, selection, focus |
+| `accent` (Teal) | `default`, `hover`, `active`, `bg-soft`, `fg` | **Function** — primary actions, active nav, links, selection, focus |
+| `gold` | `default`, `hover`, `soft`, `fg` | **Value & reward** — revenue, targets, milestones, day-close, the brand spark |
 | `semantic.success` | `fg`, `bg-soft`, `border` | Paid, completed, healthy |
 | `semantic.warning` | `fg`, `bg-soft`, `border` | Low stock, overdue soon, caution |
 | `semantic.danger` | `fg`, `bg-soft`, `border` | Failed, destructive, overdue |
 | `semantic.info` | `fg`, `bg-soft`, `border` | Neutral status, in-progress |
 | `data-viz` | `series-1` through `series-6` | Charts only — colourblind-safe, never used in UI chrome |
 
+**Duotone rule (normative):** Teal carries *function*, gold carries *value*. They never do the same job, and together they stay under ~10% of any screen. Cream (`surface-page`) is the canvas, ~70% of every view. This is what keeps an all-day screen from fatiguing.
+
 ### 2.2 Values (light — authoritative)
 
 ```css
 :root {
   /* Surface */
-  --surface-page:       #fafaf9;   /* warm white, not pure white */
+  --surface-page:       #FAF7F2;   /* warm cream paper */
   --surface-card:       #ffffff;
   --surface-row:        #ffffff;
   --surface-row-hover:  #f5f5f4;
@@ -55,46 +58,37 @@ All tokens are defined in `frontend/src/styles/tokens.css` and mapped to Tailwin
   --border-subtle:      #eeece9;
   --border-default:     #e3e0db;
   --border-strong:      #cfcac3;
-  --border-focus:       var(--accent-default);
+  --border-focus:       #0F7B83;
 
   /* Text */
-  --text-primary:       #1c1917;   /* 14.6:1 on surface-page */
-  --text-secondary:     #44403c;   /* 8.9:1  */
-  --text-muted:         #78716c;   /* 4.9:1  — WCAG AA compliant on card */
+  --text-primary:       #1B1A22;   /* ink */
+  --text-secondary:     #44403c;
+  --text-muted:         #8b6b4a;   /* walnut */
   --text-disabled:      #a8a29e;
   --text-inverse:       #ffffff;
 
-  /* Accent — Copper */
-  --accent-default:     #b0561f;
-  --accent-hover:       #954919;
-  --accent-active:      #7d3d15;
-  --accent-bg-soft:     #fbe9dd;
-  --accent-fg-on-accent:#ffffff;
+  /* Accent — Teal (function) */
+  --accent-default:     #0F7B83;
+  --accent-hover:       #0d6e75;
+  --accent-active:      #0b6069;
+  --accent-bg-soft:     #e6f4f5;
+  --accent-fg:          #FAF7F2;
 
-  /* Semantic */
-  --success-fg:         #166534;
-  --success-bg-soft:    #dcfce7;
-  --success-border:     #bbf7d0;
+  /* Gold — secondary accent (value & reward) */
+  --gold-default:       #D6A23E;
+  --gold-hover:         #c08f30;
+  --gold-soft:          #fdf3de;
+  --gold-fg:            #1B1A22;
 
-  --warning-fg:         #92400e;
-  --warning-bg-soft:    #fef3c7;
-  --warning-border:     #fde68a;
+  /* Semantic — unchanged */
+  --success-fg: #166534;  --success-bg-soft: #dcfce7;  --success-border: #bbf7d0;
+  --warning-fg: #92400e;  --warning-bg-soft: #fef3c7;  --warning-border: #fde68a;
+  --danger-fg:  #991b1b;  --danger-bg-soft:  #fee2e2;  --danger-border:  #fecaca;
+  --info-fg:    #1e40af;  --info-bg-soft:    #dbeafe;  --info-border:    #bfdbfe;
 
-  --danger-fg:          #991b1b;
-  --danger-bg-soft:     #fee2e2;
-  --danger-border:      #fecaca;
-
-  --info-fg:            #1e40af;
-  --info-bg-soft:       #dbeafe;
-  --info-border:        #bfdbfe;
-
-  /* Data viz — colourblind-safe ordered palette */
-  --data-series-1:      #b0561f;   /* copper */
-  --data-series-2:      #1e40af;   /* indigo */
-  --data-series-3:      #166534;   /* green */
-  --data-series-4:      #92400e;   /* amber */
-  --data-series-5:      #6b21a8;   /* purple */
-  --data-series-6:      #0e7490;   /* cyan */
+  /* Data viz — series-1 is now teal */
+  --data-series-1: #0F7B83;  --data-series-2: #1e40af;  --data-series-3: #166534;
+  --data-series-4: #92400e;  --data-series-5: #6b21a8;  --data-series-6: #0e7490;
 }
 ```
 
@@ -118,14 +112,14 @@ All tokens are defined in `frontend/src/styles/tokens.css` and mapped to Tailwin
   --text-secondary:     #c9c2b8;   /* 8.7:1  */
   --text-muted:         #948b7e;   /* 4.8:1  */
   --text-disabled:      #5a5249;
-  --text-inverse:       #1c1917;
+  --text-inverse:       #1B1A22;
 
-  /* Copper brightened for dark surface — preserves perceived saturation */
-  --accent-default:     #d97847;
-  --accent-hover:       #e38f65;
-  --accent-active:      #f0a684;
-  --accent-bg-soft:     #3a1d0c;
-  --accent-fg-on-accent:#1c1917;
+  /* Accent flips to Gold on dark — teal goes muddy against charcoal */
+  --accent-default:     #D6A23E;
+  --accent-hover:       #e0b24e;
+  --accent-active:      #eabf5e;
+  --accent-bg-soft:     #2a1d0a;
+  --accent-fg:          #1B1A22;
 
   --success-fg:         #86efac;
   --success-bg-soft:    #14321f;
@@ -143,7 +137,7 @@ All tokens are defined in `frontend/src/styles/tokens.css` and mapped to Tailwin
   --info-bg-soft:       #1e2a4a;
   --info-border:        #2a3d6e;
 
-  --data-series-1:      #d97847;
+  --data-series-1:      #D6A23E;
   --data-series-2:      #7aa0e8;
   --data-series-3:      #86efac;
   --data-series-4:      #fcd34d;
@@ -161,7 +155,7 @@ All tokens are defined in `frontend/src/styles/tokens.css` and mapped to Tailwin
 | Non-text UI (focus rings, icons carrying info) | **3:1** | `border-focus`, `accent-default`, semantic borders |
 | Disabled text | Exempt, but ≥ 2:1 | `text-disabled` |
 
-All values above satisfy these ratios. Any new token must be verified before landing.
+The ratios and structure are unchanged; only the accent identity changed. `--accent-default: #0F7B83` on `--surface-card (#fff)` ≈ **4.7:1** (passes non-text UI ≥ 3:1 and large-text ≥ 3:1; do not use teal for body text < 18px on white). `--text-muted: #8b6b4a` on card ≈ **4.6:1** (passes AA body). Re-run the contrast CI script (§10.2) against the new values before locking.
 
 ---
 
@@ -170,23 +164,21 @@ All values above satisfy these ratios. Any new token must be verified before lan
 ### 3.1 Font stack
 
 ```css
---font-display: "Instrument Serif", "EB Garamond", Georgia, serif;
---font-body:    "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+--font-brand:   "Space Grotesk", ui-sans-serif, system-ui, sans-serif;  /* wordmark + overlines */
+--font-display: "Cormorant Garamond", "EB Garamond", Georgia, serif;    /* money, hero, moments */
+--font-body:    "DM Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 --font-mono:    ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
 ```
 
-Fonts are self-hosted (see `frontend/public/fonts/`) — no Google Fonts runtime fetch.
+DM Sans and Cormorant Garamond are self-hosted (`frontend/public/fonts/`); Space Grotesk loads via `next/font/google` (`--font-space-grotesk`). No runtime Google fetch for body/display.
 
 ### 3.2 Usage rules
 
-- **Display (Instrument Serif)** — used sparingly. Allowed on:
-  - Page titles (`h1`) on dashboards, landing screens
-  - Empty-state headlines
-  - Login / auth screen headline
-  - **Not on printed receipts** — the print template is unchanged in V2.
-- **Body (Inter)** — every other text surface.
+- **Brand (Space Grotesk)** — the wordmark and small uppercase overline labels only. It is the signature, not a body or heading face.
+- **Display (Cormorant Garamond)** — used sparingly: money & KPI hero numbers, page/auth/empty-state headlines, day-close and other brand moments. **Never on printed receipts** (print template stays plain).
+- **Body (DM Sans)** — every other text surface.
 - **Mono** — SKU codes, invoice numbers, keyboard shortcuts.
-- **Tabular numerals** (`font-variant-numeric: tabular-nums`) — required on every surface that displays money, counts, or time. Applied via utility `.tabular`.
+- **Tabular numerals** (`.tabular`) — required on every surface showing money, counts, or time.
 
 ### 3.3 Scale
 
@@ -782,6 +774,7 @@ Reviewers block merge if a PR:
 
 | Date | Change | Author |
 |---|---|---|
+| 2026-06-28 | **V3 brand sync.** Retired Copper accent → **Teal `#0F7B83`** (function) + new **Gold `#D6A23E`** family (value/reward); documented the duotone rule. Surfaces → cream `#FAF7F2`, ink `#1B1A22`, walnut `#8b6b4a`. Fonts: Instrument Serif → **Cormorant Garamond**, Inter → **DM Sans**, added **Space Grotesk** brand face. Dark mode accent = gold (already in tokens.css). Updated contrast notes + data-series-1. Pairs with the new **Aasan Brand Guidelines** (identity layer). | Brand |
 | 2026-04-23 | Initial V2 draft: tokens (light + dark), typography scale, spacing, primitive inventory, layout shell, enforcement plan | Angel + Claude |
 | 2026-04-23 | Locked "Customers" as the single term (no "Guests" split). Receipt print template out of scope for V2 (display serif is in-app only). | Angel |
 | 2026-04-23 | Added §7.5 — entity detail routing via `@modal` parallel slot + intercepting routes. List pages must not own detail state. Enforced by lint + review checklist. | Angel |

@@ -323,7 +323,7 @@ export default function MyServicesPage() {
             <Card>
               <CardContent className="py-12 text-center">
                 <Clock className="h-12 w-12 text-text-disabled mx-auto mb-3" />
-                <p className="text-text-muted">No pending services</p>
+                <p className="text-text-muted">Nothing waiting — you&apos;re all caught up.</p>
               </CardContent>
             </Card>
           ) : (
@@ -370,7 +370,7 @@ export default function MyServicesPage() {
             <Card>
               <CardContent className="py-12 text-center">
                 <PlayCircle className="h-12 w-12 text-text-disabled mx-auto mb-3" />
-                <p className="text-text-muted">No services in progress</p>
+                <p className="text-text-muted">Nothing in progress right now.</p>
               </CardContent>
             </Card>
           ) : (
@@ -427,7 +427,7 @@ export default function MyServicesPage() {
             <Card>
               <CardContent className="py-12 text-center">
                 <CheckCircle className="h-12 w-12 text-text-disabled mx-auto mb-3" />
-                <p className="text-text-muted">No completed services today</p>
+                <p className="text-text-muted">No services wrapped up yet today.</p>
               </CardContent>
             </Card>
           ) : (

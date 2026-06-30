@@ -293,7 +293,7 @@ export default function DashboardPage() {
           {/* Active customers */}
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-              <span style={{ fontFamily: "'DM Sans', system-ui, sans-serif", fontSize: 14, fontWeight: 800, color: 'var(--db-ink)' }}>
+              <span style={{ fontFamily: "'DM Sans', system-ui, sans-serif", fontSize: 14, fontWeight: 700, color: 'var(--db-ink)' }}>
                 In service, right now
               </span>
               <span className="db-badge-gold">{stats.active_services} Active</span>

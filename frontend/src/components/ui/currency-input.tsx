@@ -10,7 +10,7 @@ type Props = Omit<React.ComponentProps<typeof Input>, "value" | "onChange" | "le
 
 /**
  * Displays a paise integer as a rupees decimal and normalises back on change.
- * All money in SalonOS is stored as paise; this is the only place rupees↔paise
+ * All money in Aasan is stored as paise; this is the only place rupees↔paise
  * conversion should live in forms.
  */
 export const CurrencyInput = React.forwardRef<HTMLInputElement, Props>(

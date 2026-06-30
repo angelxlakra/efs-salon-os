@@ -48,11 +48,11 @@ export default function LoginPage() {
       {/* Left Column — Brand panel */}
       <div
         className="hidden lg:flex w-1/2 relative flex-col justify-between p-16 text-white overflow-hidden"
-        style={{ background: 'linear-gradient(135deg, #1c104c 0%, #0e0828 100%)' }}
+        style={{ background: 'linear-gradient(155deg, #0F7B83 0%, #0a5c63 100%)' }}
       >
         {/* Subtle dot-grid texture */}
         <div
-          className="absolute inset-0 opacity-[0.04]"
+          className="absolute inset-0 opacity-[0.06]"
           style={{
             backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)',
             backgroundSize: '28px 28px',
@@ -61,26 +61,27 @@ export default function LoginPage() {
         {/* Gold accent rule at top edge */}
         <div className="absolute top-0 left-0 right-0 h-0.5" style={{ background: 'var(--gold-default)' }} />
 
-        {/* Wordmark */}
+        {/* Logotype */}
         <div className="relative z-10">
           <div className="mb-16">
             <Image
-              src="/wordmark-gold.svg"
-              alt={settings?.salon_name || 'Elegance'}
-              width={160}
-              height={160}
+              src="/aasan-logotype-reversed.svg"
+              alt="Aasan"
+              width={180}
+              height={54}
               className="object-contain"
+              style={{ filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.15))' }}
             />
           </div>
 
           <h1
-            className="text-5xl font-light leading-snug tracking-tight mb-5"
-            style={{ color: 'var(--accent-fg)', fontFamily: 'var(--font-display)' }}
+            className="text-5xl font-normal leading-snug tracking-tight mb-5"
+            style={{ color: '#FAF7F2', fontFamily: 'var(--font-display)' }}
           >
-            The quiet system<br />behind elegant service.
+            Your salon,<br />running itself.
           </h1>
-          <p className="text-sm font-light leading-relaxed" style={{ color: 'rgba(245, 240, 232, 0.55)' }}>
-            Everything your salon needs. Nothing it doesn&apos;t.
+          <p className="text-sm font-normal leading-relaxed" style={{ color: 'rgba(250, 247, 242, 0.60)' }}>
+            Everything you need to run a great salon — nothing you don&apos;t.
           </p>
         </div>
 
@@ -95,14 +96,11 @@ export default function LoginPage() {
       </div>
 
       {/* Right Column — Login form */}
-      <div className="flex-1 flex flex-col justify-center px-8 sm:px-12 lg:px-20 xl:px-28 bg-white text-text-primary border-l-2 border-gold">
+      <div className="flex-1 flex flex-col justify-center px-8 sm:px-12 lg:px-20 xl:px-28 bg-white text-text-primary" style={{ borderLeft: '1px solid var(--border-subtle)' }}>
         <div className="w-full max-w-md mx-auto">
           {/* Mobile-only logo */}
-          <div className="lg:hidden mb-10 flex items-center gap-2">
-            <div className="h-8 w-8 rounded-md flex items-center justify-center overflow-hidden flex-shrink-0" style={{ background: 'var(--accent-default)' }}>
-              <Image src="/logo-white.svg" alt="Logo" width={32} height={32} className="object-contain" />
-            </div>
-            <span className="text-base font-semibold">{settings?.salon_name || 'Elegance'}</span>
+          <div className="lg:hidden mb-10">
+            <Image src="/aasan-logotype.svg" alt="Aasan" width={120} height={36} className="object-contain" />
           </div>
 
           <div className="mb-8">

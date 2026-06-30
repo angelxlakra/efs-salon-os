@@ -120,7 +120,7 @@ export function ServiceDistributionChart({
   if (services.length === 0) {
     return (
       <div className="flex items-center justify-center h-64 text-text-muted">
-        <p className="text-sm">No service data available</p>
+        <p className="text-sm">No services billed yet today — the mix will appear as bills come in.</p>
       </div>
     );
   }

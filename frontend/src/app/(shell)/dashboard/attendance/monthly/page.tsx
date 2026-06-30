@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { ArrowLeft, Download, Calendar } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/empty-state';
 import { MonthlyCalendar } from '@/components/attendance/monthly-calendar';
 import { apiClient } from '@/lib/api-client';
 import { toast } from 'sonner';
@@ -301,11 +302,11 @@ export default function MonthlyAttendancePage() {
         </div>
       ) : (
         <Card>
-          <CardContent className="p-12">
-            <div className="text-center text-muted-foreground">
-              <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>No attendance data available for this period</p>
-            </div>
+          <CardContent className="p-0">
+            <EmptyState
+              title="Nothing recorded yet"
+              body="Attendance for this period will appear here once it's marked."
+            />
           </CardContent>
         </Card>
       )}

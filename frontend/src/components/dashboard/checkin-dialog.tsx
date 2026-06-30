@@ -90,7 +90,7 @@ export function CheckInDialog({
 
             <div>
               <span className="db-label">Scheduled</span>
-              <p style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 28, fontWeight: 300, letterSpacing: '-1px', color: 'var(--db-ink)', lineHeight: 1, fontVariantNumeric: 'tabular-nums', marginTop: 4 }}>
+              <p style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 28, fontWeight: 400, letterSpacing: '-1px', color: 'var(--db-ink)', lineHeight: 1, fontVariantNumeric: 'tabular-nums', marginTop: 4 }}>
                 {scheduledTime}
               </p>
             </div>

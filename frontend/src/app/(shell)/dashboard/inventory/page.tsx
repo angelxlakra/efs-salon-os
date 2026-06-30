@@ -447,7 +447,7 @@ export default function InventoryPage() {
         {filteredSkus.length === 0 && (
           <div className="text-center py-12 text-text-secondary">
             <Package className="h-12 w-12 mx-auto mb-4 opacity-20" />
-            <p>No SKUs found</p>
+            <p>Nothing here yet — add a SKU or adjust your search.</p>
           </div>
         )}
       </div>
@@ -539,7 +539,7 @@ export default function InventoryPage() {
             {filteredSkus.length === 0 && (
               <div className="text-center py-12 text-text-secondary">
                 <Package className="h-12 w-12 mx-auto mb-4 opacity-20" />
-                <p>No SKUs found</p>
+                <p>Nothing here yet — add a SKU or adjust your search.</p>
               </div>
             )}
           </div>
@@ -558,7 +558,7 @@ export default function InventoryPage() {
               ) : changeRequests.length === 0 ? (
                 <div className="text-center py-12 text-text-secondary">
                   <CheckCircle className="h-12 w-12 mx-auto mb-4 opacity-20" />
-                  <p>No pending change requests</p>
+                  <p>All caught up — no change requests waiting.</p>
                 </div>
               ) : (
                 <div className="space-y-3">

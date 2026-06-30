@@ -116,7 +116,8 @@ export function formatReceiptForWhatsApp(bill: BillData, salonName?: string): st
   }
 
   lines.push('');
-  lines.push('Thank you for visiting!');
+  // §09: customer-facing surfaces stay salon-led — Aasan is invisible here.
+  lines.push('Thank you for visiting — see you again soon!');
 
   return lines.join('\n');
 }

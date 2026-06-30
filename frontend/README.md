@@ -1,6 +1,6 @@
-# SalonOS Frontend
+# Aasan Frontend
 
-Modern, responsive frontend for SalonOS built with Next.js 16, React 19, and Tailwind CSS v4.
+Modern, responsive frontend for Aasan built with Next.js 16, React 19, and Tailwind CSS v4.
 
 ## Tech Stack
 
@@ -263,4 +263,4 @@ CMD ["node", "server.js"]
 
 ## License
 
-Proprietary - SalonOS
+Proprietary - Aasan

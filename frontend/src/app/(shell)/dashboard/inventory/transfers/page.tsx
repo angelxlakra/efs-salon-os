@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowRightLeft } from 'lucide-react';
+import { EmptyState } from '@/components/ui/empty-state';
 import { apiClient } from '@/lib/api-client';
 import { toast } from 'sonner';
 
@@ -120,10 +120,10 @@ export default function TransfersPage() {
       {loading ? (
         <div className="text-center py-12 text-muted-foreground">Loading transfers...</div>
       ) : transfers.length === 0 ? (
-        <div className="text-center py-12 text-muted-foreground">
-          <ArrowRightLeft className="h-12 w-12 mx-auto mb-4 opacity-20" />
-          <p>No transfers found</p>
-        </div>
+        <EmptyState
+          title="No transfers yet"
+          body="Stock you move between branches will show up here."
+        />
       ) : (
         <>
           {/* Mobile cards */}

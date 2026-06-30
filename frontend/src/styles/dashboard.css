@@ -31,7 +31,7 @@
 /* ─── Cormorant numeral base + size scale ──────────────────────────────────── */
 .db-num {
   font-family: 'Cormorant Garamond', serif;
-  font-weight: 300;
+  font-weight: 400;
   letter-spacing: -1px;
   line-height: 0.95;
   font-variant-numeric: tabular-nums lining-nums;
@@ -47,7 +47,7 @@
 .db-editorial {
   font-family: 'Cormorant Garamond', serif;
   font-style: italic;
-  font-weight: 300;
+  font-weight: 400;
   line-height: 1.15;
   letter-spacing: 0;
 }
@@ -146,6 +146,16 @@
 
 @keyframes db-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 
+/* §06/§08 — day-close reward: a ring glows gold when its target is met */
+@keyframes db-goal-glow {
+  0%, 100% { filter: drop-shadow(0 0 2px rgba(201, 168, 76, 0.45)); }
+  50%      { filter: drop-shadow(0 0 7px rgba(201, 168, 76, 0.85)); }
+}
+.db-goal-met { animation: db-goal-glow 2.6s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .db-goal-met { animation: none; filter: drop-shadow(0 0 5px rgba(201, 168, 76, 0.7)); }
+}
+
 .db-live-badge {
   font-family: 'DM Sans', system-ui, sans-serif;
   font-size: 10px;
@@ -229,13 +239,13 @@
   background: var(--db-card); color: var(--db-ink-4); border: 1px solid var(--db-border);
 }
 
-/* ─── Right sidebar (navy) ─────────────────────────────────────────────────── */
+/* ─── Right sidebar (deep teal) ────────────────────────────────────────────── */
 .db-sidebar {
   width: 256px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  background: #1c104c;
+  background: #0a4f54;
   /* Override the warm-cream palette so all var(--db-*) inside render on navy */
   --db-ink:    #f0ede8;
   --db-ink-3:  rgba(240, 237, 232, 0.85);
@@ -252,7 +262,7 @@
 .db-sidebar-section + .db-sidebar-section { border-top: 1px solid var(--db-border); }
 
 @media (prefers-color-scheme: dark) {
-  .db-sidebar { background: #140c32; }
+  .db-sidebar { background: #073a3e; }
 }
 
 .db-appt-dot { width: 9px; height: 9px; border-radius: 50%; border: 2px solid var(--db-gold); background: transparent; flex-shrink: 0; margin-top: 4px; }
@@ -274,7 +284,7 @@
 .db-upnext-title {
   font-family: 'DM Sans', system-ui, sans-serif;
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 700;
   color: var(--db-ink);
   letter-spacing: -0.3px;
 }

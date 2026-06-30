@@ -241,9 +241,9 @@ export default function StaffDashboard() {
         <Card>
           <CardContent className="p-8 sm:p-12 text-center">
             <Briefcase className="h-10 w-10 sm:h-12 sm:w-12 text-text-disabled mx-auto mb-3 sm:mb-4" />
-            <h3 className="text-base sm:text-lg font-semibold mb-2">No Services Today</h3>
+            <h3 className="text-base sm:text-lg font-semibold mb-2">Nothing on your list yet today</h3>
             <p className="text-sm text-muted-foreground">
-              You don't have any services assigned yet today.
+              Services assigned to you will show up here as they&apos;re booked.
             </p>
           </CardContent>
         </Card>

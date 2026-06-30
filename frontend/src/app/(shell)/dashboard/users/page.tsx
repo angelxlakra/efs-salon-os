@@ -198,9 +198,9 @@ export default function UsersPage() {
                         <div className="bg-muted/50 p-4 rounded-full mb-4">
                             <UserCog className="h-8 w-8 text-muted-foreground" />
                         </div>
-                        <h3 className="text-lg font-semibold text-text-primary">No users found</h3>
+                        <h3 className="text-lg font-semibold text-text-primary">{searchQuery ? "No matches" : "No users yet"}</h3>
                         <p className="text-muted-foreground max-w-[384px] mt-2">
-                            {searchQuery ? `No users matching "${searchQuery}"` : "Get started by adding a new system user."}
+                            {searchQuery ? `Nothing matches "${searchQuery}" — try a different name.` : "Get started by adding a new system user."}
                         </p>
                         {!searchQuery && isOwner && (
                             <Button variant="outline" className="mt-6" onClick={() => setUserDialog({ open: true, user: null })}>
@@ -348,9 +348,9 @@ export default function UsersPage() {
                         <div className="bg-muted/50 p-4 rounded-full mb-4">
                             <User className="h-8 w-8 text-muted-foreground" />
                         </div>
-                        <h3 className="text-lg font-semibold text-text-primary">No staff profiles found</h3>
+                        <h3 className="text-lg font-semibold text-text-primary">{searchQuery ? "No matches" : "No staff profiles yet"}</h3>
                         <p className="text-muted-foreground max-w-[384px] mt-2">
-                             {searchQuery ? `No staff matching "${searchQuery}"` : "Create staff profiles to assign services and appointments."}
+                             {searchQuery ? `Nothing matches "${searchQuery}" — try a different name.` : "Create staff profiles to assign services and appointments."}
                         </p>
                         {!searchQuery && (isOwner || user?.role === 'receptionist') && (
                             <Button variant="outline" className="mt-6" onClick={() => setStaffDialog({ open: true, staff: null })}>

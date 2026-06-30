@@ -1,4 +1,4 @@
-// Base API types for SalonOS
+// Base API types for Aasan
 export type Role = 'owner' | 'receptionist' | 'staff';
 
 export interface User {

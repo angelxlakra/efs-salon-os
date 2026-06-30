@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { EmptyState } from '@/components/ui/empty-state';
 import { useAuthStore } from '@/stores/auth-store';
 import { apiClient } from '@/lib/api-client';
 import { toast } from 'sonner';
@@ -275,14 +276,13 @@ export default function ServicesPage() {
           </CardContent>
         </Card>
       ) : filteredCategories.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <p className="text-text-muted">No services found</p>
-          {searchQuery && (
-            <Button variant="link" onClick={() => setSearchQuery('')} className="mt-2">
-              Clear search
-            </Button>
-          )}
-        </div>
+        <EmptyState
+          title={searchQuery ? "No matches" : "No services yet"}
+          body={searchQuery ? "Nothing matches your search — try a different term." : "Add a service and you can start booking it."}
+          primaryAction={searchQuery ? (
+            <Button variant="link" onClick={() => setSearchQuery('')}>Clear search</Button>
+          ) : undefined}
+        />
       ) : (
         <div className="space-y-6">
           {filteredCategories.map((category) => {

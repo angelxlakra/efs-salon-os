@@ -7,6 +7,7 @@ import { CartSidebar } from '@/components/pos/cart-sidebar';
 import { PaymentModal } from '@/components/pos/payment-modal';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { EmptyState } from '@/components/ui/empty-state';
 import { ShoppingCart } from 'lucide-react';
 import { useCartStore } from '@/stores/cart-store';
 import { EntitlementsRail } from '@/components/packages/EntitlementsRail';
@@ -35,9 +36,10 @@ function PackagesSelectorView() {
 
   if (!definitions || definitions.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 text-center">
-        <p className="text-muted-foreground">No published packages</p>
-      </div>
+      <EmptyState
+        title="No packages yet"
+        body="Publish a package and it'll be available to sell here at checkout."
+      />
     );
   }
 

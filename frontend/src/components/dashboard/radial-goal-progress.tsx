@@ -123,25 +123,28 @@ function RingItem({ label, pct, value, color }: RingItemProps) {
   const dash = svgDash(pct);
   // Start at 12 o'clock: dashoffset shifts arc by quarter-circumference
   const offset = CIRCUM * 0.25;
+  // §08 reward moment: target met → the ring settles gold and glows.
+  const met = pct >= 100;
   return (
     <div data-ring style={{ textAlign: 'center', width: 86 }}>
       <div style={{ width: 84, height: 84, position: 'relative', margin: '0 auto 8px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column' }}>
         <svg
           style={{ position: 'absolute', top: 0, left: 0 }}
           width="84" height="84" viewBox="0 0 84 84"
-          aria-label={`${label}: ${pct}% complete`}
+          aria-label={`${label}: ${pct}% complete${met ? ' — target met' : ''}`}
           role="img"
         >
           <circle cx="42" cy="42" r="35" fill="none" stroke="var(--db-muted)" strokeWidth="6" />
           <circle
+            className={met ? 'db-goal-met' : undefined}
             cx="42" cy="42" r="35" fill="none"
-            stroke={color} strokeWidth="6"
+            stroke={met ? 'var(--db-gold)' : color} strokeWidth="6"
             strokeDasharray={dash}
             strokeDashoffset={offset}
             strokeLinecap="round"
           />
         </svg>
-        <span className="db-num db-num-ring">{pct}</span>
+        <span className="db-num db-num-ring" style={met ? { color: 'var(--db-gold)' } : undefined}>{pct}</span>
       </div>
       <span className="db-label" style={{ textAlign: 'center' }}>{label}</span>
       <div className="db-ring-sub">{value}</div>
@@ -182,6 +185,7 @@ export function GoalsRings({
     : 0;
   const formatRupees = (p: number) => `₹${Math.round(p / 100).toLocaleString('en-IN')}`;
   const assessment = getAssessment(revenuePct);
+  const revenueMet = revenuePct >= 100;
 
   return (
     <div className="db-goals-section">
@@ -208,9 +212,17 @@ export function GoalsRings({
       <div className="db-goals-msg">
         <span
           className="db-editorial"
-          style={{ fontSize: 20, color: 'var(--db-ink)', display: 'block', marginBottom: 8 }}
+          style={{ fontSize: 20, color: revenueMet ? 'var(--db-gold)' : 'var(--db-ink)', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}
         >
-          {revenuePct < 40 ? 'Three rings to close.' : 'Looking strong today.'}
+          {revenueMet && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src="/aasan-mark.svg" width={20} height={20} alt="" className="db-goal-met" />
+          )}
+          {revenueMet
+            ? "Target met — a strong day."
+            : revenuePct < 40
+              ? 'Three rings to close.'
+              : 'Looking strong today.'}
         </span>
         <p style={{ fontFamily: "'DM Sans', system-ui, sans-serif", fontSize: 12, color: 'var(--db-ink-4)', lineHeight: 1.7 }}>
           At <strong style={{ color: 'var(--db-ink)' }}>{revenuePct}%</strong> of today&apos;s revenue target

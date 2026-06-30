@@ -85,11 +85,11 @@ export function ServiceQueue({ sessions, variant = 'default' }: ServiceQueueProp
 
   if (lanes.length === 0) {
     if (variant === 'sidebar') {
-      return <p className="text-sm text-text-muted">No active services</p>;
+      return <p className="text-sm text-text-muted">No one in service right now.</p>;
     }
     return (
       <div className="rounded-xl bg-surface-card border border-border-subtle p-6 text-center">
-        <p className="text-sm text-text-muted">No active services</p>
+        <p className="text-sm text-text-muted">No one in service right now — start a walk-in to fill a chair.</p>
       </div>
     );
   }
@@ -133,7 +133,7 @@ export function ServiceQueue({ sessions, variant = 'default' }: ServiceQueueProp
                   className="db-num"
                   style={{
                     fontSize: 14,
-                    fontWeight: 300,
+                    fontWeight: 400,
                     color: 'var(--db-ink-5)',
                     flexShrink: 0,
                     letterSpacing: '-0.5px',

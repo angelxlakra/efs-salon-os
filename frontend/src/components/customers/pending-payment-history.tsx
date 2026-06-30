@@ -108,7 +108,7 @@ export function PendingPaymentHistory({
           ) : collections.length === 0 ? (
             <div className="text-center py-8 text-text-muted">
               <ArrowDownCircle className="h-12 w-12 mx-auto mb-2 text-text-disabled" />
-              <p>No payment collection history</p>
+              <p>No payments collected yet — they&apos;ll appear here as balances are cleared.</p>
             </div>
           ) : (
             <div className="space-y-3">

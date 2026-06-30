@@ -151,7 +151,7 @@ export function ActiveServicesModal({
           </div>
         ) : services.length === 0 ? (
           <div className="text-center py-12 text-text-muted">
-            <p>No active services found</p>
+            <p>No one in service right now.</p>
           </div>
         ) : (
           <div className="space-y-3">

@@ -109,7 +109,7 @@ export function UpNextPanel() {
           className="db-editorial"
           style={{ fontSize: 14, color: 'var(--db-ink-4)', display: 'block', marginBottom: 12 }}
         >
-          The next guests through the door.
+          The next customers through the door.
         </span>
 
         {loading && (
@@ -144,7 +144,7 @@ export function UpNextPanel() {
             <div style={{ textAlign: 'center', minWidth: 40, flexShrink: 0 }}>
               <div
                 className="db-num"
-                style={{ fontSize: 17, fontWeight: 300, letterSpacing: '-0.5px', fontVariantNumeric: 'tabular-nums', color: 'var(--db-ink)', lineHeight: 1 }}
+                style={{ fontSize: 17, fontWeight: 400, letterSpacing: '-0.5px', fontVariantNumeric: 'tabular-nums', color: 'var(--db-ink)', lineHeight: 1 }}
               >
                 {format(parseISO(item.appt.scheduled_at), 'HH:mm')}
               </div>
