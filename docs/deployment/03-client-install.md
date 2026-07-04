@@ -1,4 +1,4 @@
-# SalonOS - Client Installation Guide (DockerHub)
+# Aasan - Client Installation Guide (DockerHub)
 
 **Version:** 1.0.0
 **Distribution Method:** DockerHub (Internet Required for Initial Setup)
@@ -7,7 +7,7 @@
 
 ## 🚀 Quick Overview
 
-SalonOS is distributed via **DockerHub** - Docker's public image registry. This means:
+Aasan is distributed via **DockerHub** - Docker's public image registry. This means:
 
 ✅ **Advantages:**
 - Small download package (~10MB instead of 500MB)
@@ -94,18 +94,18 @@ sudo systemctl enable docker
 
 ### Step 2: Extract Installation Package
 
-You should have received a file named `salon-os-x.x.x.tar.gz` from your vendor.
+You should have received a file named `aasan-x.x.x.tar.gz` from your vendor.
 
 ```bash
 # Create installation directory
-sudo mkdir -p /opt/salon-os
-cd /opt/salon-os
+sudo mkdir -p /opt/aasan
+cd /opt/aasan
 
 # Extract package
-sudo tar -xzf /path/to/salon-os-*.tar.gz
+sudo tar -xzf /path/to/aasan-*.tar.gz
 
 # Enter directory
-cd salon-os-*
+cd aasan-*
 
 # Verify files
 ls -la
@@ -281,7 +281,7 @@ docker compose up -d
 
 **Install the certificate on each mobile device** that will use the barcode scanner:
 
-- **Android:** Transfer `nginx/ssl/salon.crt` to the device (via USB or email), then install it from Settings > Security > Install from storage. Select "CA certificate" and name it "SalonOS Local".
+- **Android:** Transfer `nginx/ssl/salon.crt` to the device (via USB or email), then install it from Settings > Security > Install from storage. Select "CA certificate" and name it "Aasan Local".
 - **iOS:** Send `nginx/ssl/salon.crt` via AirDrop or email. Open the file, then go to Settings > General > VPN & Device Management to install the profile. Finally, enable full trust under Settings > General > About > Certificate Trust Settings.
 
 For detailed instructions and troubleshooting, see `HTTPS-SETUP.md` in the project root.
@@ -345,7 +345,7 @@ Open a web browser and go to:
 - `http://localhost` (from the server itself)
 - OR `http://192.168.1.50` (your server IP, from any machine on the network)
 
-You should see the SalonOS login page.
+You should see Aasan login page.
 
 ### Step 2: First Login
 
@@ -387,7 +387,7 @@ Take a quick tour:
 If the server was shut down or restarted:
 
 ```bash
-cd /opt/salon-os/salon-os-*
+cd /opt/aasan/aasan-*
 sudo docker compose up -d
 ```
 
@@ -399,7 +399,7 @@ sudo ./scripts/start.sh
 ### Stopping the System
 
 ```bash
-cd /opt/salon-os/salon-os-*
+cd /opt/aasan/aasan-*
 sudo docker compose down
 ```
 
@@ -453,7 +453,7 @@ If you have a thermal receipt printer:
 
 1. Connect printer to network
 2. Note printer IP address
-3. In SalonOS, go to Settings → Printer
+3. In Aasan, go to Settings → Printer
 4. Enter printer IP and test
 
 ---
@@ -650,7 +650,7 @@ After installation, verify:
 
 ```bash
 # Essential Commands
-cd /opt/salon-os/salon-os-*
+cd /opt/aasan/aasan-*
 
 # Start
 sudo docker compose up -d
@@ -684,7 +684,7 @@ docker compose pull && docker compose up -d
 
 **Installation Complete! 🎉**
 
-Your SalonOS is ready to use. Access it at `http://localhost` or your server's LAN IP address.
+Your Aasan is ready to use. Access it at `http://localhost` or your server's LAN IP address.
 
 For support, contact your vendor.
 

@@ -1,6 +1,6 @@
-# SalonOS Administrative Scripts
+# Aasan Administrative Scripts
 
-This document describes the administrative scripts available for managing the SalonOS database and data.
+This document describes the administrative scripts available for managing Aasan database and data.
 
 ## Table of Contents
 
@@ -15,7 +15,7 @@ This document describes the administrative scripts available for managing the Sa
 
 ### Overview
 
-Creates timestamped backups of the entire SalonOS database in PostgreSQL custom format (compressed).
+Creates timestamped backups of the entire Aasan database in PostgreSQL custom format (compressed).
 
 ### Quick Commands
 
@@ -59,7 +59,7 @@ Create a cron job on the host machine:
 crontab -e
 
 # Add entry for nightly backup at 11:30 PM
-30 23 * * * cd /path/to/salon-os && docker compose exec -T postgres pg_dump -U salon_user -Fc salon_db > /backups/salon_backup_$(date +\%Y\%m\%d_\%H\%M\%S).dump 2>&1 | logger -t salon-backup
+30 23 * * * cd /path/to/aasan && docker compose exec -T postgres pg_dump -U salon_user -Fc salon_db > /backups/salon_backup_$(date +\%Y\%m\%d_\%H\%M\%S).dump 2>&1 | logger -t salon-backup
 ```
 
 ### Backup Best Practices

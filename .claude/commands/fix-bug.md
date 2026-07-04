@@ -6,7 +6,7 @@ allowed-tools: Read, Grep, Glob, Bash, Edit, Write
 
 # Fix Bug: $ARGUMENTS
 
-Follow the SalonOS TDD bug-fix workflow. Never skip directly to a fix — always reproduce first.
+Follow Aasan TDD bug-fix workflow. Never skip directly to a fix — always reproduce first.
 
 ## Step 1: Investigate
 

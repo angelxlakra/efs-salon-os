@@ -1,12 +1,12 @@
-# SalonOS Database Models
+# Aasan Database Models
 
-Comprehensive documentation for all SQLAlchemy models in the SalonOS backend.
+Comprehensive documentation for all SQLAlchemy models in Aasan backend.
 
 ---
 
 ## Overview
 
-SalonOS uses **SQLAlchemy 2.0** with **PostgreSQL 15** for data persistence. All models follow consistent conventions for IDs, timestamps, and soft deletion.
+Aasan uses **SQLAlchemy 2.0** with **PostgreSQL 15** for data persistence. All models follow consistent conventions for IDs, timestamps, and soft deletion.
 
 ### Model Count Summary
 

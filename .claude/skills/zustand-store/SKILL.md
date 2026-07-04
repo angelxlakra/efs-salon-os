@@ -1,12 +1,12 @@
 ---
 name: zustand-store
-description: "Create or update Zustand stores following SalonOS conventions. Use when adding new state management, store actions, or computed values."
+description: "Create or update Zustand stores following Aasan conventions. Use when adding new state management, store actions, or computed values."
 allowed-tools: Read, Grep, Glob, Edit, Write
 ---
 
 # Zustand Store Conventions
 
-SalonOS uses Zustand for client-side state management. All stores live in `frontend/src/stores/` and follow consistent patterns.
+Aasan uses Zustand for client-side state management. All stores live in `frontend/src/stores/` and follow consistent patterns.
 
 ## Existing Stores
 

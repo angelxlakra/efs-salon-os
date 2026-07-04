@@ -1,14 +1,22 @@
 import type { Metadata } from 'next';
+import { Space_Grotesk } from 'next/font/google';
 import { Toaster } from '@/components/ui/sonner';
 
 import './globals.css';
 
+const spaceGrotesk = Space_Grotesk({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-space-grotesk',
+  display: 'swap',
+});
+
 export const metadata: Metadata = {
-  title: 'Salon Management System',
-  description: 'Local-first salon POS, scheduling, inventory, and accounting system',
+  title: 'Aasan',
+  description: 'Your salon, running itself.',
   icons: {
     icon: '/favicon.svg',
-    apple: '/logo-navy.svg',
+    apple: '/apple-touch-icon-180.png',
   },
 };
 
@@ -28,7 +36,7 @@ export default function RootLayout({
         />
 
       </head>
-      <body className="antialiased font-sans">
+      <body className={`${spaceGrotesk.variable} antialiased font-sans`}>
         {children}
         <Toaster position="top-right" />
       </body>

@@ -40,6 +40,8 @@ salon-data/logs/
 # Local environment variable files
 .env
 *.env
+.env.*
+!.env.example
 
 # Database and backup data
 salon-data/
@@ -90,3 +92,6 @@ backend/check_*.sh
 worktrees/
 .superpowers/
 .playwright-mcp/
+
+# Stray local credential/scratch files
+scripts/b2-configs.*

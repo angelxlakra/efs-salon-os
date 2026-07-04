@@ -1,6 +1,6 @@
 ---
 name: alembic-migration
-description: "Generate Alembic database migrations for SalonOS. Use when creating schema changes, data migrations, or backfills."
+description: "Generate Alembic database migrations for Aasan. Use when creating schema changes, data migrations, or backfills."
 allowed-tools: Read, Grep, Glob, Bash, Edit, Write
 ---
 

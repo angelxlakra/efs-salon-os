@@ -1,4 +1,4 @@
-# SalonOS Auto-Update System — Design Spec
+# Aasan Auto-Update System — Design Spec
 
 **Date:** 2026-05-24  
 **Status:** Approved  
@@ -7,7 +7,7 @@
 
 ## Problem
 
-Deploying a new SalonOS release to two Windows/WSL2 production machines requires:
+Deploying a new Aasan release to two Windows/WSL2 production machines requires:
 1. Building a distribution tarball on the dev Mac
 2. SCP'ing it to each machine
 3. SSH → `wsl.exe` → copy to WSL → extract → copy `.env` → run `setup-https.sh` → `docker compose up`
@@ -39,14 +39,14 @@ This is slow, manual, and especially painful during urgent bug fixes. There are 
 ```
 Dev Mac
   └── ./scripts/package-for-distribution.sh --publish 1.0.38
-        ├── builds & packages → salon-os-1.0.38-20260524.tar.gz (~25 KB)
-        ├── uploads tarball   → B2: salon-os-releases/salon-os-1.0.38-20260524.tar.gz
-        └── uploads manifest  → B2: salon-os-releases/latest.json  (overwrites)
+        ├── builds & packages → aasan-1.0.38-20260524.tar.gz (~25 KB)
+        ├── uploads tarball   → B2: aasan-releases/aasan-1.0.38-20260524.tar.gz
+        └── uploads manifest  → B2: aasan-releases/latest.json  (overwrites)
 
-Backblaze B2 Bucket: salon-os-releases  (public download, private upload)
-  ├── latest.json  →  {"version":"1.0.38","filename":"salon-os-1.0.38-20260524.tar.gz","sha256":"..."}
-  ├── salon-os-1.0.37-20260523.tar.gz
-  └── salon-os-1.0.38-20260524.tar.gz
+Backblaze B2 Bucket: aasan-releases  (public download, private upload)
+  ├── latest.json  →  {"version":"1.0.38","filename":"aasan-1.0.38-20260524.tar.gz","sha256":"..."}
+  ├── aasan-1.0.37-20260523.tar.gz
+  └── aasan-1.0.38-20260524.tar.gz
 
 Each Windows/WSL2 Machine (x2)
   └── Task Scheduler → every 30 min → wsl.exe auto-update.sh
@@ -80,13 +80,13 @@ No changes to Docker configs, compose files, or frontend/backend code.
 After existing build+package steps complete:
 
 ```
-1. Compute SHA256 of dist/salon-os-{version}-{date}.tar.gz
-2. b2 upload-file salon-os-releases \
-       dist/salon-os-{version}-{date}.tar.gz \
-       salon-os-{version}-{date}.tar.gz
+1. Compute SHA256 of dist/aasan-{version}-{date}.tar.gz
+2. b2 upload-file aasan-releases \
+       dist/aasan-{version}-{date}.tar.gz \
+       aasan-{version}-{date}.tar.gz
 3. Write latest.json:
-   {"version":"{version}","filename":"salon-os-{version}-{date}.tar.gz","sha256":"{sha256}","released_at":"{iso8601}"}
-4. b2 upload-file salon-os-releases latest.json latest.json
+   {"version":"{version}","filename":"aasan-{version}-{date}.tar.gz","sha256":"{sha256}","released_at":"{iso8601}"}
+4. b2 upload-file aasan-releases latest.json latest.json
 5. Print: "Published {version} to B2. Machines will pick it up within 30 min."
 ```
 
@@ -111,22 +111,22 @@ Without `--publish`, the script behaves exactly as before (no B2 changes).
 
 ```
 1.  curl B2_PUBLIC_URL/latest.json → parse version, filename, sha256
-2.  Read /opt/salon-os/.current-version
+2.  Read /opt/aasan/.current-version
 3.  Versions match → log "already at {version}, nothing to do" → exit 0
 
 4.  Log "new version {new} detected (current: {old}), starting update"
-5.  curl -o /tmp/salon-os-{version}.tar.gz  B2_PUBLIC_URL/{filename}
+5.  curl -o /tmp/aasan-{version}.tar.gz  B2_PUBLIC_URL/{filename}
 6.  Verify SHA256 → mismatch → log error → exit 1  (old version untouched)
-7.  tar -xzf /tmp/salon-os-{version}.tar.gz -C /opt/
-8.  cp /opt/salon-os/.env /opt/salon-os-{version}/.env
-9.  cd /opt/salon-os-{version} && ./scripts/setup-https.sh --auto
-10. cd /opt/salon-os && docker compose down                   ← old symlink still active
-11. ln -sfn /opt/salon-os-{version} /opt/salon-os            ← atomic swap
-12. cd /opt/salon-os && docker compose up -d                  ← new version
-13. cd /opt/salon-os && docker compose exec -T api alembic upgrade head
-14. echo "{version}" > /opt/salon-os/.current-version
+7.  tar -xzf /tmp/aasan-{version}.tar.gz -C /opt/
+8.  cp /opt/aasan/.env /opt/aasan-{version}/.env
+9.  cd /opt/aasan-{version} && ./scripts/setup-https.sh --auto
+10. cd /opt/aasan && docker compose down                   ← old symlink still active
+11. ln -sfn /opt/aasan-{version} /opt/aasan            ← atomic swap
+12. cd /opt/aasan && docker compose up -d                  ← new version
+13. cd /opt/aasan && docker compose exec -T api alembic upgrade head
+14. echo "{version}" > /opt/aasan/.current-version
 15. Prune: keep newest 3 versioned dirs under /opt/, delete older ones
-16. rm /tmp/salon-os-{version}.tar.gz
+16. rm /tmp/aasan-{version}.tar.gz
 17. Log "update to {version} complete in {elapsed}s"
 ```
 
@@ -140,17 +140,17 @@ Without `--publish`, the script behaves exactly as before (no B2 changes).
 #!/bin/bash
 # Usage: ./rollback.sh 1.0.36
 TARGET_VERSION=$1
-TARGET_DIR="/opt/salon-os-${TARGET_VERSION}"
+TARGET_DIR="/opt/aasan-${TARGET_VERSION}"
 
 if [ ! -d "$TARGET_DIR" ]; then
   echo "Error: $TARGET_DIR does not exist"
   exit 1
 fi
 
-docker compose -f /opt/salon-os/compose.yaml down
-ln -sfn "$TARGET_DIR" /opt/salon-os
-docker compose -f /opt/salon-os/compose.yaml up -d
-echo "$TARGET_VERSION" > /opt/salon-os/.current-version
+docker compose -f /opt/aasan/compose.yaml down
+ln -sfn "$TARGET_DIR" /opt/aasan
+docker compose -f /opt/aasan/compose.yaml up -d
+echo "$TARGET_VERSION" > /opt/aasan/.current-version
 echo "Rolled back to $TARGET_VERSION"
 ```
 
@@ -159,9 +159,9 @@ echo "Rolled back to $TARGET_VERSION"
 ### `setup-auto-update.ps1` (one-time per machine)
 
 Registers a Windows Task Scheduler job:
-- **Name:** `SalonOS-AutoUpdate`
+- **Name:** `Aasan-AutoUpdate`
 - **Trigger:** At system startup + repeat every 30 minutes indefinitely
-- **Action:** `wsl.exe -u root -e bash /opt/salon-os/scripts/auto-update.sh`
+- **Action:** `wsl.exe -u root -e bash /opt/aasan/scripts/auto-update.sh`
 - **Run as:** SYSTEM (runs without user login)
 
 ---
@@ -171,14 +171,14 @@ Registers a Windows Task Scheduler job:
 ```
 # Auto-update
 TAILSCALE_IP=100.x.x.x           # Stable Tailscale IP of this machine
-B2_PUBLIC_BASE_URL=https://...    # Public download URL for salon-os-releases bucket
+B2_PUBLIC_BASE_URL=https://...    # Public download URL for aasan-releases bucket
 ```
 
 ---
 
 ## Logging
 
-All update activity appended to `/var/log/salon-os-updater.log`:
+All update activity appended to `/var/log/aasan-updater.log`:
 
 ```
 2026-05-24 23:15:01 [INFO] already at 1.0.37, nothing to do
@@ -190,7 +190,7 @@ All update activity appended to `/var/log/salon-os-updater.log`:
 
 ## B2 Bucket Setup
 
-- **Bucket name:** `salon-os-releases`
+- **Bucket name:** `aasan-releases`
 - **Access:** Public (download without auth) — 25 KB files contain no secrets
 - **Lifecycle:** Keep all files (versions are small; manual cleanup if ever needed)
 - The dev Mac needs the `b2` CLI installed and authenticated (one-time setup step, covered in the implementation plan). Target machines need only `curl` — downloads are via public URL, no credentials required.
@@ -203,7 +203,7 @@ All update activity appended to `/var/log/salon-os-updater.log`:
 The last 3 versioned dirs are always retained under `/opt/`. To roll back:
 
 ```bash
-wsl.exe -u root -e bash /opt/salon-os/scripts/rollback.sh 1.0.36
+wsl.exe -u root -e bash /opt/aasan/scripts/rollback.sh 1.0.36
 ```
 
 ---

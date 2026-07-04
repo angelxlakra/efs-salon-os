@@ -1,6 +1,6 @@
 ---
 name: receipt-printing
-description: "Generate or fix thermal receipt printing components for SalonOS. Use when working on 80mm receipt layout, silent print, or GST breakdown formatting."
+description: "Generate or fix thermal receipt printing components for Aasan. Use when working on 80mm receipt layout, silent print, or GST breakdown formatting."
 allowed-tools: Read, Grep, Glob, Edit, Write
 ---
 

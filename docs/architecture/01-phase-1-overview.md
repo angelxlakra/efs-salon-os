@@ -1,4 +1,4 @@
-# SalonOS Phase 1 Development Plan
+# Aasan Phase 1 Development Plan
 
 ## Timeline: Weeks 1-4
 

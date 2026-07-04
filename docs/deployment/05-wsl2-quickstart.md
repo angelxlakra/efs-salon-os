@@ -1,6 +1,6 @@
 # WSL2 Quick Start - Fix External Access
 
-Your SalonOS works on the Windows PC but not on other devices? Here's the fix.
+Your Aasan works on the Windows PC but not on other devices? Here's the fix.
 
 ## The Problem
 
@@ -28,7 +28,7 @@ cd C:\path\to\efs-salon-os
 .\scripts\wsl-port-forward.ps1
 ```
 
-The script will show you the URLs to access SalonOS.
+The script will show you the URLs to access Aasan.
 
 ### Step 4: Test from another device
 

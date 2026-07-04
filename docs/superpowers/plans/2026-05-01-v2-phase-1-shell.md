@@ -325,7 +325,7 @@ export function SidebarV2({ className }: { className?: string }) {
       )}
     >
       <div className="px-4 py-3 border-b border-border-subtle">
-        <span className="font-display text-display-sm text-text-primary">SalonOS</span>
+        <span className="font-display text-display-sm text-text-primary">Aasan</span>
       </div>
       <nav className="flex-1 overflow-y-auto p-2 flex flex-col gap-4">
         {SHELL_SECTIONS.map((section) => (

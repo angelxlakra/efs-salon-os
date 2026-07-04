@@ -1,4 +1,4 @@
-# SalonOS UI/UX Enhancement — Design Spec
+# Aasan UI/UX Enhancement — Design Spec
 
 **Date:** 2026-04-17  
 **Author:** Angel Lakra  

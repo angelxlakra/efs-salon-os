@@ -144,7 +144,7 @@ class MyModel(Base, ULIDMixin, TimestampMixin, SoftDeleteMixin):
 
 ## Conventions
 
-All SalonOS models follow these conventions:
+All Aasan models follow these conventions:
 
 | Convention | Implementation |
 |------------|----------------|

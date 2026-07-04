@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Automate SalonOS release distribution so publishing one command on the dev Mac causes both WSL production machines to self-update within 30 minutes.
+**Goal:** Automate Aasan release distribution so publishing one command on the dev Mac causes both WSL production machines to self-update within 30 minutes.
 
 **Architecture:** A `--publish` flag on the existing packaging script uploads the tarball + a `latest.json` manifest to a public Backblaze B2 bucket. Each Windows machine runs a WSL bash poller every 30 minutes via Task Scheduler: it fetches the manifest, compares to its installed version, and if newer downloads → extracts → swaps symlink → restarts Docker.
 
@@ -50,17 +50,17 @@ Follow prompts: enter your Application Key ID and Application Key from the Backb
 - [ ] **Step 3: Create the releases bucket**
 
 ```bash
-b2 bucket create salon-os-releases allPublic
+b2 bucket create aasan-releases allPublic
 ```
 
 Expected output includes `"bucketId"` and `"bucketType": "allPublic"`.
 
 - [ ] **Step 4: Note your bucket's public base URL**
 
-In the Backblaze web console → Buckets → `salon-os-releases` → Bucket Settings → find the "Friendly URL" or use:
+In the Backblaze web console → Buckets → `aasan-releases` → Bucket Settings → find the "Friendly URL" or use:
 
 ```
-https://f003.backblazeb2.com/file/salon-os-releases/
+https://f003.backblazeb2.com/file/aasan-releases/
 ```
 
 The exact subdomain (f003, f004, etc.) depends on your account region. Copy the full base URL — you will need it in Task 3 and Task 5.
@@ -69,10 +69,10 @@ The exact subdomain (f003, f004, etc.) depends on your account region. Copy the 
 
 ```bash
 echo "test" > /tmp/test.txt
-b2 file upload salon-os-releases /tmp/test.txt test.txt
-curl https://f003.backblazeb2.com/file/salon-os-releases/test.txt
-b2 file delete-unfinished-large-files salon-os-releases
-b2 rm b2://salon-os-releases/test.txt
+b2 file upload aasan-releases /tmp/test.txt test.txt
+curl https://f003.backblazeb2.com/file/aasan-releases/test.txt
+b2 file delete-unfinished-large-files aasan-releases
+b2 rm b2://aasan-releases/test.txt
 ```
 
 Expected: `curl` returns `test`, then cleanup succeeds.
@@ -80,7 +80,7 @@ Expected: `curl` returns `test`, then cleanup succeeds.
 - [ ] **Step 6: Commit (no code changes, just log this step)**
 
 ```bash
-git commit --allow-empty -m "chore: b2 releases bucket created (salon-os-releases)"
+git commit --allow-empty -m "chore: b2 releases bucket created (aasan-releases)"
 ```
 
 ---
@@ -106,7 +106,7 @@ Replace the top of `scripts/setup-https.sh` (the section from `set -e` through t
 ```bash
 #!/bin/bash
 
-# Setup HTTPS for SalonOS Local Server
+# Setup HTTPS for Aasan Local Server
 # Usage: ./setup-https.sh [--auto]
 #   --auto: non-interactive, reads TAILSCALE_IP from .env in current directory
 
@@ -119,7 +119,7 @@ fi
 
 if [[ "$AUTO_MODE" == "false" ]]; then
     echo "========================================="
-    echo "SalonOS HTTPS Setup"
+    echo "Aasan HTTPS Setup"
     echo "========================================="
     echo ""
 fi
@@ -233,9 +233,9 @@ Open `env.txt` and append at the end:
 TAILSCALE_IP=100.x.x.x
 
 # Public base URL for the Backblaze B2 releases bucket
-# Example: https://f003.backblazeb2.com/file/salon-os-releases
+# Example: https://f003.backblazeb2.com/file/aasan-releases
 # Find it in the B2 console under Bucket Settings > Friendly URL
-B2_PUBLIC_BASE_URL=https://f003.backblazeb2.com/file/salon-os-releases
+B2_PUBLIC_BASE_URL=https://f003.backblazeb2.com/file/aasan-releases
 ```
 
 - [ ] **Step 2: Commit**
@@ -313,7 +313,7 @@ publish_to_b2() {
 
     # Upload tarball
     log_info "Uploading ${PACKAGE_NAME}.tar.gz ..."
-    b2 file upload salon-os-releases "$tarball" "${PACKAGE_NAME}.tar.gz"
+    b2 file upload aasan-releases "$tarball" "${PACKAGE_NAME}.tar.gz"
 
     # Write and upload latest.json
     local tmp_json
@@ -323,7 +323,7 @@ publish_to_b2() {
         > "$tmp_json"
 
     log_info "Uploading latest.json ..."
-    b2 file upload salon-os-releases "$tmp_json" latest.json
+    b2 file upload aasan-releases "$tmp_json" latest.json
     rm "$tmp_json"
 
     log_success "Published ${VERSION} to B2. Machines will pick it up within 30 min."
@@ -383,12 +383,12 @@ This is the core poller/deployer that runs in WSL as root every 30 minutes.
 ```bash
 #!/bin/bash
 #
-# SalonOS Auto-Update Script
+# Aasan Auto-Update Script
 # Runs every 30 min via Windows Task Scheduler → wsl.exe
 # Checks B2 for a newer version; deploys if found.
 #
-# Requires (set once in /opt/salon-os/.env):
-#   B2_PUBLIC_BASE_URL=https://f003.backblazeb2.com/file/salon-os-releases
+# Requires (set once in /opt/aasan/.env):
+#   B2_PUBLIC_BASE_URL=https://f003.backblazeb2.com/file/aasan-releases
 #   TAILSCALE_IP=100.x.x.x
 
 set -euo pipefail
@@ -396,9 +396,9 @@ set -euo pipefail
 # ─── Config ───────────────────────────────────────────────────────────────────
 
 INSTALL_ROOT="/opt"
-INSTALL_LINK="${INSTALL_ROOT}/salon-os"
-VERSION_FILE="${INSTALL_ROOT}/salon-os-current-version"
-LOG_FILE="/var/log/salon-os-updater.log"
+INSTALL_LINK="${INSTALL_ROOT}/aasan"
+VERSION_FILE="${INSTALL_ROOT}/aasan-current-version"
+LOG_FILE="/var/log/aasan-updater.log"
 TMP_DIR="/tmp"
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -471,7 +471,7 @@ log "INFO" "SHA256 verified OK"
 
 # ─── Extract ──────────────────────────────────────────────────────────────────
 
-# Tarball contains a directory named like salon-os-1.0.38-20260524
+# Tarball contains a directory named like aasan-1.0.38-20260524
 TARBALL_INNER_DIR=$(tar -tzf "$TMP_TARBALL" | head -1 | cut -d'/' -f1)
 NEW_INSTALL_DIR="${INSTALL_ROOT}/${TARBALL_INNER_DIR}"
 
@@ -530,7 +530,7 @@ log "INFO" "cleaned up temp tarball"
 # ─── Prune old versions (keep newest 3) ───────────────────────────────────────
 
 mapfile -t OLD_DIRS < <(
-    find "$INSTALL_ROOT" -maxdepth 1 -type d -name "salon-os-*" \
+    find "$INSTALL_ROOT" -maxdepth 1 -type d -name "aasan-*" \
     | sort -V | head -n -3
 )
 for old_dir in "${OLD_DIRS[@]}"; do
@@ -572,33 +572,33 @@ git commit -m "feat: add auto-update.sh — WSL poller/deployer for B2 releases"
 ```bash
 #!/bin/bash
 #
-# SalonOS Rollback Script
-# Usage: bash /opt/salon-os/scripts/rollback.sh 1.0.36
+# Aasan Rollback Script
+# Usage: bash /opt/aasan/scripts/rollback.sh 1.0.36
 #
 # Rolls back to a previously installed version (must still exist under /opt/)
 
 set -euo pipefail
 
 INSTALL_ROOT="/opt"
-INSTALL_LINK="${INSTALL_ROOT}/salon-os"
-VERSION_FILE="${INSTALL_ROOT}/salon-os-current-version"
+INSTALL_LINK="${INSTALL_ROOT}/aasan"
+VERSION_FILE="${INSTALL_ROOT}/aasan-current-version"
 
 TARGET_VERSION="${1:-}"
 if [ -z "$TARGET_VERSION" ]; then
     echo "Usage: $0 <version>"
     echo ""
     echo "Available versions:"
-    find "$INSTALL_ROOT" -maxdepth 1 -type d -name "salon-os-*" | sort -V | sed 's|.*/||'
+    find "$INSTALL_ROOT" -maxdepth 1 -type d -name "aasan-*" | sort -V | sed 's|.*/||'
     exit 1
 fi
 
-TARGET_DIR="${INSTALL_ROOT}/salon-os-${TARGET_VERSION}"
+TARGET_DIR="${INSTALL_ROOT}/aasan-${TARGET_VERSION}"
 
 if [ ! -d "$TARGET_DIR" ]; then
     echo "Error: ${TARGET_DIR} does not exist"
     echo ""
     echo "Available versions:"
-    find "$INSTALL_ROOT" -maxdepth 1 -type d -name "salon-os-*" | sort -V | sed 's|.*/||'
+    find "$INSTALL_ROOT" -maxdepth 1 -type d -name "aasan-*" | sort -V | sed 's|.*/||'
     exit 1
 fi
 
@@ -644,14 +644,14 @@ Run this PowerShell script once on each Windows machine (as Administrator) to re
 - [ ] **Step 1: Create `scripts/setup-auto-update.ps1`**
 
 ```powershell
-# SalonOS Auto-Update — Task Scheduler Setup
+# Aasan Auto-Update — Task Scheduler Setup
 # Run once on each Windows machine as Administrator:
 #   PowerShell -ExecutionPolicy Bypass -File setup-auto-update.ps1
 #
 # Registers a Task Scheduler job that runs auto-update.sh in WSL
 # every 30 minutes starting at system boot.
 
-$TaskName = "SalonOS-AutoUpdate"
+$TaskName = "Aasan-AutoUpdate"
 
 # Remove existing task if present
 if (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue) {
@@ -662,7 +662,7 @@ if (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue) {
 # Action: run WSL bash as root
 $Action = New-ScheduledTaskAction `
     -Execute "wsl.exe" `
-    -Argument "-u root -e bash /opt/salon-os/scripts/auto-update.sh"
+    -Argument "-u root -e bash /opt/aasan/scripts/auto-update.sh"
 
 # Trigger: at system boot, then repeat every 30 minutes forever
 $BootTrigger = New-ScheduledTaskTrigger -AtStartup
@@ -696,7 +696,7 @@ Register-ScheduledTask `
     -Trigger $BootTrigger `
     -Settings $Settings `
     -Principal $Principal `
-    -Description "Polls B2 for SalonOS updates every 30 min and auto-deploys"
+    -Description "Polls B2 for Aasan updates every 30 min and auto-deploys"
 
 Write-Host ""
 Write-Host "Task '$TaskName' registered successfully."
@@ -706,7 +706,7 @@ Write-Host "To run it immediately:"
 Write-Host "  Start-ScheduledTask -TaskName '$TaskName'"
 Write-Host ""
 Write-Host "To view logs inside WSL:"
-Write-Host "  wsl.exe -u root -e tail -f /var/log/salon-os-updater.log"
+Write-Host "  wsl.exe -u root -e tail -f /var/log/aasan-updater.log"
 ```
 
 - [ ] **Step 2: Commit**
@@ -728,7 +728,7 @@ git commit -m "feat: add setup-auto-update.ps1 — registers WSL updater in Task
 ```markdown
 # 09 — Auto-Update System
 
-SalonOS machines self-update via a Backblaze B2 release bucket.
+Aasan machines self-update via a Backblaze B2 release bucket.
 The developer publishes with one command; machines poll every 30 minutes.
 
 ---
@@ -736,7 +736,7 @@ The developer publishes with one command; machines poll every 30 minutes.
 ## How it works
 
 1. Dev Mac runs `./scripts/package-for-distribution.sh --publish 1.0.38`
-2. Tarball + `latest.json` uploaded to `salon-os-releases` B2 bucket
+2. Tarball + `latest.json` uploaded to `aasan-releases` B2 bucket
 3. Each WSL machine polls `latest.json` every 30 min via Task Scheduler
 4. If a newer version is detected: downloads, verifies SHA256, extracts,
    copies `.env`, regenerates HTTPS cert, swaps symlink, restarts Docker
@@ -755,15 +755,15 @@ Machines will pick it up within 30 minutes. No further action needed.
 
 ## One-time machine setup
 
-Do this once per Windows/WSL machine after the initial SalonOS install.
+Do this once per Windows/WSL machine after the initial Aasan install.
 
 ### 1. Add variables to `.env`
 
-Inside WSL, edit `/opt/salon-os/.env` and add:
+Inside WSL, edit `/opt/aasan/.env` and add:
 
 ```
 TAILSCALE_IP=100.x.x.x          # Run: tailscale ip -4
-B2_PUBLIC_BASE_URL=https://f003.backblazeb2.com/file/salon-os-releases
+B2_PUBLIC_BASE_URL=https://f003.backblazeb2.com/file/aasan-releases
 ```
 
 ### 2. Register the Task Scheduler job
@@ -777,9 +777,9 @@ PowerShell -ExecutionPolicy Bypass -File C:\path\to\setup-auto-update.ps1
 ### 3. Test it manually
 
 ```powershell
-Start-ScheduledTask -TaskName "SalonOS-AutoUpdate"
+Start-ScheduledTask -TaskName "Aasan-AutoUpdate"
 # Then check WSL logs:
-wsl.exe -u root -e tail -f /var/log/salon-os-updater.log
+wsl.exe -u root -e tail -f /var/log/aasan-updater.log
 ```
 
 ---
@@ -788,10 +788,10 @@ wsl.exe -u root -e tail -f /var/log/salon-os-updater.log
 
 ```bash
 # Inside WSL
-tail -50 /var/log/salon-os-updater.log
+tail -50 /var/log/aasan-updater.log
 
 # From Windows PowerShell
-wsl.exe -u root -e tail -50 /var/log/salon-os-updater.log
+wsl.exe -u root -e tail -50 /var/log/aasan-updater.log
 ```
 
 ---
@@ -802,10 +802,10 @@ Each update retains the 3 most recent versioned directories under `/opt/`.
 
 ```bash
 # List available versions
-wsl.exe -u root -e bash -c "ls /opt | grep salon-os-"
+wsl.exe -u root -e bash -c "ls /opt | grep aasan-"
 
 # Roll back to a specific version
-wsl.exe -u root -e bash /opt/salon-os/scripts/rollback.sh 1.0.36
+wsl.exe -u root -e bash /opt/aasan/scripts/rollback.sh 1.0.36
 ```
 
 ---
@@ -813,21 +813,21 @@ wsl.exe -u root -e bash /opt/salon-os/scripts/rollback.sh 1.0.36
 ## Troubleshooting
 
 **Update not firing:**
-- Check Task Scheduler: `Get-ScheduledTask -TaskName SalonOS-AutoUpdate`
+- Check Task Scheduler: `Get-ScheduledTask -TaskName Aasan-AutoUpdate`
 - Check WSL is running: `wsl.exe --status`
-- Manually trigger: `Start-ScheduledTask -TaskName SalonOS-AutoUpdate`
+- Manually trigger: `Start-ScheduledTask -TaskName Aasan-AutoUpdate`
 
 **SHA256 mismatch in logs:**
 - Re-publish: `./scripts/package-for-distribution.sh --publish <version>`
 - The previous partial upload may have been corrupted
 
 **docker compose up failed after update:**
-- Check logs: `wsl.exe -u root -e bash -c "cd /opt/salon-os && docker compose logs --tail=50"`
-- Roll back: `wsl.exe -u root -e bash /opt/salon-os/scripts/rollback.sh <previous>`
+- Check logs: `wsl.exe -u root -e bash -c "cd /opt/aasan && docker compose logs --tail=50"`
+- Roll back: `wsl.exe -u root -e bash /opt/aasan/scripts/rollback.sh <previous>`
 
 **alembic upgrade failed:**
 - The new version is running; only the migration step failed
-- Run manually: `wsl.exe -u root -e bash -c "cd /opt/salon-os && docker compose exec api alembic upgrade head"`
+- Run manually: `wsl.exe -u root -e bash -c "cd /opt/aasan && docker compose exec api alembic upgrade head"`
 ```
 
 - [ ] **Step 2: Commit**
@@ -856,7 +856,7 @@ Expected: tarball uploaded, `latest.json` visible at `${B2_PUBLIC_BASE_URL}/late
 curl -s "${B2_PUBLIC_BASE_URL}/latest.json"
 ```
 
-Expected: `{"version":"1.0.37","filename":"salon-os-1.0.37-...tar.gz","sha256":"...","released_at":"..."}`
+Expected: `{"version":"1.0.37","filename":"aasan-1.0.37-...tar.gz","sha256":"...","released_at":"..."}`
 
 - [ ] **Step 3: Simulate the poller on one WSL machine**
 
@@ -864,10 +864,10 @@ On the Windows machine (inside WSL as root):
 
 ```bash
 # Run the updater once manually
-bash /opt/salon-os/scripts/auto-update.sh
+bash /opt/aasan/scripts/auto-update.sh
 
 # Watch the log
-tail -20 /var/log/salon-os-updater.log
+tail -20 /var/log/aasan-updater.log
 ```
 
 Expected: either `already at 1.0.37, nothing to do` (if already on 1.0.37) or full update cycle completes.
@@ -878,10 +878,10 @@ On the WSL machine (after at least one update has been applied):
 
 ```bash
 # List retained versions
-ls /opt | grep salon-os-
+ls /opt | grep aasan-
 
 # Roll back to previous
-bash /opt/salon-os/scripts/rollback.sh <previous-version>
+bash /opt/aasan/scripts/rollback.sh <previous-version>
 
 # Verify app is reachable
 curl -k https://localhost/healthz
@@ -907,4 +907,4 @@ git status   # should be clean
 - [x] Old version dirs are pruned (keep newest 3) to prevent unbounded disk growth (Task 5)
 - [x] `rollback.sh` lists available versions when called with no args (Task 6)
 - [x] `alembic upgrade head` failure does not tear down running containers — just logs a die message (Task 5)
-- [x] Compose commands use `cd /opt/salon-os && docker compose` not `-f` flag — matches existing dist `start.sh` pattern
+- [x] Compose commands use `cd /opt/aasan && docker compose` not `-f` flag — matches existing dist `start.sh` pattern

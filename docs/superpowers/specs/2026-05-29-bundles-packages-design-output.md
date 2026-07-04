@@ -1,6 +1,6 @@
 # Bundles & Packages — Frontend Design Output
 
-> **Design round deliverable** feeding the engineering spec. Visual proposals for the Packages feature, grounded in the **live** SalonOS V2 design system as read from the codebase (`src/styles/tokens.css`, `typography.css`, `dashboard.css`, and the `ui/*` primitives).
+> **Design round deliverable** feeding the engineering spec. Visual proposals for the Packages feature, grounded in the **live** Aasan V2 design system as read from the codebase (`src/styles/tokens.css`, `typography.css`, `dashboard.css`, and the `ui/*` primitives).
 >
 > **⚠ Design-system reconciliation (read first).** The brief's §1 describes copper `#b0561f`, Instrument Serif, Inter, surface `#fafaf9`. The **shipped code does not match that** — it uses **Navy `#1c104c`** as `accent-default` (light), a **Gold `#c9a96e`** secondary, **Cormorant Garamond** (display) + **DM Sans** (body), warm-cream surface `#f8f5f0`, with an editorial big-numeral treatment in the V2 dashboard. **Every mockup here is built against the live tokens, not the brief's stale palette.** If the brief reflects an intended re-skin, flag it back — see open-questions file.
 >

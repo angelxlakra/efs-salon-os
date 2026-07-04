@@ -1,6 +1,6 @@
 ---
 name: testing-workflow
-description: "TDD testing workflow for SalonOS. Use when writing tests first, reproducing bugs as failing tests, or verifying coverage for money/permissions/concurrency."
+description: "TDD testing workflow for Aasan. Use when writing tests first, reproducing bugs as failing tests, or verifying coverage for money/permissions/concurrency."
 allowed-tools: Read, Grep, Glob, Bash, Edit, Write
 ---
 

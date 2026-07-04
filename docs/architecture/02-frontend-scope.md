@@ -1,4 +1,4 @@
-# SalonOS Frontend - 1-Week Implementation Scope (UPDATED)
+# Aasan Frontend - 1-Week Implementation Scope (UPDATED)
 
 **Framework:** Next.js 16 (App Router) + React 19
 **Timeline:** 7 days
@@ -32,7 +32,7 @@
 
 ## Executive Summary
 
-This document outlines the **complete** frontend implementation plan for SalonOS Phase 1, focusing on delivering a production-ready application within 7 days. The scope now includes **all critical transactional flows** identified from backend analysis: POS with payment processing, cash drawer management, appointments with walk-ins, inventory, and comprehensive reporting.
+This document outlines the **complete** frontend implementation plan for Aasan Phase 1, focusing on delivering a production-ready application within 7 days. The scope now includes **all critical transactional flows** identified from backend analysis: POS with payment processing, cash drawer management, appointments with walk-ins, inventory, and comprehensive reporting.
 
 **Key Technologies:**
 - **Next.js 16:** Partial Prerendering (PPR), Server Components, Server Actions
@@ -105,13 +105,13 @@ npx shadcn@latest add button input card table dialog select label separator tabs
 **File:** `.env.local`
 ```bash
 NEXT_PUBLIC_API_URL=http://localhost/api
-NEXT_PUBLIC_APP_NAME=SalonOS
+NEXT_PUBLIC_APP_NAME=Aasan
 ```
 
 **File:** `.env.example`
 ```bash
 NEXT_PUBLIC_API_URL=http://localhost/api
-NEXT_PUBLIC_APP_NAME=SalonOS
+NEXT_PUBLIC_APP_NAME=Aasan
 ```
 
 ---
@@ -656,7 +656,7 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-muted/50">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold">SalonOS</CardTitle>
+          <CardTitle className="text-2xl font-bold">Aasan</CardTitle>
           <CardDescription>Enter your credentials to access the system</CardDescription>
         </CardHeader>
         <CardContent>
@@ -2261,4 +2261,4 @@ export default function RefundPage({ params }: { params: { id: string } }) {
 
 **End of Updated Scope Document**
 
-This updated scope now includes ALL critical features identified from the backend analysis, ensuring a complete, production-ready SalonOS frontend implementation.
+This updated scope now includes ALL critical features identified from the backend analysis, ensuring a complete, production-ready Aasan frontend implementation.

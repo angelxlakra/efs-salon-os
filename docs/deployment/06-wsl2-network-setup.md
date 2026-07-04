@@ -1,8 +1,8 @@
-# WSL2 Network Setup Guide for SalonOS
+# WSL2 Network Setup Guide for Aasan
 
 ## Problem Summary
 
-SalonOS works on the Windows PC browser (localhost, all IPs work), but **cannot be accessed from**:
+Aasan works on the Windows PC browser (localhost, all IPs work), but **cannot be accessed from**:
 - ❌ Other devices on the same WiFi network (phones, laptops)
 - ❌ Other devices on Tailscale network
 
@@ -141,7 +141,7 @@ You should see rules for ports 80 and 443. If empty:
 
 In Windows PowerShell (as Administrator):
 ```powershell
-Get-NetFirewallRule -DisplayName "SalonOS*" | Select-Object DisplayName, Enabled, Action
+Get-NetFirewallRule -DisplayName "Aasan*" | Select-Object DisplayName, Enabled, Action
 ```
 
 Should show two enabled rules. If not:
@@ -270,7 +270,7 @@ If you're still having issues:
 
 4. **Check firewall:**
    ```powershell
-   Get-NetFirewallRule -DisplayName "SalonOS*"
+   Get-NetFirewallRule -DisplayName "Aasan*"
    ```
 
 5. **Get your IPs:**

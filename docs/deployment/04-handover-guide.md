@@ -1,4 +1,4 @@
-# SalonOS - Handover Guide (DockerHub Distribution)
+# Aasan - Handover Guide (DockerHub Distribution)
 
 **Simple, streamlined deployment using DockerHub**
 
@@ -76,7 +76,7 @@ docker login
 ✓ Built angel112/salon-backend:1.0.0
 ✓ Built angel112/salon-frontend:1.0.0
 ✓ Pushed to DockerHub
-✓ Created dist/salon-os-1.0.0.tar.gz
+✓ Created dist/aasan-1.0.0.tar.gz
 ```
 
 #### Step 4: Verify Images on DockerHub
@@ -90,7 +90,7 @@ docker login
 #### Step 5: Prepare for Client
 
 **What to bring:**
-- [ ] USB drive with `dist/salon-os-1.0.0.tar.gz` (~10MB)
+- [ ] USB drive with `dist/aasan-1.0.0.tar.gz` (~10MB)
 - [ ] Printed installation guide
 - [ ] Your laptop
 - [ ] This checklist
@@ -176,15 +176,15 @@ sudo ufw enable
 
 ```bash
 # Create installation directory
-sudo mkdir -p /opt/salon-os
-cd /opt/salon-os
+sudo mkdir -p /opt/aasan
+cd /opt/aasan
 
 # Copy from USB
-sudo cp /media/usb/salon-os-1.0.0.tar.gz .
+sudo cp /media/usb/aasan-1.0.0.tar.gz .
 
 # Extract (very fast - only 10MB)
-sudo tar -xzf salon-os-1.0.0.tar.gz
-cd salon-os-1.0.0
+sudo tar -xzf aasan-1.0.0.tar.gz
+cd aasan-1.0.0
 
 # Verify contents
 ls -la
@@ -419,7 +419,7 @@ Focus on:
 
 ```bash
 cat > INSTALLATION_SUMMARY.txt << EOF
-SalonOS Installation
+Aasan Installation
 ====================
 
 Date: $(date)
@@ -437,7 +437,7 @@ Support:
 - Email: [Your email]
 
 Quick Commands:
-cd /opt/salon-os/salon-os-1.0.0
+cd /opt/aasan/aasan-1.0.0
 
 Start:  docker compose up -d
 Stop:   docker compose down
@@ -486,7 +486,7 @@ When the client obtains GST registration, activate dual-rate split billing
 **Remote check (if access configured):**
 ```bash
 ssh client@192.168.1.50
-cd /opt/salon-os/salon-os-1.0.0
+cd /opt/aasan/aasan-1.0.0
 docker compose ps
 docker compose logs --tail=50 | grep ERROR
 ```
@@ -529,7 +529,7 @@ docker compose logs --tail=50 | grep ERROR
 
 ```bash
 # Backup first
-cd /opt/salon-os/salon-os-1.0.0
+cd /opt/aasan/aasan-1.0.0
 ./scripts/backup.sh
 
 # Stop services
@@ -558,9 +558,9 @@ docker compose ps
 
 ```bash
 # 1. Transfer package
-cd /opt/salon-os
-tar -xzf salon-os-1.0.0.tar.gz
-cd salon-os-1.0.0
+cd /opt/aasan
+tar -xzf aasan-1.0.0.tar.gz
+cd aasan-1.0.0
 
 # 2. Configure
 cp .env.example .env
@@ -586,7 +586,7 @@ curl http://localhost/api/healthz
 
 ```bash
 # Start
-cd /opt/salon-os/salon-os-1.0.0
+cd /opt/aasan/aasan-1.0.0
 docker compose up -d
 
 # Stop

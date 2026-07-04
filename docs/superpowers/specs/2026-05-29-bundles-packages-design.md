@@ -12,7 +12,7 @@
 
 ## 1. Goal
 
-Introduce **packages** as a first-class transactional primitive in SalonOS: pre-paid, multi-service or unlimited entitlements that customers buy once and redeem over time. Covers single-sitting bundles (e.g. "Bridal Glam = Hair + Makeup + Nails @ ₹5,200"), counted multi-session packs (e.g. "10 × Hair Spa @ ₹6,000, valid 180 days"), and unlimited time-bound entitlements (e.g. "Unlimited hair wash, valid 30 days @ ₹1,500"). Includes per-package shareability between registered customers (family/friends), auto-application at POS with conflict resolution, Owner-only refunds with cancellation fee, and audit-logged expiry extensions.
+Introduce **packages** as a first-class transactional primitive in Aasan: pre-paid, multi-service or unlimited entitlements that customers buy once and redeem over time. Covers single-sitting bundles (e.g. "Bridal Glam = Hair + Makeup + Nails @ ₹5,200"), counted multi-session packs (e.g. "10 × Hair Spa @ ₹6,000, valid 180 days"), and unlimited time-bound entitlements (e.g. "Unlimited hair wash, valid 30 days @ ₹1,500"). Includes per-package shareability between registered customers (family/friends), auto-application at POS with conflict resolution, Owner-only refunds with cancellation fee, and audit-logged expiry extensions.
 
 This is the foundation for sub-project B (memberships with recurring billing), sub-project C (customer 360 + tabbed profile), sub-project D (loyalty tiering), and sub-project E (AI recommendations).
 
@@ -1037,7 +1037,7 @@ These are not blockers but should be spawned as separate sessions:
 - Design output: `2026-05-29-bundles-packages-design-output.md`
 - Design open questions (all resolved in this spec): `2026-05-29-bundles-packages-design-open-questions.md`
 - Mockups: `design-assets/2026-05-29-bundles-packages/`
-- Architecture: SalonOS backend spec `docs/architecture/04-backend-spec.md`
+- Architecture: Aasan backend spec `docs/architecture/04-backend-spec.md`
 - Existing billing model: `docs/models/03-billing.md`
 - Existing multi-staff services pattern: `docs/features/01-multi-staff-services.md`
 - RBAC reference: `rbac-permissions` skill

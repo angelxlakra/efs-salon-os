@@ -5,7 +5,7 @@ allowed-tools: Read, Grep, Glob, Bash, Edit, Write
 
 # Review & Test
 
-Run the full SalonOS review pipeline on recent changes:
+Run the full Aasan review pipeline on recent changes:
 
 1. **Code Review**: Use the code-reviewer agent to review the git diff for quality, type safety, money handling (paise), and existing patterns.
 2. **Security Audit**: Use the security-auditor agent to check for auth vulnerabilities, PII exposure, input validation, and network security.

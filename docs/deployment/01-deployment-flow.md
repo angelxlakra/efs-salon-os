@@ -1,4 +1,4 @@
-# SalonOS - Complete Deployment Flow
+# Aasan - Complete Deployment Flow
 
 **Quick visual guide: From development to production**
 
@@ -203,9 +203,9 @@
 
 ```bash
 # 1. Load package
-cd /opt/salon-os
-tar -xzf salon-os-*.tar.gz
-cd salon-os-*
+cd /opt/aasan
+tar -xzf aasan-*.tar.gz
+cd aasan-*
 
 # 2. Install
 ./scripts/install.sh
@@ -230,7 +230,7 @@ curl http://localhost/api/healthz
 
 ```bash
 # Start system (if stopped)
-cd /opt/salon-os
+cd /opt/aasan
 sudo ./scripts/start.sh
 
 # Stop system (for maintenance)
@@ -262,7 +262,7 @@ sudo docker compose logs -f
 
 ### Digital Items
 
-- [ ] `salon-os-1.0.0-YYYYMMDD.tar.gz`
+- [ ] `aasan-1.0.0-YYYYMMDD.tar.gz`
 - [ ] `CLIENT_INSTALL.md`
 - [ ] `HANDOVER_GUIDE.md`
 - [ ] Support contact template
@@ -521,4 +521,4 @@ After reading this guide, you now have:
 
 **Last Updated:** January 2026
 **Version:** 1.0.0
-**For:** SalonOS Production Deployment
+**For:** Aasan Production Deployment

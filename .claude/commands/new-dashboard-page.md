@@ -6,7 +6,7 @@ allowed-tools: Read, Grep, Glob, Bash, Edit, Write
 
 # New Dashboard Page: $ARGUMENTS
 
-Create a new SalonOS dashboard page following the full workflow:
+Create a new Aasan dashboard page following the full workflow:
 
 1. **Plan**: Use the architect agent to design the page structure, data requirements, and component breakdown.
 2. **Implement**: Build the page using the dashboard-component skill patterns — Next.js App Router, shadcn/ui, mobile-first Tailwind, role-based visibility.

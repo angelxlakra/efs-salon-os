@@ -1,8 +1,8 @@
-# SalonOS UI/UX Enhancement Implementation Plan
+# Aasan UI/UX Enhancement Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Redesign the entire SalonOS frontend with a Premium Dark theme, 4 swappable accent palettes, a Service Queue dashboard widget, revenue privacy toggle, and all 65+ mobile responsiveness fixes.
+**Goal:** Redesign the entire Aasan frontend with a Premium Dark theme, 4 swappable accent palettes, a Service Queue dashboard widget, revenue privacy toggle, and all 65+ mobile responsiveness fixes.
 
 **Architecture:** CSS variable token system defined in `globals.css` (Tailwind v4 `@theme` block) drives all surface/accent colours; a `data-accent` attribute on `<html>` swaps palettes; each component is rebuilt in-place following the new token system without changing business logic.
 

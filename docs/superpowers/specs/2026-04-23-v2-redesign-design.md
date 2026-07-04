@@ -1,4 +1,4 @@
-# SalonOS V2 — Redesign Design Spec
+# Aasan V2 — Redesign Design Spec
 
 **Status:** Draft — pending review
 **Date:** 2026-04-23
@@ -8,7 +8,7 @@
 
 ## 1. Executive summary
 
-V1 of SalonOS shipped feature-by-feature. The result is an app without an enforced design language: tables drift into card lists, a partial dark-theme migration left legacy Tailwind grays at 1.02 contrast on the dashboard, POS renders as a wall of white cards on dark chrome, and destructive delete icons live permanently in customer rows. The audit found 9 contrast-rule violations on the dashboard alone and 65+ responsive issues already documented in `docs/audits/01-mobile-responsiveness-audit.md`.
+V1 of Aasan shipped feature-by-feature. The result is an app without an enforced design language: tables drift into card lists, a partial dark-theme migration left legacy Tailwind grays at 1.02 contrast on the dashboard, POS renders as a wall of white cards on dark chrome, and destructive delete icons live permanently in customer rows. The audit found 9 contrast-rule violations on the dashboard alone and 65+ responsive issues already documented in `docs/audits/01-mobile-responsiveness-audit.md`.
 
 V2 is not a reskin. It is the **introduction of a strict design system** — tokens, primitives, and layout shell treated as shippable infrastructure — followed by page-by-page retrofit behind that system. The end goal is one sentence: **the staff open the app and feel fresh and productive.**
 

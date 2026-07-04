@@ -1,6 +1,6 @@
-# SalonOS Documentation Index
+# Aasan Documentation Index
 
-Complete technical documentation for SalonOS - a local-first salon management system.
+Complete technical documentation for Aasan - a local-first salon management system.
 
 ---
 
@@ -90,7 +90,7 @@ Technical audits and improvement tracking.
 
 | Document | Description |
 |----------|-------------|
-| [Salon OS Software Development Plan.pdf](./Salon%20OS%20Software%20Development%20Plan.pdf) | Original software development plan (PDF) |
+| [Aasan Software Development Plan.pdf](./Salon%20OS%20Software%20Development%20Plan.pdf) | Original software development plan (PDF) |
 | [HTTPS-SETUP.md](../HTTPS-SETUP.md) | HTTPS certificate setup for mobile camera access (kept in root for dist packaging) |
 
 ---

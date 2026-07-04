@@ -1,6 +1,6 @@
-# SalonOS Docker Deployment Guide
+# Aasan Docker Deployment Guide
 
-Complete guide for running SalonOS with Docker Compose.
+Complete guide for running Aasan with Docker Compose.
 
 ## Quick Start
 
@@ -235,7 +235,7 @@ docker compose up -d --build api worker
 1. **Clone repository:**
    ```bash
    git clone <repository-url>
-   cd salon-os
+   cd aasan
    ```
 
 2. **Create `.env` file** with secure credentials

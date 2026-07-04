@@ -24,7 +24,7 @@ export function PackageSaleLine({ item, className }: Props) {
         "flex items-start gap-3 px-3 py-2.5 rounded-lg border border-border bg-card",
         className
       )}
-      style={{ borderLeftWidth: "3px", borderLeftColor: "#1c104c" }}
+      style={{ borderLeftWidth: "3px", borderLeftColor: "#0F7B83" }}
     >
       <Package size={16} className="mt-0.5 text-muted-foreground shrink-0" />
       <div className="flex-1 min-w-0">

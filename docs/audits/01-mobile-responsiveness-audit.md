@@ -1,4 +1,4 @@
-# Mobile Responsiveness Audit - SalonOS Frontend
+# Mobile Responsiveness Audit - Aasan Frontend
 
 **Date**: February 12, 2026
 **Scope**: All frontend pages, components, layout, and shared UI
@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-The SalonOS frontend was built primarily for desktop/tablet use. While some pages have responsive breakpoints, **most data-heavy pages break on mobile** due to wide tables, fixed widths, cramped grids, and oversized dialogs. The layout shell itself has global issues (padding, viewport height, dialog sizing) that compound per-page problems.
+The Aasan frontend was built primarily for desktop/tablet use. While some pages have responsive breakpoints, **most data-heavy pages break on mobile** due to wide tables, fixed widths, cramped grids, and oversized dialogs. The layout shell itself has global issues (padding, viewport height, dialog sizing) that compound per-page problems.
 
 **Total issues found**: 65+
 **Critical (blocks usability)**: 8

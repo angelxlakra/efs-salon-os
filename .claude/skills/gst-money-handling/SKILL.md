@@ -1,6 +1,6 @@
 ---
 name: gst-money-handling
-description: "Handle GST calculations and money in paise for SalonOS. Use when implementing or reviewing billing, expenses, invoices, or tax logic."
+description: "Handle GST calculations and money in paise for Aasan. Use when implementing or reviewing billing, expenses, invoices, or tax logic."
 allowed-tools: Read, Grep, Glob, Edit, Write
 ---
 

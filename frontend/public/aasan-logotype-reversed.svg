@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="470" height="140" viewBox="0 0 470 140">
+  
+  
+  <circle cx="70" cy="70" r="60" fill="#FAF7F2"></circle>
+  <path d="M43.9 72.6 C49.1 96.1, 90.9 96.1, 96.1 72.6" stroke="#0F7B83" stroke-width="8.9" stroke-linecap="round" fill="none"></path>
+  <circle cx="70" cy="77.8" r="8.9" fill="#0F7B83"></circle>
+  <circle cx="70" cy="41.3" r="8.9" fill="#D6A23E"></circle>
+  <text x="150" y="103" font-family="&#39;Space Grotesk&#39;,sans-serif" font-weight="600" font-size="96" letter-spacing="-3.2" fill="#FAF7F2">Aasan<tspan fill="#3AB0B8">.</tspan></text>
+</svg>

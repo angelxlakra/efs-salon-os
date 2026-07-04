@@ -6,7 +6,7 @@ allowed-tools: Read, Grep, Glob, Bash, Edit, Write
 
 # New API Endpoint: $ARGUMENTS
 
-Scaffold a full-stack API endpoint for SalonOS following the established codebase conventions.
+Scaffold a full-stack API endpoint for Aasan following the established codebase conventions.
 
 ## Phase 1: Understand & Plan
 

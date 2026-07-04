@@ -1,6 +1,6 @@
 ---
 name: responsive-fixes
-description: "Fix mobile and tablet responsiveness issues in SalonOS. Use when refactoring layouts for POS tablets, fixing viewport issues, or applying responsive padding."
+description: "Fix mobile and tablet responsiveness issues in Aasan. Use when refactoring layouts for POS tablets, fixing viewport issues, or applying responsive padding."
 allowed-tools: Read, Grep, Glob, Edit, Write
 ---
 

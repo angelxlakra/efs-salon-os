@@ -1,12 +1,12 @@
 ---
 name: rbac-permissions
-description: "Reference for SalonOS RBAC permission system. Use when adding new permissions, checking role access, or ensuring frontend/backend permission consistency."
+description: "Reference for Aasan RBAC permission system. Use when adding new permissions, checking role access, or ensuring frontend/backend permission consistency."
 allowed-tools: Read, Grep, Glob
 ---
 
 # RBAC Permissions Reference
 
-SalonOS uses a resource.action permission model with 3 roles. Permissions must be consistent between backend (PermissionChecker) and frontend (hasPermission).
+Aasan uses a resource.action permission model with 3 roles. Permissions must be consistent between backend (PermissionChecker) and frontend (hasPermission).
 
 ## Roles
 

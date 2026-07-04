@@ -1,8 +1,8 @@
-# Redis Cache Invalidation Audit - SalonOS Backend
+# Redis Cache Invalidation Audit - Aasan Backend
 
 ## Overview
 
-The SalonOS backend uses a Redis-based `CacheService` singleton (`app/services/cache_service.py`) for caching frequently-accessed data. The service supports `get`, `get_json`, `set` (with TTL), `delete`, `delete_pattern`, and `exists` operations.
+The Aasan backend uses a Redis-based `CacheService` singleton (`app/services/cache_service.py`) for caching frequently-accessed data. The service supports `get`, `get_json`, `set` (with TTL), `delete`, `delete_pattern`, and `exists` operations.
 
 **Audit Result**: Out of ~95 mutation endpoints, only **5 properly invalidate cache**. The remaining **~90 endpoints perform no cache invalidation** after modifying data.
 

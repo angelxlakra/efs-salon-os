@@ -32,7 +32,7 @@ Change these lines:
 ```bash
 PROD_HOST="your-production-server.com"  # Your actual production hostname/IP
 PROD_USER="your-ssh-user"               # Your SSH username
-PROD_PATH="/path/to/salon-os"          # Where salon-os is installed
+PROD_PATH="/path/to/aasan"          # Where aasan is installed
 ```
 
 ### Step 2: Test SSH Connection
@@ -127,7 +127,7 @@ cd /Users/angelxlakra/dev/efs-salon-os
 ```bash
 # SSH to production and create historical dump
 ssh salon-prod
-cd /path/to/salon-os
+cd /path/to/aasan
 
 # Restore production backup from last week first
 docker compose exec -T postgres pg_restore -U salon_user -d salon_db < /path/to/old/backup.dump
@@ -262,7 +262,7 @@ docker compose exec api uv run alembic downgrade <revision>
 
 Before running for the first time:
 - [ ] Can SSH into production server
-- [ ] Know where salon-os is installed on production
+- [ ] Know where aasan is installed on production
 - [ ] Edited scripts/pull-prod-data.sh with correct details
 - [ ] Made scripts executable (`chmod +x scripts/*.sh`)
 - [ ] `backups/` is in .gitignore (already done ✓)

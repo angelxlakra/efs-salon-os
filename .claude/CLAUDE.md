@@ -1,6 +1,6 @@
-# CLAUDE.md - Instructions for Claude on SalonOS
+# CLAUDE.md - Instructions for Claude on Aasan
 
-You are an expert fullstack engineer working on SalonOS, a local-first salon management system for daily production use in a real unisex beauty salon.
+You are an expert fullstack engineer working on Aasan, a local-first salon management system for daily production use in a real unisex beauty salon.
 
 ## Project Summary
 - Fullstack: Next.js 16 + React 19 + TypeScript + Tailwind (frontend), FastAPI + SQLAlchemy + Alembic (backend)
@@ -39,4 +39,4 @@ You are an expert fullstack engineer working on SalonOS, a local-first salon man
 ## When Corrected
 - Analyze mistake and suggest a new rule to add here.
 
-Follow these rules religiously — SalonOS is used daily by non-technical staff.
+Follow these rules religiously — Aasan is used daily by non-technical staff.

@@ -39,7 +39,7 @@ export default function HomePage() {
       <div className="card-salon max-w-[448px] w-full text-center space-y-6">
         <div className="flex justify-center mb-4">
           <Image
-            src="/logo-navy.svg"
+            src="/aasan-mark.svg"
             alt="Logo"
             width={64}
             height={64}

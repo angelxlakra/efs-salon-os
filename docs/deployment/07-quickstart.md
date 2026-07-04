@@ -1,4 +1,4 @@
-# SalonOS - Quick Start Guide
+# Aasan - Quick Start Guide
 
 ## Prerequisites
 

@@ -1,4 +1,4 @@
-# SalonOS - Production Ready Checklist
+# Aasan - Production Ready Checklist
 
 **Version:** 1.0.0
 **Status:** ✅ Production Ready
@@ -8,7 +8,7 @@
 
 ## 🎯 Production Readiness Summary
 
-This document confirms that SalonOS has been prepared for production deployment and client distribution.
+This document confirms that Aasan has been prepared for production deployment and client distribution.
 
 ---
 
@@ -79,7 +79,7 @@ The distribution package includes:
 # Run the packaging script
 ./scripts/package-for-distribution.sh 1.0.0
 
-# Output: dist/salon-os-1.0.0-YYYYMMDD.tar.gz
+# Output: dist/aasan-1.0.0-YYYYMMDD.tar.gz
 ```
 
 ---
@@ -126,7 +126,7 @@ docker compose up -d
 
 ### Option 4: Windows/WSL2 Deployment
 
-SalonOS supports deployment on Windows 10/11 via WSL2 + Docker Desktop. WSL2 networking requires additional port forwarding configuration for LAN access. See [`docs/deployment/05-wsl2-quickstart.md`](../deployment/05-wsl2-quickstart.md) for detailed setup instructions.
+Aasan supports deployment on Windows 10/11 via WSL2 + Docker Desktop. WSL2 networking requires additional port forwarding configuration for LAN access. See [`docs/deployment/05-wsl2-quickstart.md`](../deployment/05-wsl2-quickstart.md) for detailed setup instructions.
 
 ---
 
@@ -362,7 +362,7 @@ docker compose exec -T postgres pg_restore \
 
 **Complete System Failure:**
 
-1. Install SalonOS on new hardware (follow CLIENT_INSTALL.md)
+1. Install Aasan on new hardware (follow CLIENT_INSTALL.md)
 2. Configure with same `.env` values
 3. Start only PostgreSQL: `docker compose up -d postgres`
 4. Restore latest backup (see above)
@@ -490,7 +490,7 @@ docker compose exec postgres psql -U salon_user -d salon_db -c "VACUUM ANALYZE;"
 ### Contact Information
 
 For technical support, provide:
-- SalonOS version (check VERSION file)
+- Aasan version (check VERSION file)
 - Error logs (copy from `docker compose logs`)
 - Steps to reproduce issue
 - Environment details (OS, Docker version)
@@ -597,7 +597,7 @@ Before distributing to client:
 
 **Status:** ✅ **PRODUCTION READY**
 
-SalonOS is ready for client deployment. Follow the CLIENT_INSTALL.md guide for installation instructions.
+Aasan is ready for client deployment. Follow the CLIENT_INSTALL.md guide for installation instructions.
 
 ---
 

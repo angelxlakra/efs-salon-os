@@ -1,0 +1,1047 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com"></link>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous"></link>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Instrument+Serif&amp;display=swap"></link>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #f8f5f0; }
+    input, textarea, button { font-family: inherit; }
+    input:focus, textarea:focus { outline: none; border-color: #1c104c !important; box-shadow: 0 0 0 3px rgba(28,16,76,0.14); }
+    @keyframes sheetIn { from { transform: translateX(40px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes toastIn { from { transform: translate(-50%, 8px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+  </style>
+</helmet>
+
+<div style="font-family:'Inter',sans-serif;color:#1c1917;min-height:100vh;font-size:14px">
+
+  <!-- ───────────────── Header ───────────────── -->
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 24px;background:#ffffff;border-bottom:1px solid #e3e0db">
+    <div style="display:flex;align-items:baseline;gap:10px">
+      <span style="font-family:'Instrument Serif',serif;font-size:22px;color:#1c104c">Aasan</span>
+      <span style="font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#8b6b4a">Packages v2 — prototype</span>
+    </div>
+    <div style="display:flex;gap:2px;background:#f0ede9;border:1px solid #e3e0db;border-radius:8px;padding:3px">
+      <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="3">
+        <button onClick="{{ t.onClick }}" style="border:none;cursor:pointer;padding:7px 18px;border-radius:6px;font-size:13px;font-weight:600;background:{{ t.bg }};color:{{ t.fg }};box-shadow:{{ t.shadow }}">{{ t.label }}</button>
+      </sc-for>
+    </div>
+    <button onClick="{{ toggleNotes }}" style="border:1px solid #e3e0db;background:#ffffff;border-radius:6px;padding:7px 12px;font-size:12px;font-weight:500;color:#44403c;cursor:pointer" style-hover="border-color:#cfcac3">{{ notesLabel }}</button>
+  </div>
+
+  <!-- ───────────────── Design notes ───────────────── -->
+  <sc-if value="{{ notesOpen }}" hint-placeholder-val="{{ true }}">
+    <div style="background:#ece8f5;border-bottom:1px solid #d8d2e8;padding:16px 24px">
+      <div style="max-width:1240px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr 1fr;gap:28px">
+        <div>
+          <p style="margin:0 0 6px;font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#1c104c">The new model — entitlement blocks</p>
+          <p style="margin:0;font-size:12.5px;line-height:1.55;color:#44403c">A package is a stack of blocks instead of a flat service list: <b>Fixed items</b>, <b>Choice groups</b> (pick N — locked at purchase or chosen each visit), <b>Unlimited</b>, <b>Session pools</b> and <b>Credit</b>. Any block can be a free bonus. This expresses everything from "10 haircuts" to "3 facials of choice + unlimited threading".</p>
+        </div>
+        <div>
+          <p style="margin:0 0 6px;font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#1c104c">Selling — recommendation</p>
+          <p style="margin:0;font-size:12.5px;line-height:1.55;color:#44403c">Today, tapping a package card in POS is an unwired TODO that would add a bill line directly, bypassing the cart. Instead: a <b>Configure &amp; Sell sheet</b> binds the customer, resolves purchase-time choices, previews expiry — then drops <b>one package line into the existing cart</b>. One path for discounts, refunds and receipts. The cart itself is unchanged.</p>
+        </div>
+        <div>
+          <p style="margin:0 0 6px;font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#1c104c">What stays</p>
+          <p style="margin:0;font-size:12.5px;line-height:1.55;color:#44403c">The redemption side is already good: entitlements rail, FIFO multi-package selector, auto-apply, gold redemption lines with undo. Kept as-is — see the Customer view tab. Pricing keeps your model: sum of value minus a discount (%, ₹ off, or final price).</p>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ═════════════════ SCREEN 1 · BUILDER ═════════════════ -->
+  <sc-if value="{{ isBuilder }}" hint-placeholder-val="{{ true }}">
+    <div data-screen-label="Package Builder" style="max-width:1240px;margin:0 auto;padding:22px 24px;display:grid;grid-template-columns:320px 1fr;gap:20px;align-items:start">
+
+      <!-- Left: config -->
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div style="background:#ffffff;border:1px solid #e3e0db;border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:12px">
+          <p style="margin:0;font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#8b6b4a">Package</p>
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <label style="font-size:12px;font-weight:500;color:#44403c">Name</label>
+            <input value="{{ pkgName }}" onChange="{{ onName }}" placeholder="e.g. Bridal Radiance" style="height:34px;border:1px solid #e3e0db;border-radius:6px;padding:0 10px;font-size:14px;color:#1c1917;background:#ffffff;width:100%">
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <label style="font-size:12px;font-weight:500;color:#44403c">Description</label>
+            <textarea value="{{ pkgDesc }}" onChange="{{ onDesc }}" rows="3" placeholder="What's included…" style="border:1px solid #e3e0db;border-radius:6px;padding:8px 10px;font-size:13px;color:#1c1917;background:#ffffff;width:100%;resize:vertical;line-height:1.45"></textarea>
+          </div>
+        </div>
+
+        <div style="background:#ffffff;border:1px solid #e3e0db;border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:12px">
+          <p style="margin:0;font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#8b6b4a">Rules</p>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div style="display:flex;flex-direction:column;gap:4px">
+              <label style="font-size:12px;font-weight:500;color:#44403c">Validity (days)</label>
+              <input type="number" min="1" value="{{ pkgValidity }}" onChange="{{ onValidity }}" style="height:34px;border:1px solid #e3e0db;border-radius:6px;padding:0 10px;font-size:14px;color:#1c1917;background:#ffffff;width:100%;font-variant-numeric:tabular-nums">
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px">
+              <label style="font-size:12px;font-weight:500;color:#44403c">Cancellation fee %</label>
+              <input type="number" min="0" max="100" value="{{ pkgFee }}" onChange="{{ onFee }}" style="height:34px;border:1px solid #e3e0db;border-radius:6px;padding:0 10px;font-size:14px;color:#1c1917;background:#ffffff;width:100%;font-variant-numeric:tabular-nums">
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <label style="font-size:12px;font-weight:500;color:#44403c">Who can redeem</label>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px;background:#f0ede9;border:1px solid #e3e0db;border-radius:7px;padding:3px">
+              <button onClick="{{ setOwnerOnly }}" style="border:none;cursor:pointer;padding:6px 0;border-radius:5px;font-size:12.5px;font-weight:600;background:{{ ownerBg }};color:{{ ownerFg }};box-shadow:{{ ownerShadow }}">Personal</button>
+              <button onClick="{{ setShared }}" style="border:none;cursor:pointer;padding:6px 0;border-radius:5px;font-size:12.5px;font-weight:600;background:{{ sharedBg }};color:{{ sharedFg }};box-shadow:{{ sharedShadow }}">Shared</button>
+            </div>
+            <p style="margin:2px 0 0;font-size:11px;color:#8b6b4a;line-height:1.4">{{ shareHint }}</p>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding-top:2px">
+            <div>
+              <p style="margin:0;font-size:13px;font-weight:500;color:#1c1917">Auto-apply</p>
+              <p style="margin:1px 0 0;font-size:11px;color:#8b6b4a">Redeem automatically when only one package is eligible</p>
+            </div>
+            <button onClick="{{ toggleAuto }}" style="width:36px;height:20px;border-radius:999px;border:none;cursor:pointer;position:relative;flex-shrink:0;background:{{ autoBg }};transition:background 120ms">
+              <span style="position:absolute;top:2px;left:{{ autoLeft }};width:16px;height:16px;border-radius:999px;background:#ffffff;box-shadow:0 1px 2px rgba(20,14,10,0.25);transition:left 120ms"></span>
+            </button>
+          </div>
+        </div>
+
+        <div style="background:#ffffff;border:1px solid #e3e0db;border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <p style="margin:0;font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#8b6b4a">Status</p>
+            <span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:999px;background:{{ statusBg }};color:{{ statusFg }};border:1px solid {{ statusBorder }}">{{ statusLabel }}</span>
+          </div>
+          <button onClick="{{ onPublish }}" style="height:36px;border:none;border-radius:6px;background:#1c104c;color:#f5f0e8;font-size:13.5px;font-weight:600;cursor:pointer;width:100%" style-hover="background:#2a1865">{{ publishLabel }}</button>
+          <p style="margin:0;font-size:11px;color:#8b6b4a;line-height:1.45">{{ publishHint }}</p>
+        </div>
+      </div>
+
+      <!-- Right: contents + pricing -->
+      <div style="display:flex;flex-direction:column;gap:14px;min-width:0">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px">
+          <p style="margin:0;font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#8b6b4a">Contents · {{ blockCount }}</p>
+          <p style="margin:0;font-size:12px;color:#8b6b4a">Stack blocks — mix counted, unlimited, choices, pools and credit in one package</p>
+        </div>
+
+        <sc-for list="{{ blocks }}" as="b" hint-placeholder-count="3">
+          <div style="background:#ffffff;border:1px solid #e3e0db;border-radius:10px;overflow:hidden">
+            <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid #eeece9;background:#fcfbfa">
+              <span style="font-size:10.5px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;padding:3px 9px;border-radius:999px;white-space:nowrap;background:{{ b.chipBg }};color:{{ b.chipFg }}">{{ b.typeLabel }}</span>
+              <span style="flex:1;min-width:0;font-size:13px;font-weight:600;color:#1c1917;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ b.title }}</span>
+              <span style="font-size:12.5px;font-weight:600;color:#44403c;font-variant-numeric:tabular-nums;white-space:nowrap">{{ b.valueStr }}</span>
+              <button onClick="{{ b.toggleBonus }}" title="Free bonus — adds value, not price" style="font-size:11px;font-weight:600;padding:3px 9px;border-radius:999px;cursor:pointer;white-space:nowrap;border:1px solid {{ b.bonusBorder }};background:{{ b.bonusBg }};color:{{ b.bonusFg }}">{{ b.bonusLabel }}</button>
+              <button onClick="{{ b.remove }}" title="Remove block" style="border:none;background:none;cursor:pointer;color:#8b6b4a;font-size:17px;line-height:1;padding:2px 4px" style-hover="color:#991b1b">×</button>
+            </div>
+            <div style="padding:10px 12px;display:flex;flex-direction:column;gap:7px">
+
+              <sc-if value="{{ b.isChoice }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding-bottom:2px">
+                  <span style="font-size:13px;color:#44403c">Customer picks</span>
+                  <input type="number" min="1" value="{{ b.picks }}" onChange="{{ b.onPicks }}" style="width:54px;height:30px;border:1px solid #e3e0db;border-radius:6px;font-size:13px;text-align:center;background:#ffffff;color:#1c1917;font-variant-numeric:tabular-nums">
+                  <span style="font-size:13px;color:#44403c">of the options below —</span>
+                  <div style="display:flex;gap:2px;background:#f0ede9;border:1px solid #e3e0db;border-radius:7px;padding:2px">
+                    <button onClick="{{ b.setAtPurchase }}" style="border:none;cursor:pointer;padding:5px 12px;border-radius:5px;font-size:12px;font-weight:600;background:{{ b.purchBg }};color:{{ b.purchFg }}">locked at purchase</button>
+                    <button onClick="{{ b.setAtVisit }}" style="border:none;cursor:pointer;padding:5px 12px;border-radius:5px;font-size:12px;font-weight:600;background:{{ b.visitBg }};color:{{ b.visitFg }}">chosen each visit</button>
+                  </div>
+                </div>
+                <sc-for list="{{ b.rows }}" as="r" hint-placeholder-count="2">
+                  <div style="display:grid;grid-template-columns:1fr 92px 24px;gap:8px;align-items:center">
+                    <button onClick="{{ r.pick }}" style="height:30px;border:1px solid #e3e0db;border-radius:6px;background:#ffffff;padding:0 10px;text-align:left;font-size:13px;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:{{ r.svcColor }}" style-hover="border-color:#cfcac3">{{ r.svcName }}</button>
+                    <input type="number" min="0" value="{{ r.price }}" onChange="{{ r.onPrice }}" title="Price (₹)" style="height:30px;border:1px solid #e3e0db;border-radius:6px;padding:0 8px;font-size:13px;text-align:right;background:#ffffff;color:#1c1917;font-variant-numeric:tabular-nums">
+                    <button onClick="{{ r.remove }}" style="border:none;background:none;cursor:pointer;color:#a8a29e;font-size:15px;line-height:1;padding:0" style-hover="color:#991b1b">×</button>
+                  </div>
+                </sc-for>
+              </sc-if>
+
+              <sc-if value="{{ b.isItems }}" hint-placeholder-val="{{ false }}">
+                <div style="display:grid;grid-template-columns:1fr 60px 92px 24px;gap:8px;padding:0 2px">
+                  <span style="font-size:10px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;color:#a8a29e">Service / product</span>
+                  <span style="font-size:10px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;color:#a8a29e;text-align:center">Qty</span>
+                  <span style="font-size:10px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;color:#a8a29e;text-align:right">Price ₹</span>
+                  <span></span>
+                </div>
+                <sc-for list="{{ b.rows }}" as="r" hint-placeholder-count="2">
+                  <div style="display:grid;grid-template-columns:1fr 60px 92px 24px;gap:8px;align-items:center">
+                    <button onClick="{{ r.pick }}" style="height:30px;border:1px solid #e3e0db;border-radius:6px;background:#ffffff;padding:0 10px;text-align:left;font-size:13px;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:{{ r.svcColor }}" style-hover="border-color:#cfcac3">{{ r.svcName }}</button>
+                    <input type="number" min="1" value="{{ r.qty }}" onChange="{{ r.onQty }}" style="height:30px;border:1px solid #e3e0db;border-radius:6px;font-size:13px;text-align:center;background:#ffffff;color:#1c1917;font-variant-numeric:tabular-nums">
+                    <input type="number" min="0" value="{{ r.price }}" onChange="{{ r.onPrice }}" style="height:30px;border:1px solid #e3e0db;border-radius:6px;padding:0 8px;font-size:13px;text-align:right;background:#ffffff;color:#1c1917;font-variant-numeric:tabular-nums">
+                    <button onClick="{{ r.remove }}" style="border:none;background:none;cursor:pointer;color:#a8a29e;font-size:15px;line-height:1;padding:0" style-hover="color:#991b1b">×</button>
+                  </div>
+                </sc-for>
+              </sc-if>
+
+              <sc-if value="{{ b.isPool }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding-bottom:2px">
+                  <span style="font-size:13px;color:#44403c">A pool of</span>
+                  <input type="number" min="1" value="{{ b.sessions }}" onChange="{{ b.onSessions }}" style="width:54px;height:30px;border:1px solid #e3e0db;border-radius:6px;font-size:13px;text-align:center;background:#ffffff;color:#1c1917;font-variant-numeric:tabular-nums">
+                  <span style="font-size:13px;color:#44403c">sessions, spendable on any service below</span>
+                </div>
+                <sc-for list="{{ b.rows }}" as="r" hint-placeholder-count="2">
+                  <div style="display:grid;grid-template-columns:1fr 92px 24px;gap:8px;align-items:center">
+                    <button onClick="{{ r.pick }}" style="height:30px;border:1px solid #e3e0db;border-radius:6px;background:#ffffff;padding:0 10px;text-align:left;font-size:13px;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:{{ r.svcColor }}" style-hover="border-color:#cfcac3">{{ r.svcName }}</button>
+                    <input type="number" min="0" value="{{ r.price }}" onChange="{{ r.onPrice }}" title="Price (₹)" style="height:30px;border:1px solid #e3e0db;border-radius:6px;padding:0 8px;font-size:13px;text-align:right;background:#ffffff;color:#1c1917;font-variant-numeric:tabular-nums">
+                    <button onClick="{{ r.remove }}" style="border:none;background:none;cursor:pointer;color:#a8a29e;font-size:15px;line-height:1;padding:0" style-hover="color:#991b1b">×</button>
+                  </div>
+                </sc-for>
+              </sc-if>
+
+              <sc-if value="{{ b.isUnlimited }}" hint-placeholder-val="{{ false }}">
+                <sc-for list="{{ b.rows }}" as="r" hint-placeholder-count="1">
+                  <div style="display:grid;grid-template-columns:1fr 24px;gap:8px;align-items:center">
+                    <button onClick="{{ r.pick }}" style="height:30px;border:1px solid #e3e0db;border-radius:6px;background:#ffffff;padding:0 10px;text-align:left;font-size:13px;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:{{ r.svcColor }}" style-hover="border-color:#cfcac3">{{ r.svcName }}</button>
+                    <button onClick="{{ r.remove }}" style="border:none;background:none;cursor:pointer;color:#a8a29e;font-size:15px;line-height:1;padding:0" style-hover="color:#991b1b">×</button>
+                  </div>
+                </sc-for>
+                <div style="display:flex;gap:12px;border-top:1px dashed #eeece9;padding-top:8px;margin-top:2px">
+                  <div style="display:flex;flex-direction:column;gap:3px;flex:1">
+                    <label style="font-size:11px;font-weight:500;color:#8b6b4a">Assigned value for pricing (₹)</label>
+                    <input type="number" min="0" value="{{ b.value }}" onChange="{{ b.onValue }}" placeholder="0" style="height:30px;border:1px solid #e3e0db;border-radius:6px;padding:0 8px;font-size:13px;background:#ffffff;color:#1c1917;font-variant-numeric:tabular-nums;width:100%">
+                  </div>
+                  <div style="display:flex;flex-direction:column;gap:3px;flex:1">
+                    <label style="font-size:11px;font-weight:500;color:#8b6b4a">Fair-use cap per day (optional)</label>
+                    <input type="number" min="1" value="{{ b.cap }}" onChange="{{ b.onCap }}" placeholder="None" style="height:30px;border:1px solid #e3e0db;border-radius:6px;padding:0 8px;font-size:13px;background:#ffffff;color:#1c1917;font-variant-numeric:tabular-nums;width:100%">
+                  </div>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ b.isCredit }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap">
+                  <div style="display:flex;flex-direction:column;gap:3px">
+                    <label style="font-size:11px;font-weight:500;color:#8b6b4a">Credit amount (₹)</label>
+                    <input type="number" min="0" value="{{ b.amount }}" onChange="{{ b.onAmount }}" style="width:130px;height:32px;border:1px solid #e3e0db;border-radius:6px;padding:0 10px;font-size:14px;font-weight:600;background:#ffffff;color:#1c1917;font-variant-numeric:tabular-nums">
+                  </div>
+                  <div style="display:flex;flex-direction:column;gap:3px">
+                    <label style="font-size:11px;font-weight:500;color:#8b6b4a">Spendable on</label>
+                    <div style="display:flex;gap:2px;background:#f0ede9;border:1px solid #e3e0db;border-radius:7px;padding:2px">
+                      <button onClick="{{ b.setScopeAny }}" style="border:none;cursor:pointer;padding:6px 12px;border-radius:5px;font-size:12px;font-weight:600;background:{{ b.anyBg }};color:{{ b.anyFg }}">Anything</button>
+                      <button onClick="{{ b.setScopeSvc }}" style="border:none;cursor:pointer;padding:6px 12px;border-radius:5px;font-size:12px;font-weight:600;background:{{ b.svcScopeBg }};color:{{ b.svcScopeFg }}">Services only</button>
+                      <button onClick="{{ b.setScopeRetail }}" style="border:none;cursor:pointer;padding:6px 12px;border-radius:5px;font-size:12px;font-weight:600;background:{{ b.retailBg }};color:{{ b.retailFg }}">Retail only</button>
+                    </div>
+                  </div>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ b.hasRows }}" hint-placeholder-val="{{ false }}">
+                <button onClick="{{ b.addRow }}" style="height:30px;border:1px dashed #cfcac3;border-radius:6px;background:none;font-size:12.5px;font-weight:500;color:#8b6b4a;cursor:pointer;width:100%" style-hover="border-color:#1c104c;color:#1c104c">＋ Add service</button>
+              </sc-if>
+            </div>
+          </div>
+        </sc-for>
+
+        <!-- Add block palette -->
+        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px">
+          <sc-for list="{{ blockTypes }}" as="bt" hint-placeholder-count="5">
+            <button onClick="{{ bt.onAdd }}" style="border:1px dashed #cfcac3;background:#fdfcfb;border-radius:10px;padding:10px;cursor:pointer;text-align:left;display:flex;flex-direction:column;gap:5px" style-hover="border-color:#1c104c;background:#ffffff">
+              <span style="width:22px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;background:{{ bt.bg }};color:{{ bt.fg }}">{{ bt.glyph }}</span>
+              <span style="font-size:12px;font-weight:600;color:#1c1917">{{ bt.label }}</span>
+              <span style="font-size:10.5px;color:#8b6b4a;line-height:1.35">{{ bt.desc }}</span>
+            </button>
+          </sc-for>
+        </div>
+
+        <!-- Pricing -->
+        <div style="background:#ffffff;border:1px solid #e3e0db;border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:12px">
+          <p style="margin:0;font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#8b6b4a">Pricing</p>
+          <div style="display:flex;justify-content:space-between;align-items:baseline">
+            <span style="font-size:13px;color:#44403c">Total value to customer</span>
+            <span style="font-size:14px;font-weight:600;color:#1c1917;font-variant-numeric:tabular-nums">{{ totalValueStr }}</span>
+          </div>
+          <sc-if value="{{ hasBonus }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:-8px">
+              <span style="font-size:12px;color:#8a5a16">includes free bonuses (not charged)</span>
+              <span style="font-size:12.5px;font-weight:600;color:#8a5a16;font-variant-numeric:tabular-nums">{{ bonusValueStr }}</span>
+            </div>
+          </sc-if>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+            <sc-for list="{{ discountFields }}" as="f" hint-placeholder-count="3">
+              <div style="display:flex;flex-direction:column;gap:4px">
+                <label style="font-size:12px;font-weight:{{ f.labelWeight }};color:{{ f.labelColor }}">{{ f.label }}</label>
+                <input type="number" min="0" value="{{ f.value }}" onChange="{{ f.onChange }}" placeholder="—" style="height:32px;border:1px solid #e3e0db;border-radius:6px;padding:0 10px;font-size:13.5px;background:#ffffff;color:#1c1917;font-variant-numeric:tabular-nums;width:100%">
+              </div>
+            </sc-for>
+          </div>
+          <div style="border-top:1px solid #eeece9;padding-top:12px;display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:13px;font-weight:500;color:#44403c">Sells at</span>
+            <div style="display:flex;align-items:center;gap:10px">
+              <span style="font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:999px;background:#f5ecd9;color:#8a5a16;border:1px solid #e8d9b8">Customer saves {{ savingsPct }}%</span>
+              <span style="font-size:24px;font-weight:700;color:#1c104c;font-variant-numeric:tabular-nums">{{ priceStr }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ═════════════════ SCREEN 2 · POS SELL FLOW ═════════════════ -->
+  <sc-if value="{{ isPos }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="POS — sell flow" style="max-width:1240px;margin:0 auto;padding:22px 24px;display:grid;grid-template-columns:1fr 372px;gap:20px;align-items:start">
+
+      <!-- Left: package grid -->
+      <div style="min-width:0">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+          <span style="font-size:12.5px;font-weight:600;padding:6px 14px;border-radius:999px;color:#8b6b4a;background:#f0ede9;border:1px solid #e3e0db">Services</span>
+          <span style="font-size:12.5px;font-weight:600;padding:6px 14px;border-radius:999px;color:#8b6b4a;background:#f0ede9;border:1px solid #e3e0db">Products</span>
+          <span style="font-size:12.5px;font-weight:600;padding:6px 14px;border-radius:999px;color:#f5f0e8;background:#1c104c;border:1px solid #1c104c">Packages · {{ posCount }}</span>
+          <span style="margin-left:auto;font-size:11.5px;color:#8b6b4a">Selling a package requires a customer — <b style="color:#44403c">Ananya Sharma</b> selected</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <sc-for list="{{ posCards }}" as="p" hint-placeholder-count="4">
+            <button onClick="{{ p.onClick }}" style="background:#ffffff;border:1px solid #e3e0db;border-radius:10px;padding:14px;text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:8px;min-width:0" style-hover="border-color:#1c104c;box-shadow:0 1px 2px rgba(20,14,10,0.06)">
+              <div style="display:flex;align-items:center;gap:8px">
+                <span style="font-size:14px;font-weight:600;color:#1c1917;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ p.name }}</span>
+                <sc-if value="{{ p.isNew }}" hint-placeholder-val="{{ false }}">
+                  <span style="font-size:10px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;padding:2px 8px;border-radius:999px;background:#dcfce7;color:#166534;border:1px solid #bbf7d0">Just published</span>
+                </sc-if>
+              </div>
+              <span style="font-size:12px;color:#8b6b4a;line-height:1.5">{{ p.summary }}</span>
+              <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                <span style="font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:999px;background:#f0ede9;color:#44403c">{{ p.validityStr }}</span>
+                <sc-if value="{{ p.isShared }}" hint-placeholder-val="{{ false }}">
+                  <span style="font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:999px;background:#dbeafe;color:#1e40af">Shareable</span>
+                </sc-if>
+                <sc-if value="{{ p.needsConfig }}" hint-placeholder-val="{{ false }}">
+                  <span style="font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:999px;background:#f5ecd9;color:#8a5a16">Choices at purchase</span>
+                </sc-if>
+              </div>
+              <div style="display:flex;align-items:baseline;justify-content:space-between;border-top:1px solid #eeece9;padding-top:8px;margin-top:2px">
+                <span style="font-size:11.5px;color:#a8a29e;text-decoration:line-through;font-variant-numeric:tabular-nums">worth {{ p.valueStr }}</span>
+                <span style="font-size:16px;font-weight:700;color:#1c104c;font-variant-numeric:tabular-nums">{{ p.priceStr }}</span>
+              </div>
+            </button>
+          </sc-for>
+        </div>
+      </div>
+
+      <!-- Right: cart (visually unchanged from today's CartSidebar) -->
+      <div style="background:#ffffff;border:1px solid #e3e0db;border-radius:10px;display:flex;flex-direction:column;overflow:hidden">
+        <div style="padding:13px 14px;border-bottom:1px solid #eeece9;display:flex;align-items:center;justify-content:space-between">
+          <span style="font-size:14px;font-weight:600;color:#1c1917">Cart</span>
+          <span style="font-size:11.5px;color:#8b6b4a">{{ cartCount }} items</span>
+        </div>
+        <div style="padding:10px 14px;border-bottom:1px solid #eeece9;display:flex;align-items:center;gap:10px">
+          <span style="width:30px;height:30px;border-radius:999px;background:#1c104c;color:#f5f0e8;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">AS</span>
+          <div style="flex:1;min-width:0">
+            <p style="margin:0;font-size:13px;font-weight:600;color:#1c1917">Ananya Sharma</p>
+            <p style="margin:0;font-size:11px;color:#8b6b4a;font-variant-numeric:tabular-nums">+91 98201 44552</p>
+          </div>
+          <span style="font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:999px;background:#ece8f5;color:#1c104c">4 active packages</span>
+        </div>
+        <div style="padding:10px 12px;display:flex;flex-direction:column;gap:8px;min-height:120px">
+          <sc-for list="{{ cartLines }}" as="l" hint-placeholder-count="2">
+            <div style="border:1px solid #e3e0db;border-left:3px solid {{ l.rail }};border-radius:8px;padding:9px 10px;background:#ffffff">
+              <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+                <p style="margin:0;font-size:13px;font-weight:500;color:#1c1917;line-height:1.3">{{ l.name }}</p>
+                <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+                  <span style="font-size:13px;font-weight:600;color:#1c1917;font-variant-numeric:tabular-nums">{{ l.priceStr }}</span>
+                  <button onClick="{{ l.onRemove }}" style="border:none;background:none;cursor:pointer;color:#a8a29e;font-size:14px;line-height:1;padding:0" style-hover="color:#991b1b">×</button>
+                </div>
+              </div>
+              <p style="margin:3px 0 0;font-size:11px;color:#8b6b4a">{{ l.meta }}</p>
+              <sc-if value="{{ l.hasChosen }}" hint-placeholder-val="{{ false }}">
+                <p style="margin:3px 0 0;font-size:11px;color:#1c104c;background:#ece8f5;border-radius:5px;padding:3px 7px;display:inline-block">Chosen: {{ l.chosen }}</p>
+              </sc-if>
+            </div>
+          </sc-for>
+        </div>
+        <div style="padding:12px 14px;border-top:1px solid #eeece9;display:flex;flex-direction:column;gap:8px;background:#fcfbfa">
+          <div style="display:flex;justify-content:space-between">
+            <span style="font-size:12.5px;color:#44403c">Subtotal</span>
+            <span style="font-size:12.5px;color:#1c1917;font-variant-numeric:tabular-nums">{{ cartSubtotalStr }}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between">
+            <span style="font-size:14px;font-weight:600;color:#1c1917">To pay</span>
+            <span style="font-size:16px;font-weight:700;color:#1c104c;font-variant-numeric:tabular-nums">{{ cartTotalStr }}</span>
+          </div>
+          <button onClick="{{ onCheckout }}" style="height:38px;border:none;border-radius:6px;background:#1c104c;color:#f5f0e8;font-size:13.5px;font-weight:600;cursor:pointer;width:100%" style-hover="background:#2a1865">Checkout</button>
+          <p style="margin:0;font-size:10.5px;color:#8b6b4a;text-align:center">Payment, GST split-billing &amp; receipts unchanged from today</p>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ═════════════════ SCREEN 3 · CUSTOMER VIEW ═════════════════ -->
+  <sc-if value="{{ isCustomer }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="Customer — active packages &amp; redemption" style="max-width:1020px;margin:0 auto;padding:22px 24px;display:flex;flex-direction:column;gap:16px">
+
+      <div style="background:#ffffff;border:1px solid #e3e0db;border-radius:10px;padding:14px 16px;display:flex;align-items:center;gap:12px">
+        <span style="width:40px;height:40px;border-radius:999px;background:#1c104c;color:#f5f0e8;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700">AS</span>
+        <div style="flex:1">
+          <p style="margin:0;font-size:16px;font-weight:600;color:#1c1917">Ananya Sharma</p>
+          <p style="margin:0;font-size:12px;color:#8b6b4a;font-variant-numeric:tabular-nums">+91 98201 44552 · customer since Mar 2024</p>
+        </div>
+        <span style="font-size:11.5px;font-weight:600;padding:4px 12px;border-radius:999px;background:#ece8f5;color:#1c104c">4 active packages</span>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+
+        <!-- Counted classic -->
+        <div style="background:#ffffff;border:1px solid #e3e0db;border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+            <p style="margin:0;font-size:14px;font-weight:600;color:#1c1917">Gentlemen's 10</p>
+            <span style="font-size:10.5px;font-weight:600;padding:2px 9px;border-radius:999px;background:#dcfce7;color:#166534;border:1px solid #bbf7d0">122d left</span>
+          </div>
+          <div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+              <span style="font-size:12.5px;color:#44403c">Haircut &amp; Style</span>
+              <span style="font-size:12px;font-weight:600;color:#1c1917;font-variant-numeric:tabular-nums">4 of 10 used</span>
+            </div>
+            <div style="display:flex;gap:4px">
+              <span style="flex:1;height:7px;border-radius:99px;background:#1c104c"></span>
+              <span style="flex:1;height:7px;border-radius:99px;background:#1c104c"></span>
+              <span style="flex:1;height:7px;border-radius:99px;background:#1c104c"></span>
+              <span style="flex:1;height:7px;border-radius:99px;background:#1c104c"></span>
+              <span style="flex:1;height:7px;border-radius:99px;background:#e3e0db"></span>
+              <span style="flex:1;height:7px;border-radius:99px;background:#e3e0db"></span>
+              <span style="flex:1;height:7px;border-radius:99px;background:#e3e0db"></span>
+              <span style="flex:1;height:7px;border-radius:99px;background:#e3e0db"></span>
+              <span style="flex:1;height:7px;border-radius:99px;background:#e3e0db"></span>
+              <span style="flex:1;height:7px;border-radius:99px;background:#e3e0db"></span>
+            </div>
+          </div>
+          <p style="margin:0;font-size:11px;color:#8b6b4a">Personal · expires 12 Oct 2026</p>
+        </div>
+
+        <!-- Choices locked at purchase -->
+        <div style="background:#ffffff;border:1px solid #e3e0db;border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+            <p style="margin:0;font-size:14px;font-weight:600;color:#1c1917">Spa Day Duo</p>
+            <span style="font-size:10.5px;font-weight:600;padding:2px 9px;border-radius:999px;background:#fef3c7;color:#92400e;border:1px solid #fde68a">18d left</span>
+          </div>
+          <p style="margin:0;font-size:11px;color:#8b6b4a">Facials locked at purchase:</p>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span style="font-size:12.5px;color:#44403c">Hydra Facial</span>
+              <span style="font-size:11px;font-weight:600;color:#166534">1 of 1 used ✓</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span style="font-size:12.5px;color:#44403c">Gold Facial</span>
+              <span style="font-size:11px;font-weight:600;color:#44403c;font-variant-numeric:tabular-nums">0 of 1</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span style="font-size:12.5px;color:#44403c">Classic Pedicure</span>
+              <span style="font-size:11px;font-weight:600;color:#44403c;font-variant-numeric:tabular-nums">0 of 1</span>
+            </div>
+          </div>
+          <p style="margin:0;font-size:11px;color:#8b6b4a">Personal · expires 30 Jun 2026</p>
+        </div>
+
+        <!-- Mixed: choice each visit + unlimited + bonus -->
+        <div style="background:#ffffff;border:1px solid #e3e0db;border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+            <p style="margin:0;font-size:14px;font-weight:600;color:#1c1917">Bridal Radiance — 3 Months</p>
+            <span style="font-size:10.5px;font-weight:600;padding:2px 9px;border-radius:999px;background:#fef3c7;color:#92400e;border:1px solid #fde68a">23d left</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span style="font-size:12.5px;color:#44403c">Facial of choice <span style="color:#8b6b4a">(picks fresh each visit)</span></span>
+              <span style="font-size:11px;font-weight:600;color:#44403c;font-variant-numeric:tabular-nums">1 of 3 · last: Hydra</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span style="font-size:12.5px;color:#44403c">Hair Spa</span>
+              <span style="font-size:11px;font-weight:600;color:#44403c;font-variant-numeric:tabular-nums">0 of 1</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span style="font-size:12.5px;color:#44403c">Eyebrow Threading</span>
+              <span style="font-size:11px;font-weight:600;color:#1e40af">∞ unlimited · 9 visits · 1/day</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span style="font-size:12.5px;color:#44403c">Bonus: Argan Hair Serum</span>
+              <span style="font-size:11px;font-weight:600;color:#8a5a16">free · delivered ✓</span>
+            </div>
+          </div>
+          <p style="margin:0;font-size:11px;color:#8b6b4a">Personal · expires 5 Jul 2026</p>
+        </div>
+
+        <!-- Credit wallet -->
+        <div style="background:#ffffff;border:1px solid #e3e0db;border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+            <p style="margin:0;font-size:14px;font-weight:600;color:#1c1917">Beauty Wallet 5000</p>
+            <span style="font-size:10.5px;font-weight:600;padding:2px 9px;border-radius:999px;background:#dcfce7;color:#166534;border:1px solid #bbf7d0">287d left</span>
+          </div>
+          <div>
+            <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">
+              <span style="font-size:18px;font-weight:700;color:#1c1917;font-variant-numeric:tabular-nums">₹3,250</span>
+              <span style="font-size:11.5px;color:#8b6b4a;font-variant-numeric:tabular-nums">of ₹5,000 remaining</span>
+            </div>
+            <div style="height:8px;border-radius:99px;background:#eeece9;overflow:hidden">
+              <div style="width:65%;height:100%;border-radius:99px;background:#c9a96e"></div>
+            </div>
+          </div>
+          <p style="margin:0;font-size:11px;color:#8b6b4a">Shared — any registered customer can spend · expires 26 Mar 2027</p>
+        </div>
+      </div>
+
+      <!-- Bill examples — unchanged components -->
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <p style="margin:6px 0 0;font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#8b6b4a">On the bill — existing components, unchanged</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <div style="background:#ffffff;border:1px solid #e3e0db;border-left:3px solid #1c104c;border-radius:8px;padding:10px 12px">
+              <div style="display:flex;justify-content:space-between;gap:8px">
+                <p style="margin:0;font-size:13px;font-weight:500;color:#1c1917">Bridal Radiance — 3 Months</p>
+                <p style="margin:0;font-size:13px;font-weight:600;color:#1c1917;font-variant-numeric:tabular-nums">₹6,999</p>
+              </div>
+              <p style="margin:3px 0 0;font-size:11px;color:#8b6b4a">Package sale · expires 10 Sep 2026</p>
+            </div>
+            <p style="margin:0;font-size:11px;color:#8b6b4a">Navy rail = paid now (package sale line)</p>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <div style="background:#ffffff;border:1px solid #e3e0db;border-left:3px solid #c9a96e;border-radius:8px;padding:10px 12px">
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+                <p style="margin:0;font-size:13px;font-weight:500;color:#1c1917">Hydra Facial</p>
+                <div style="display:flex;align-items:center;gap:8px">
+                  <p style="margin:0;font-size:12.5px;color:#a8a29e;text-decoration:line-through;font-variant-numeric:tabular-nums">₹2,500</p>
+                  <span style="font-size:10.5px;font-weight:500;padding:2px 9px;border-radius:999px;border:1px solid #e3e0db;color:#8b6b4a">↩ Undo</span>
+                </div>
+              </div>
+              <p style="margin:3px 0 0;font-size:11px;color:#8a5a16">Paid via Bridal Radiance · Facial choice 2 of 3</p>
+            </div>
+            <p style="margin:0;font-size:11px;color:#8b6b4a">Gold rail = already paid (redemption, with undo)</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ───────────────── Service picker modal ───────────────── -->
+  <sc-if value="{{ pickerOpen }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closePicker }}" style="position:fixed;inset:0;background:rgba(20,14,10,0.48);z-index:50;animation:fadeIn 120ms ease-out"></div>
+    <div style="position:fixed;top:9vh;left:50%;transform:translateX(-50%);width:400px;max-height:72vh;overflow:auto;background:#ffffff;border-radius:12px;box-shadow:0 8px 20px rgba(20,14,10,0.18);z-index:51;animation:sheetIn 160ms ease-out">
+      <div style="position:sticky;top:0;background:#ffffff;display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid #eeece9">
+        <span style="font-size:14px;font-weight:600;color:#1c1917">Select a service or product</span>
+        <button onClick="{{ closePicker }}" style="border:none;background:none;cursor:pointer;color:#8b6b4a;font-size:18px;line-height:1;padding:2px">×</button>
+      </div>
+      <div style="padding:8px 8px 12px">
+        <sc-for list="{{ pickerGroups }}" as="g" hint-placeholder-count="3">
+          <div>
+            <p style="margin:8px 8px 4px;font-size:10.5px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#8b6b4a">{{ g.cat }}</p>
+            <sc-for list="{{ g.items }}" as="s" hint-placeholder-count="3">
+              <button onClick="{{ s.onPick }}" style="display:flex;justify-content:space-between;align-items:center;width:100%;border:none;background:none;cursor:pointer;padding:8px 10px;border-radius:6px;text-align:left" style-hover="background:#f5f5f4">
+                <span style="font-size:13px;color:#1c1917">{{ s.name }}</span>
+                <span style="font-size:12.5px;color:#8b6b4a;font-variant-numeric:tabular-nums">{{ s.priceStr }}</span>
+              </button>
+            </sc-for>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ───────────────── Configure & Sell sheet ───────────────── -->
+  <sc-if value="{{ sheetOpen }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeSheet }}" style="position:fixed;inset:0;background:rgba(20,14,10,0.48);z-index:40;animation:fadeIn 120ms ease-out"></div>
+    <div style="position:fixed;top:0;right:0;bottom:0;width:440px;background:#ffffff;z-index:41;box-shadow:-8px 0 24px rgba(20,14,10,0.14);display:flex;flex-direction:column;animation:sheetIn 200ms cubic-bezier(0.22,1.2,0.36,1)">
+      <div style="padding:16px 20px;border-bottom:1px solid #eeece9">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <span style="font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#8b6b4a">Configure &amp; sell</span>
+          <button onClick="{{ closeSheet }}" style="border:none;background:none;cursor:pointer;color:#8b6b4a;font-size:18px;line-height:1;padding:2px">×</button>
+        </div>
+        <p style="margin:6px 0 8px;font-family:'Instrument Serif',serif;font-size:23px;color:#1c1917;line-height:1.15">{{ sheetName }}</p>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <span style="font-size:10.5px;font-weight:600;padding:3px 9px;border-radius:999px;background:#f0ede9;color:#44403c">For Ananya Sharma</span>
+          <span style="font-size:10.5px;font-weight:600;padding:3px 9px;border-radius:999px;background:#f0ede9;color:#44403c;font-variant-numeric:tabular-nums">Valid till {{ sheetExpiry }}</span>
+          <span style="font-size:10.5px;font-weight:600;padding:3px 9px;border-radius:999px;background:#f0ede9;color:#44403c">{{ sheetShare }}</span>
+        </div>
+      </div>
+      <div style="flex:1;overflow:auto;padding:14px 20px;display:flex;flex-direction:column;gap:10px">
+        <sc-for list="{{ sheetLines }}" as="ln" hint-placeholder-count="3">
+          <div style="border:1px solid #e3e0db;border-radius:9px;padding:10px 12px;display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:10px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;padding:2px 8px;border-radius:999px;white-space:nowrap;background:{{ ln.chipBg }};color:{{ ln.chipFg }}">{{ ln.chipLabel }}</span>
+              <span style="flex:1;min-width:0;font-size:12.5px;font-weight:500;color:#1c1917">{{ ln.text }}</span>
+            </div>
+            <sc-if value="{{ ln.isPicker }}" hint-placeholder-val="{{ false }}">
+              <p style="margin:0;font-size:11.5px;font-weight:600;color:{{ ln.counterColor }}">{{ ln.counter }}</p>
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <sc-for list="{{ ln.options }}" as="o" hint-placeholder-count="3">
+                  <button onClick="{{ o.onToggle }}" style="display:flex;align-items:center;gap:10px;width:100%;border:1px solid {{ o.border }};background:{{ o.bg }};border-radius:7px;padding:8px 10px;cursor:pointer;text-align:left">
+                    <span style="width:16px;height:16px;border-radius:4px;border:1.5px solid {{ o.markBorder }};background:{{ o.markBg }};color:#f5f0e8;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0">{{ o.mark }}</span>
+                    <span style="flex:1;font-size:13px;color:#1c1917">{{ o.name }}</span>
+                    <span style="font-size:12px;color:#8b6b4a;font-variant-numeric:tabular-nums">{{ o.priceStr }}</span>
+                  </button>
+                </sc-for>
+              </div>
+            </sc-if>
+            <sc-if value="{{ ln.hasNote }}" hint-placeholder-val="{{ false }}">
+              <p style="margin:0;font-size:11.5px;color:#8b6b4a;font-style:italic">{{ ln.note }}</p>
+            </sc-if>
+          </div>
+        </sc-for>
+      </div>
+      <div style="padding:14px 20px;border-top:1px solid #eeece9;background:#fcfbfa;display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline">
+          <span style="font-size:13px;color:#44403c">Package price</span>
+          <div style="display:flex;align-items:baseline;gap:8px">
+            <span style="font-size:11.5px;color:#a8a29e;text-decoration:line-through;font-variant-numeric:tabular-nums">{{ sheetWorth }}</span>
+            <span style="font-size:20px;font-weight:700;color:#1c104c;font-variant-numeric:tabular-nums">{{ sheetPrice }}</span>
+          </div>
+        </div>
+        <button onClick="{{ sheetAdd }}" style="height:40px;border:none;border-radius:6px;font-size:14px;font-weight:600;width:100%;background:{{ sheetAddBg }};color:{{ sheetAddFg }};cursor:{{ sheetAddCursor }}">Add to cart — one package line</button>
+        <sc-if value="{{ sheetIncomplete }}" hint-placeholder-val="{{ false }}">
+          <p style="margin:0;font-size:11px;color:#92400e;text-align:center">Pick the remaining options to continue</p>
+        </sc-if>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ───────────────── Toast ───────────────── -->
+  <sc-if value="{{ toastOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1c1917;color:#f5f2ee;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:500;z-index:60;box-shadow:0 8px 20px rgba(20,14,10,0.25);animation:toastIn 160ms ease-out;white-space:nowrap">{{ toastMsg }}</div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  catalog = [
+    { id: 'haircut', name: 'Haircut & Style', price: 500, cat: 'Hair' },
+    { id: 'spa', name: 'Hair Spa', price: 1200, cat: 'Hair' },
+    { id: 'wash', name: 'Wash & Blow Dry', price: 400, cat: 'Hair' },
+    { id: 'color', name: 'Global Hair Color', price: 3500, cat: 'Hair' },
+    { id: 'beard', name: 'Beard Trim', price: 250, cat: 'Hair' },
+    { id: 'gold', name: 'Gold Facial', price: 1800, cat: 'Skin' },
+    { id: 'hydra', name: 'Hydra Facial', price: 2500, cat: 'Skin' },
+    { id: 'fruit', name: 'Fruit Facial', price: 1200, cat: 'Skin' },
+    { id: 'cleanup', name: 'Express Clean-Up', price: 800, cat: 'Skin' },
+    { id: 'detan', name: 'De-Tan Pack', price: 600, cat: 'Skin' },
+    { id: 'mani', name: 'Classic Manicure', price: 600, cat: 'Hands & Feet' },
+    { id: 'pedi', name: 'Classic Pedicure', price: 800, cat: 'Hands & Feet' },
+    { id: 'thread', name: 'Eyebrow Threading', price: 100, cat: 'Threading & Wax' },
+    { id: 'wax', name: 'Full Arms Wax', price: 700, cat: 'Threading & Wax' },
+    { id: 'serum', name: 'Argan Hair Serum 100ml', price: 950, cat: 'Retail' },
+    { id: 'spf', name: 'SPF 50 Sunscreen 50g', price: 650, cat: 'Retail' },
+  ];
+
+  typeMeta = {
+    items:     { label: 'Fixed items',  bg: '#ece8f5', fg: '#1c104c', glyph: '×n', desc: 'Set services & quantities, e.g. 10 × Haircut' },
+    choice:    { label: 'Choice group', bg: '#f5ecd9', fg: '#8a5a16', glyph: '✓',  desc: 'Pick N from a list — at purchase or each visit' },
+    unlimited: { label: 'Unlimited',    bg: '#dbeafe', fg: '#1e40af', glyph: '∞',  desc: 'Unlimited use until expiry, optional daily cap' },
+    pool:      { label: 'Session pool', bg: '#f3e8ff', fg: '#6b21a8', glyph: 'Σ',  desc: 'N visits spendable across listed services' },
+    credit:    { label: 'Credit',       bg: '#dcfce7', fg: '#166534', glyph: '₹',  desc: 'A spendable balance, like a wallet' },
+  };
+
+  posPackages = [
+    { id: 'p1', name: "Gentlemen's 10", validity: '180', shareability: 'owner_only', price: 3999,
+      blocks: [ { type: 'items', bonus: false, rows: [{ svc: 'haircut', qty: '10', price: '500' }] } ] },
+    { id: 'p2', name: 'Spa Day Duo', validity: '60', shareability: 'owner_only', price: 3499,
+      blocks: [
+        { type: 'choice', bonus: false, picks: '2', chooseAt: 'purchase', rows: [{ svc: 'gold', price: '1800' }, { svc: 'hydra', price: '2500' }, { svc: 'fruit', price: '1200' }, { svc: 'detan', price: '600' }] },
+        { type: 'items', bonus: false, rows: [{ svc: 'pedi', qty: '1', price: '800' }] } ] },
+    { id: 'p3', name: 'Any-10 Visit Pool', validity: '120', shareability: 'shared', price: 2999,
+      blocks: [ { type: 'pool', bonus: false, sessions: '10', rows: [{ svc: 'haircut', price: '500' }, { svc: 'wash', price: '400' }, { svc: 'beard', price: '250' }, { svc: 'thread', price: '100' }] } ] },
+    { id: 'p4', name: 'Beauty Wallet 5000', validity: '365', shareability: 'shared', price: 4250,
+      blocks: [ { type: 'credit', bonus: false, amount: '5000', scope: 'any' } ] },
+  ];
+
+  state = {
+    screen: 'builder',
+    notesOpen: true,
+    picker: null,
+    toast: null,
+    nextId: 10,
+    cartSeq: 2,
+    sheet: null,
+    cart: [{ id: 'c1', kind: 'svc', name: 'Haircut & Style', meta: 'Service · Priya · 45 min', price: 500 }],
+    pkg: {
+      name: 'Bridal Radiance — 3 Months',
+      desc: 'Pre-wedding course: facials of choice, hair spa, unlimited threading.',
+      validity: '90', fee: '20', shareability: 'owner_only', autoApply: true, status: 'draft',
+      discount: { mode: 'final', value: '6999' },
+      blocks: [
+        { id: 1, type: 'items', bonus: false, rows: [{ svc: 'spa', qty: '1', price: '1200' }] },
+        { id: 2, type: 'choice', bonus: false, picks: '3', chooseAt: 'visit', rows: [{ svc: 'gold', price: '1800' }, { svc: 'hydra', price: '2500' }, { svc: 'fruit', price: '1200' }] },
+        { id: 3, type: 'unlimited', bonus: false, value: '1500', cap: '1', rows: [{ svc: 'thread' }] },
+        { id: 4, type: 'items', bonus: true, rows: [{ svc: 'serum', qty: '1', price: '950' }] },
+      ],
+    },
+  };
+
+  svc(id) { return this.catalog.find((s) => s.id === id); }
+  num(v) { const n = parseFloat(v); return Number.isFinite(n) ? n : 0; }
+  fmt(n) { return '₹' + Math.round(n).toLocaleString('en-IN'); }
+  trim(n) { return String(Math.round(n * 10) / 10); }
+  avgPrice(rows) { if (!rows.length) return 0; return rows.reduce((s, r) => s + this.num(r.price), 0) / rows.length; }
+
+  blockValue(b) {
+    if (b.type === 'items') return b.rows.reduce((s, r) => s + (this.num(r.qty) || 1) * this.num(r.price), 0);
+    if (b.type === 'choice') return Math.round(this.num(b.picks) * this.avgPrice(b.rows));
+    if (b.type === 'unlimited') return this.num(b.value);
+    if (b.type === 'pool') return Math.round(this.num(b.sessions) * this.avgPrice(b.rows));
+    if (b.type === 'credit') return this.num(b.amount);
+    return 0;
+  }
+
+  blockSummary(b) {
+    const names = (b.rows || []).map((r) => (r.svc ? this.svc(r.svc).name : '…'));
+    if (b.type === 'items') {
+      if (!b.rows.length) return 'Empty — add services';
+      return b.rows.map((r, i) => `${this.num(r.qty) || 1} × ${names[i]}`).join(', ');
+    }
+    if (b.type === 'choice') return `Pick ${this.num(b.picks) || 0} of ${b.rows.length}` + (b.chooseAt === 'visit' ? ' — chosen each visit' : ' — locked at purchase');
+    if (b.type === 'unlimited') return b.rows.length ? `Unlimited ${names.join(', ')}` : 'Unlimited — add services';
+    if (b.type === 'pool') return `${this.num(b.sessions) || 0} sessions across ${b.rows.length} service${b.rows.length === 1 ? '' : 's'}`;
+    if (b.type === 'credit') return `₹${this.num(b.amount).toLocaleString('en-IN')} spendable ${b.scope === 'any' ? 'on anything' : b.scope === 'svc' ? 'on services only' : 'on retail only'}`;
+    return '';
+  }
+
+  chargeableOf(blocks) { return blocks.filter((b) => !b.bonus).reduce((s, b) => s + this.blockValue(b), 0); }
+  bonusOf(blocks) { return blocks.filter((b) => b.bonus).reduce((s, b) => s + this.blockValue(b), 0); }
+
+  discountAmt(chargeable, d) {
+    if (!d || d.value === '' || d.value == null) return 0;
+    const v = this.num(d.value);
+    if (d.mode === 'pct') return (chargeable * v) / 100;
+    if (d.mode === 'flat') return v;
+    return Math.max(0, chargeable - v);
+  }
+
+  priceOf(blocks, d) {
+    const c = this.chargeableOf(blocks);
+    return Math.max(0, Math.round(c - Math.min(this.discountAmt(c, d), c)));
+  }
+
+  setPkg(patch) { this.setState((s) => ({ pkg: { ...s.pkg, ...patch } })); }
+  updateBlock(id, patch) { this.setState((s) => ({ pkg: { ...s.pkg, blocks: s.pkg.blocks.map((b) => (b.id === id ? { ...b, ...patch } : b)) } })); }
+  updateRow(bid, ri, patch) {
+    this.setState((s) => ({ pkg: { ...s.pkg, blocks: s.pkg.blocks.map((b) => (b.id === bid ? { ...b, rows: b.rows.map((r, i) => (i === ri ? { ...r, ...patch } : r)) } : b)) } }));
+  }
+  removeRow(bid, ri) {
+    this.setState((s) => ({ pkg: { ...s.pkg, blocks: s.pkg.blocks.map((b) => (b.id === bid ? { ...b, rows: b.rows.filter((_, i) => i !== ri) } : b)) } }));
+  }
+  addBlock(type) {
+    const base = {
+      items: { type: 'items', bonus: false, rows: [] },
+      choice: { type: 'choice', bonus: false, picks: '2', chooseAt: 'visit', rows: [] },
+      unlimited: { type: 'unlimited', bonus: false, value: '', cap: '', rows: [] },
+      pool: { type: 'pool', bonus: false, sessions: '10', rows: [] },
+      credit: { type: 'credit', bonus: false, amount: '2000', scope: 'any' },
+    }[type];
+    this.setState((s) => ({ nextId: s.nextId + 1, pkg: { ...s.pkg, blocks: [...s.pkg.blocks, { ...base, id: s.nextId }] } }));
+  }
+  applyPick(svcId) {
+    const p = this.state.picker;
+    if (!p) return;
+    const sv = this.svc(svcId);
+    this.setState((s) => ({
+      picker: null,
+      pkg: { ...s.pkg, blocks: s.pkg.blocks.map((b) => {
+        if (b.id !== p.blockId) return b;
+        const fresh = b.type === 'unlimited' ? { svc: svcId } : b.type === 'items' ? { svc: svcId, qty: '1', price: String(sv.price) } : { svc: svcId, price: String(sv.price) };
+        const rows = [...b.rows];
+        if (p.rowIdx === -1) rows.push(fresh); else rows[p.rowIdx] = { ...rows[p.rowIdx], ...fresh };
+        return { ...b, rows };
+      }) },
+    }));
+  }
+  showToast(msg) {
+    this.setState({ toast: msg });
+    clearTimeout(this._tt);
+    this._tt = setTimeout(() => this.setState({ toast: null }), 2800);
+  }
+
+  publishedList() {
+    const s = this.state;
+    const mine = s.pkg.status === 'published'
+      ? [{ id: 'mine', isNew: true, name: s.pkg.name || 'Untitled package', validity: s.pkg.validity, shareability: s.pkg.shareability, price: this.priceOf(s.pkg.blocks, s.pkg.discount), blocks: s.pkg.blocks }]
+      : [];
+    return [...mine, ...this.posPackages];
+  }
+  openSheet(pid) {
+    const p = this.publishedList().find((x) => x.id === pid);
+    if (!p) return;
+    const choices = {};
+    p.blocks.forEach((b, i) => { if (b.type === 'choice' && b.chooseAt === 'purchase') choices[i] = []; });
+    this.setState({ sheet: { pid, choices } });
+  }
+  toggleChoice(bi, svcId, picks) {
+    this.setState((s) => {
+      const ch = { ...s.sheet.choices };
+      const arr = [...(ch[bi] || [])];
+      const ix = arr.indexOf(svcId);
+      if (ix >= 0) arr.splice(ix, 1);
+      else if (arr.length < picks) arr.push(svcId);
+      else if (picks === 1) { arr.length = 0; arr.push(svcId); }
+      ch[bi] = arr;
+      return { sheet: { ...s.sheet, choices: ch } };
+    });
+  }
+  expiryStr(days) {
+    const d = new Date(Date.now() + this.num(days) * 86400000);
+    return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+
+  renderVals() {
+    const s = this.state;
+    const pkg = s.pkg;
+    const navy = '#1c104c', walnut = '#8b6b4a';
+
+    // ── Tabs ──
+    const tabDefs = [
+      { key: 'builder', label: '1 · Builder' },
+      { key: 'pos', label: '2 · Sell at POS' },
+      { key: 'customer', label: '3 · Customer view' },
+    ];
+    const tabs = tabDefs.map((t) => ({
+      label: t.label,
+      bg: s.screen === t.key ? '#ffffff' : 'transparent',
+      fg: s.screen === t.key ? '#1c1917' : walnut,
+      shadow: s.screen === t.key ? '0 1px 2px rgba(20,14,10,0.08)' : 'none',
+      onClick: () => this.setState({ screen: t.key }),
+    }));
+
+    // ── Builder: blocks ──
+    const blocks = pkg.blocks.map((b) => {
+      const meta = this.typeMeta[b.type];
+      const rows = (b.rows || []).map((r, ri) => ({
+        svcName: r.svc ? this.svc(r.svc).name : 'Select service…',
+        svcColor: r.svc ? '#1c1917' : '#a8a29e',
+        qty: r.qty ?? '', price: r.price ?? '',
+        onQty: (e) => this.updateRow(b.id, ri, { qty: e.target.value }),
+        onPrice: (e) => this.updateRow(b.id, ri, { price: e.target.value }),
+        pick: () => this.setState({ picker: { blockId: b.id, rowIdx: ri } }),
+        remove: () => this.removeRow(b.id, ri),
+      }));
+      const est = b.type === 'choice' || b.type === 'pool' ? '≈ ' : '';
+      return {
+        key: b.id,
+        typeLabel: meta.label, chipBg: meta.bg, chipFg: meta.fg,
+        title: this.blockSummary(b),
+        valueStr: est + this.fmt(this.blockValue(b)),
+        bonusLabel: b.bonus ? '★ Free bonus' : 'Bonus?',
+        bonusBg: b.bonus ? '#f5ecd9' : 'transparent',
+        bonusFg: b.bonus ? '#8a5a16' : '#a8a29e',
+        bonusBorder: b.bonus ? '#c9a96e' : '#e3e0db',
+        toggleBonus: () => this.updateBlock(b.id, { bonus: !b.bonus }),
+        remove: () => this.setState((st) => ({ pkg: { ...st.pkg, blocks: st.pkg.blocks.filter((x) => x.id !== b.id) } })),
+        isItems: b.type === 'items', isChoice: b.type === 'choice', isUnlimited: b.type === 'unlimited',
+        isPool: b.type === 'pool', isCredit: b.type === 'credit',
+        hasRows: b.type !== 'credit',
+        rows,
+        addRow: () => this.setState({ picker: { blockId: b.id, rowIdx: -1 } }),
+        picks: b.picks ?? '', onPicks: (e) => this.updateBlock(b.id, { picks: e.target.value }),
+        purchBg: b.chooseAt === 'purchase' ? '#ffffff' : 'transparent',
+        purchFg: b.chooseAt === 'purchase' ? '#1c1917' : walnut,
+        visitBg: b.chooseAt === 'visit' ? '#ffffff' : 'transparent',
+        visitFg: b.chooseAt === 'visit' ? '#1c1917' : walnut,
+        setAtPurchase: () => this.updateBlock(b.id, { chooseAt: 'purchase' }),
+        setAtVisit: () => this.updateBlock(b.id, { chooseAt: 'visit' }),
+        sessions: b.sessions ?? '', onSessions: (e) => this.updateBlock(b.id, { sessions: e.target.value }),
+        value: b.value ?? '', onValue: (e) => this.updateBlock(b.id, { value: e.target.value }),
+        cap: b.cap ?? '', onCap: (e) => this.updateBlock(b.id, { cap: e.target.value }),
+        amount: b.amount ?? '', onAmount: (e) => this.updateBlock(b.id, { amount: e.target.value }),
+        anyBg: b.scope === 'any' ? '#ffffff' : 'transparent', anyFg: b.scope === 'any' ? '#1c1917' : walnut,
+        svcScopeBg: b.scope === 'svc' ? '#ffffff' : 'transparent', svcScopeFg: b.scope === 'svc' ? '#1c1917' : walnut,
+        retailBg: b.scope === 'retail' ? '#ffffff' : 'transparent', retailFg: b.scope === 'retail' ? '#1c1917' : walnut,
+        setScopeAny: () => this.updateBlock(b.id, { scope: 'any' }),
+        setScopeSvc: () => this.updateBlock(b.id, { scope: 'svc' }),
+        setScopeRetail: () => this.updateBlock(b.id, { scope: 'retail' }),
+      };
+    });
+
+    const blockTypes = Object.keys(this.typeMeta).map((k) => ({
+      label: this.typeMeta[k].label, desc: this.typeMeta[k].desc,
+      glyph: this.typeMeta[k].glyph, bg: this.typeMeta[k].bg, fg: this.typeMeta[k].fg,
+      onAdd: () => this.addBlock(k),
+    }));
+
+    // ── Pricing ──
+    const chargeable = this.chargeableOf(pkg.blocks);
+    const bonusVal = this.bonusOf(pkg.blocks);
+    const totalValue = chargeable + bonusVal;
+    const d = pkg.discount;
+    const dAmt = Math.min(this.discountAmt(chargeable, d), chargeable);
+    const price = Math.max(0, Math.round(chargeable - dAmt));
+    const savingsPct = totalValue > 0 ? Math.max(0, Math.round((1 - price / totalValue) * 100)) : 0;
+    const derived = (mode) => {
+      if (!d || d.value === '' || d.value == null) return '';
+      if (d.mode === mode) return d.value;
+      if (chargeable <= 0) return '';
+      if (mode === 'pct') return this.trim((dAmt / chargeable) * 100);
+      if (mode === 'flat') return this.trim(dAmt);
+      return this.trim(chargeable - dAmt);
+    };
+    const discountFields = [
+      { mode: 'pct', label: '% off' },
+      { mode: 'flat', label: '₹ off' },
+      { mode: 'final', label: 'Final price ₹' },
+    ].map((f) => ({
+      label: f.label,
+      labelColor: d && d.mode === f.mode && d.value !== '' ? navy : walnut,
+      labelWeight: d && d.mode === f.mode && d.value !== '' ? '600' : '500',
+      value: derived(f.mode),
+      onChange: (e) => this.setPkg({ discount: e.target.value === '' ? null : { mode: f.mode, value: e.target.value } }),
+    }));
+
+    // ── Picker ──
+    const cats = [...new Set(this.catalog.map((c) => c.cat))];
+    const pickerGroups = s.picker ? cats.map((cat) => ({
+      cat,
+      items: this.catalog.filter((c) => c.cat === cat).map((c) => ({
+        name: c.name, priceStr: this.fmt(c.price), onPick: () => this.applyPick(c.id),
+      })),
+    })) : [];
+
+    // ── POS ──
+    const published = this.publishedList();
+    const posCards = published.map((p) => {
+      const worth = this.chargeableOf(p.blocks) + this.bonusOf(p.blocks);
+      return {
+        name: p.name, isNew: !!p.isNew,
+        summary: p.blocks.map((b) => (b.bonus ? 'Free: ' : '') + this.blockSummary(b)).join('  ·  '),
+        validityStr: p.validity + ' days',
+        isShared: p.shareability === 'shared',
+        needsConfig: p.blocks.some((b) => b.type === 'choice' && b.chooseAt === 'purchase'),
+        valueStr: this.fmt(worth), priceStr: this.fmt(p.price),
+        onClick: () => this.openSheet(p.id),
+      };
+    });
+
+    // ── Sheet ──
+    const sheetPkg = s.sheet ? published.find((x) => x.id === s.sheet.pid) : null;
+    let sheetLines = [], sheetName = '', sheetExpiry = '', sheetShare = '', sheetWorth = '', sheetPrice = '', canAdd = false;
+    if (sheetPkg) {
+      sheetName = sheetPkg.name;
+      sheetExpiry = this.expiryStr(sheetPkg.validity);
+      sheetShare = sheetPkg.shareability === 'shared' ? 'Shareable' : 'Personal';
+      sheetWorth = this.fmt(this.chargeableOf(sheetPkg.blocks) + this.bonusOf(sheetPkg.blocks));
+      sheetPrice = this.fmt(sheetPkg.price);
+      let allPicked = true;
+      sheetLines = sheetPkg.blocks.map((b, bi) => {
+        const meta = this.typeMeta[b.type];
+        const isPicker = b.type === 'choice' && b.chooseAt === 'purchase';
+        const picksN = this.num(b.picks) || 0;
+        const sel = (s.sheet.choices[bi] || []);
+        if (isPicker && sel.length !== picksN) allPicked = false;
+        let note = '';
+        if (b.type === 'choice' && b.chooseAt === 'visit') note = 'Customer chooses fresh at each visit — nothing to lock now.';
+        if (b.type === 'unlimited') note = 'No configuration — usable on every visit' + (b.cap ? ` (max ${b.cap}/day).` : '.');
+        if (b.bonus) note = (note ? note + ' ' : '') + 'Included free — not charged.';
+        return {
+          chipLabel: meta.label, chipBg: meta.bg, chipFg: meta.fg,
+          text: this.blockSummary(b),
+          isPicker,
+          counter: `${sel.length} of ${picksN} selected`,
+          counterColor: sel.length === picksN ? '#166534' : '#92400e',
+          options: isPicker ? b.rows.map((r) => {
+            const selOn = sel.includes(r.svc);
+            return {
+              name: this.svc(r.svc).name, priceStr: this.fmt(this.num(r.price)),
+              border: selOn ? navy : '#e3e0db', bg: selOn ? '#ece8f5' : '#ffffff',
+              markBorder: selOn ? navy : '#cfcac3', markBg: selOn ? navy : '#ffffff',
+              mark: selOn ? '✓' : '',
+              onToggle: () => this.toggleChoice(bi, r.svc, picksN),
+            };
+          }) : [],
+          hasNote: !!note, note,
+        };
+      });
+      canAdd = allPicked;
+    }
+
+    // ── Cart ──
+    const cartLines = s.cart.map((l) => ({
+      name: l.name, meta: l.meta, priceStr: this.fmt(l.price),
+      rail: l.kind === 'pkg' ? navy : '#e3e0db',
+      hasChosen: !!l.chosen, chosen: l.chosen || '',
+      onRemove: () => this.setState((st) => ({ cart: st.cart.filter((x) => x.id !== l.id) })),
+    }));
+    const cartTotal = s.cart.reduce((sum, l) => sum + l.price, 0);
+
+    return {
+      // chrome
+      tabs,
+      notesOpen: s.notesOpen,
+      notesLabel: s.notesOpen ? 'Hide design notes' : 'Design notes',
+      toggleNotes: () => this.setState({ notesOpen: !s.notesOpen }),
+      isBuilder: s.screen === 'builder', isPos: s.screen === 'pos', isCustomer: s.screen === 'customer',
+
+      // builder left
+      pkgName: pkg.name, onName: (e) => this.setPkg({ name: e.target.value }),
+      pkgDesc: pkg.desc, onDesc: (e) => this.setPkg({ desc: e.target.value }),
+      pkgValidity: pkg.validity, onValidity: (e) => this.setPkg({ validity: e.target.value }),
+      pkgFee: pkg.fee, onFee: (e) => this.setPkg({ fee: e.target.value }),
+      ownerBg: pkg.shareability === 'owner_only' ? '#ffffff' : 'transparent',
+      ownerFg: pkg.shareability === 'owner_only' ? '#1c1917' : walnut,
+      ownerShadow: pkg.shareability === 'owner_only' ? '0 1px 2px rgba(20,14,10,0.08)' : 'none',
+      sharedBg: pkg.shareability === 'shared' ? '#ffffff' : 'transparent',
+      sharedFg: pkg.shareability === 'shared' ? '#1c1917' : walnut,
+      sharedShadow: pkg.shareability === 'shared' ? '0 1px 2px rgba(20,14,10,0.08)' : 'none',
+      setOwnerOnly: () => this.setPkg({ shareability: 'owner_only' }),
+      setShared: () => this.setPkg({ shareability: 'shared' }),
+      shareHint: pkg.shareability === 'shared' ? 'Any registered customer can redeem from this package.' : 'Only the buyer can redeem.',
+      autoBg: pkg.autoApply ? navy : '#cfcac3',
+      autoLeft: pkg.autoApply ? '18px' : '2px',
+      toggleAuto: () => this.setPkg({ autoApply: !pkg.autoApply }),
+      statusLabel: pkg.status === 'published' ? 'Published' : 'Draft',
+      statusBg: pkg.status === 'published' ? '#dcfce7' : '#f0ede9',
+      statusFg: pkg.status === 'published' ? '#166534' : '#44403c',
+      statusBorder: pkg.status === 'published' ? '#bbf7d0' : '#e3e0db',
+      publishLabel: pkg.status === 'published' ? 'View in POS →' : 'Publish to POS',
+      publishHint: pkg.status === 'published'
+        ? 'Live — this package is now sellable in the POS tab.'
+        : 'Publishing makes it sellable. Existing sales always keep the snapshot they were sold with.',
+      onPublish: () => {
+        if (pkg.status === 'published') { this.setState({ screen: 'pos' }); return; }
+        if (!pkg.name.trim()) { this.showToast('Give the package a name first'); return; }
+        if (!pkg.blocks.length) { this.showToast('Add at least one block'); return; }
+        this.setPkg({ status: 'published' });
+        this.showToast('Published — now sellable in the POS tab');
+      },
+
+      // builder right
+      blockCount: String(pkg.blocks.length) + (pkg.blocks.length === 1 ? ' block' : ' blocks'),
+      blocks, blockTypes,
+      totalValueStr: this.fmt(totalValue),
+      hasBonus: bonusVal > 0,
+      bonusValueStr: this.fmt(bonusVal),
+      discountFields,
+      priceStr: this.fmt(price),
+      savingsPct: String(savingsPct),
+
+      // picker
+      pickerOpen: !!s.picker,
+      closePicker: () => this.setState({ picker: null }),
+      pickerGroups,
+
+      // pos
+      posCount: String(published.length),
+      posCards,
+      sheetOpen: !!s.sheet,
+      closeSheet: () => this.setState({ sheet: null }),
+      sheetName, sheetExpiry, sheetShare, sheetWorth, sheetPrice, sheetLines,
+      sheetAddBg: canAdd ? navy : '#e3e0db',
+      sheetAddFg: canAdd ? '#f5f0e8' : '#a8a29e',
+      sheetAddCursor: canAdd ? 'pointer' : 'not-allowed',
+      sheetIncomplete: !!sheetPkg && !canAdd,
+      sheetAdd: () => {
+        if (!canAdd || !sheetPkg) return;
+        const chosenNames = [];
+        sheetPkg.blocks.forEach((b, bi) => {
+          (s.sheet.choices[bi] || []).forEach((id) => chosenNames.push(this.svc(id).name));
+        });
+        const line = {
+          id: 'c' + s.cartSeq, kind: 'pkg', name: sheetPkg.name,
+          meta: 'Package · expires ' + this.expiryStr(sheetPkg.validity),
+          chosen: chosenNames.join(', ') || null,
+          price: sheetPkg.price,
+        };
+        this.setState((st) => ({ cart: [...st.cart, line], cartSeq: st.cartSeq + 1, sheet: null }));
+        this.showToast('Added to cart as a single package line');
+      },
+
+      // cart
+      cartLines,
+      cartCount: String(s.cart.length),
+      cartSubtotalStr: this.fmt(cartTotal),
+      cartTotalStr: this.fmt(cartTotal),
+      onCheckout: () => this.showToast('Opens the existing PaymentModal — payment flow is unchanged'),
+
+      // toast
+      toastOpen: !!s.toast,
+      toastMsg: s.toast || '',
+    };
+  }
+}
+</script>
+</body>
+</html>

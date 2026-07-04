@@ -251,7 +251,7 @@ git commit -m "feat(fonts): self-host Inter + Instrument Serif"
 
 ```css
 /* ────────────────────────────────────────────────────────────────
-   SalonOS design tokens — V2
+   Aasan design tokens — V2
    Single source of truth. Do not add raw hex literals anywhere
    else in the codebase. Lint enforces this.
    ──────────────────────────────────────────────────────────────── */
@@ -1080,7 +1080,7 @@ git commit -m "feat(ui): V2 Input with label/hint/error/addons"
 - Create: `frontend/src/components/ui/currency-input.tsx`
 - Create: `frontend/src/components/ui/__tests__/currency-input.test.tsx`
 
-**Why:** All money in SalonOS is paise (integers). Every form that takes money needs the paise↔rupee conversion in one place. This is a new primitive — no V1 equivalent.
+**Why:** All money in Aasan is paise (integers). Every form that takes money needs the paise↔rupee conversion in one place. This is a new primitive — no V1 equivalent.
 
 - [ ] **Step 1: Write failing tests**
 
@@ -1146,7 +1146,7 @@ type Props = Omit<React.ComponentProps<typeof Input>, "value" | "onChange" | "le
 
 /**
  * Displays a paise integer as a rupees decimal and normalises back on change.
- * All money in SalonOS is stored as paise; this is the only place rupees↔paise
+ * All money in Aasan is stored as paise; this is the only place rupees↔paise
  * conversion should live in forms.
  */
 export const CurrencyInput = React.forwardRef<HTMLInputElement, Props>(

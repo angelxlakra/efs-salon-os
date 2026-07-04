@@ -67,6 +67,7 @@
   --shadow-focus:             var(--shadow-focus);
 
   /* Font families */
+  --font-brand:               var(--font-brand);
   --font-sans:                var(--font-body);
   --font-display:             var(--font-display);
   --font-mono:                var(--font-mono);

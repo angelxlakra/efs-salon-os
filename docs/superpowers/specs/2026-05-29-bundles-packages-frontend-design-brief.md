@@ -1,14 +1,14 @@
-# Frontend Design Brief — Bundles & Session Packages (SalonOS Sub-Project A)
+# Frontend Design Brief — Bundles & Session Packages (Aasan Sub-Project A)
 
-**Audience:** A separate design-focused Claude session (claude.ai/design) that already has the SalonOS frontend codebase and design system loaded.
+**Audience:** A separate design-focused Claude session (claude.ai/design) that already has Aasan frontend codebase and design system loaded.
 **Purpose:** Brainstorm visual treatments, layouts, micro-interactions, and component behaviors for the upcoming "Packages" feature before the engineering spec is finalized.
 **Hand-off path:** Read this entire brief, then begin proposing visual approaches for the screens listed in Section 6.
 
 ---
 
-## 1. Context: what SalonOS is
+## 1. Context: what Aasan is
 
-SalonOS is a **local-first salon management system** used daily by non-technical staff in a real unisex beauty salon. It runs on the local LAN behind an Nginx reverse proxy, served by a Next.js 16 + React 19 + TypeScript frontend talking to a FastAPI backend over PostgreSQL 15.
+Aasan is a **local-first salon management system** used daily by non-technical staff in a real unisex beauty salon. It runs on the local LAN behind an Nginx reverse proxy, served by a Next.js 16 + React 19 + TypeScript frontend talking to a FastAPI backend over PostgreSQL 15.
 
 **Users you are designing for:**
 
@@ -180,7 +180,7 @@ You don't need to design around this — it's just the backend's shape so you un
 
 ## 5. Open visual / interaction questions (THE BRAINSTORM)
 
-This is where I want your creative input. For each question, propose **2–3 distinct approaches** with sketches/mockups (text-described is fine; visual is better), then recommend one with reasoning grounded in the SalonOS design system (density, primitives, tabular numerals, copper accent) and the user contexts above (tablet POS, desktop admin).
+This is where I want your creative input. For each question, propose **2–3 distinct approaches** with sketches/mockups (text-described is fine; visual is better), then recommend one with reasoning grounded in Aasan design system (density, primitives, tabular numerals, copper accent) and the user contexts above (tablet POS, desktop admin).
 
 ### Q-VIS-1 — The "Build Your Own Package" form (Owner desktop)
 
